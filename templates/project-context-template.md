@@ -17,42 +17,42 @@
 ### Этапы разработки
 
 #### Этап 0: Концепция
-- **Файл**: `.madspec/concept.md`
+- **Файл**: `.madspec/<BRANCH>/concept.md`
 - **Статус**: [Не начат / В процессе / Завершен]
 
 #### Этап 1: UI Дизайн
-- **Файл**: `.madspec/ui-design.md`
+- **Файл**: `.madspec/<BRANCH>/ui-design.md`
 - **Статус**: [Не начат / В процессе / Завершен]
 
 #### Этап 2: Технологический стек
-- **Файл**: `.madspec/tech-stack.md`
+- **Файл**: `.madspec/<BRANCH>/tech-stack.md`
 - **Статус**: [Не начат / В процессе / Завершен]
 
 #### Этап 3: Архитектура
-- **Файл**: `.madspec/architecture.md`
+- **Файл**: `.madspec/<BRANCH>/architecture.md`
 - **Статус**: [Не начат / В процессе / Завершен]
 
 #### Этап 3.5: Деплой
-- **Файл**: `.madspec/deployment.md`
+- **Файл**: `.madspec/<BRANCH>/deployment.md`
 - **Статус**: [Не начат / В процессе / Завершен]
 
 #### Этап 4: План реализации
-- **Файл**: `.madspec/implementation-plan.md`
+- **Файл**: `.madspec/<BRANCH>/implementation-plan.md`
 - **Статус**: [Не начат / В процессе / Завершен]
 - **Контексты шагов**: См. раздел "Шаги реализации" ниже
 
 #### Этап 5: Реализация
-- **Файл**: [шаги в директории `.madspec/steps/`]
+- **Файл**: [шаги в директории `.madspec/<BRANCH>/steps/`]
 - **Статус**: [Не начат / В процессе / Завершен]
 - **Текущий шаг**: [step-NN-name или N/A]
 - **Прогресс**: [X/Y шагов завершено]
 
 #### Этап 6: Аудит безопасности
-- **Файл**: `.madspec/security-audit.md`
+- **Файл**: `.madspec/<BRANCH>/security-audit.md`
 - **Статус**: [Не начат / В процессе / Завершен]
 
 #### Этап 7: Обзор кода
-- **Файл**: `.madspec/review.md`
+- **Файл**: `.madspec/<BRANCH>/review.md`
 - **Статус**: [Не начат / В процессе / Завершен]
 
 ### Шаги реализации (Планирование и Реализация)
@@ -62,9 +62,9 @@
 Пример структуры для каждого шага:
 
 #### Шаг [NN]: [Название шага]
-- **Директория**: `.madspec/steps/step-[NN]-[name]/`
-- **Контекст планирования**: `.madspec/steps/step-[NN]-[name]/planning-context.md`
-- **Контекст реализации**: `.madspec/steps/step-[NN]-[name]/implementation-context.md`
+- **Директория**: `.madspec/<BRANCH>/steps/step-[NN]-[name]/`
+- **Контекст планирования**: `.madspec/<BRANCH>/steps/step-[NN]-[name]/planning-context.md`
+- **Контекст реализации**: `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md`
 - **Статус**: [Запланирован / В процессе / Завершен]
 
 ---

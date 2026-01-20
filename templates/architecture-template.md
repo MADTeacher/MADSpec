@@ -1,6 +1,6 @@
 # Архитектура проекта: [НАЗВАНИЕ_ПРОЕКТА]
 
-**Основано на**: [Ссылки на concept.md, ui-design.md, tech-stack.md]
+**Основано на**: [Ссылки на .madspec/<BRANCH>/concept.md, .madspec/<BRANCH>/ui-design.md, .madspec/<BRANCH>/tech-stack.md]
 
 ## Структура проекта
 
@@ -33,7 +33,7 @@ project-root/
 
 ## Модель данных
 
-**Ссылка на детальную модель**: [data-model.md]
+**Ссылка на детальную модель**: [.madspec/<BRANCH>/data-model.md]
 
 **Краткое описание**:
 - Основные сущности: [СПИСОК]
@@ -41,7 +41,7 @@ project-root/
 
 ## API контракты
 
-**Ссылка на контракты**: [contracts/]
+**Ссылка на контракты**: [.madspec/<BRANCH>/contracts/]
 
 **Краткое описание**:
 - Количество эндпоинтов: [ЧИСЛО]

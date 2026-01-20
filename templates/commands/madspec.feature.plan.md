@@ -1,12 +1,12 @@
 ---
-description: Этап 4 - Создание плана реализации с разбивкой на последовательность шагов
+description: Feature - Планирование новой функциональности - создание плана реализации с разбивкой на последовательность шагов
 handoffs: 
   - label: Начать реализацию
-    agent: madspec.implement
+    agent: madspec.feature.implement
     prompt: Начни реализацию с шага [N]
 scripts:
-  sh:
-  ps:
+  sh: scripts/bash/get-branch.sh
+  ps: scripts/powershell/get-branch.ps1
 ---
 
 ## Пользовательский ввод
@@ -27,7 +27,9 @@ $ARGUMENTS
 
 ## Описание
 
-На этом этапе **MADSpec (MADSpec Framework)** проект разбивается на конкретные шаги реализации с использованием **инкрементального подхода**. Каждый запуск команды создает только **один новый шаг**, что позволяет работать в пределах контекстного окна даже для больших проектов со всеми функциями (P1, P2, P3).
+На этом этапе **MADSpec (MADSpec Framework)** новая функциональность разбивается на конкретные шаги реализации с использованием **инкрементального подхода**. Каждый запуск команды создает только **один новый шаг**, что позволяет работать в пределах контекстного окна.
+
+**Режим Feature**: Эта команда предназначена для работы с существующим проектом. Базовые артефакты читаются из feature ветки (`.madspec/<feature-branch>/`), новые артефакты также сохраняются в `.madspec/<feature-branch>/`, где `<feature-branch>` - имя текущей feature ветки. Базовые артефакты были скопированы из основной ветки в feature ветку на этапе инициализации.
 
 Каждый шаг должен быть:
 - Независимо тестируемым
@@ -38,20 +40,22 @@ $ARGUMENTS
 
 ## Предварительные условия
 
-- Должны существовать все предыдущие артефакты:
-  - `.madspec/concept.md`
-  - `.madspec/ui-design.md`
-  - `.madspec/tech-stack.md`
-  - `.madspec/architecture.md`
-  - `.madspec/data-model.md`
-  - `.madspec/contracts/`
-- Рекомендуется (если выполнялась команда `/madspec.deploy`): `.madspec/deployment.md`
-  - Если `.madspec/deployment.md` существует — ты **ОБЯЗАН** прочитать его и учитывать ограничения деплоя при планировании шагов
+- Должны существовать все предыдущие артефакты в feature ветке (где `<feature-branch>` определяется через скрипт):
+  - `.madspec/<feature-branch>/concept.md`
+  - `.madspec/<feature-branch>/ui-design.md`
+  - `.madspec/<feature-branch>/tech-stack.md`
+  - `.madspec/<feature-branch>/architecture.md`
+  - `.madspec/<feature-branch>/data-model.md`
+  - `.madspec/<feature-branch>/contracts/`
+  - `.madspec/<feature-branch>/feature-context.md`
+- Рекомендуется (если выполнялась команда `/madspec.deploy`): `.madspec/<feature-branch>/deployment.md`
+  - Если `.madspec/<feature-branch>/deployment.md` существует — ты **ОБЯЗАН** прочитать его и учитывать ограничения деплоя при планировании шагов
   - Если файла нет — продолжай планирование, но при появлении вопросов про окружения/CI/CD/секреты/миграции/наблюдаемость предложи сначала выполнить `/madspec.deploy`
-- Если файлы отсутствуют, предложи выполнить предыдущие этапы
+- Если файлы отсутствуют, предложи выполнить `/madspec.feature.init`
 - **ВАЖНО**: При планировании шага, который реализует функцию:
   - Проверь наличие связанных артефактов (UI-дизайн, контракты API, модели данных)
   - Если такие файлы существуют, они **ОБЯЗАТЕЛЬНО** должны быть связаны в описании шага
+- **ВАЖНО**: Все базовые артефакты должны быть скопированы из основной ветки в feature ветку на этапе `/madspec.feature.init`
 
 ## Цель этапа
 
@@ -67,10 +71,19 @@ $ARGUMENTS
 
 **ВАЖНО**: Этот этап использует **инкрементальный подход к планированию**. Каждый запуск команды создает только **один новый шаг**, что позволяет работать в пределах контекстного окна даже для больших проектов.
 
-0. **Проверка состояния планирования**:
-   - Проверь существование `.madspec/memory/progress.json`
+0. **Определение текущей ветки**:
+   - **ВАЖНО**: Перед началом работы определи текущую ветку, выполнив `{SCRIPT}` из корня проекта
+   - Скрипт возвращает имя ветки через stdout
+   - Используй результат выполнения скрипта (имя ветки) для формирования путей к артефактам
+   - Все пути к артефактам должны быть в формате `.madspec/<feature-branch>/...`, где `feature-branch` - это имя ветки, полученное из скрипта
+   - Если скрипт недоступен, прочитай значение из файла `.madspec/.current-branch` (если он существует)
+   - Если ни скрипт, ни файл недоступны, используй значение по умолчанию `main`
+   - Сохрани имя ветки для использования в дальнейших шагах
+
+1. **Проверка состояния планирования**:
+   - Проверь существование `.madspec/<feature-branch>/memory/progress.json` (где `feature-branch` - имя ветки, определенное в шаге 0)
    - Если файл не существует:
-     - Создай файл на основе шаблона `.madspec/templates/planning-state-template.json`
+     - Создай файл на основе шаблона `.madspec/templates/planning-state-template.json` (шаблоны хранятся в корне `.madspec/templates/`)
      - Установи режим работы: **`initial`**
    - Если файл существует:
      - Прочитай `plannedSteps` и `planningMetadata`
@@ -87,25 +100,28 @@ $ARGUMENTS
        - Предложи выполнить предыдущие этапы для создания недостающих артефактов
        - **НЕ ПРОДОЛЖАЙ** планирование до устранения проблемы
    
-   - Загрузи все предыдущие артефакты:
-     - `.madspec/concept.md` (для понимания функций и приоритетов)
-     - `.madspec/architecture.md` (для понимания структуры)
-     - `.madspec/ui-design.md`, `.madspec/tech-stack.md`, `.madspec/data-model.md` (если существуют)
-     - Если существует `.madspec/deployment.md` — загрузи его и учитывай ограничения деплоя при планировании шагов
+   - Загрузи контекст feature работы:
+     - Прочитай `.madspec/<feature-branch>/feature-context.md` (где `<feature-branch>` - имя текущей feature ветки)
+   - Загрузи базовые артефакты из feature ветки (они были скопированы из основной ветки на этапе инициализации):
+     - `.madspec/<feature-branch>/concept.md` (для понимания целей проекта)
+     - `.madspec/<feature-branch>/architecture.md` (для понимания структуры)
+     - `.madspec/<feature-branch>/tech-stack.md` (для понимания технологического стека)
+     - `.madspec/<feature-branch>/data-model.md` (если существует)
+     - Если существует `.madspec/<feature-branch>/deployment.md` — загрузи его и учитывай ограничения деплоя при планировании шагов
    
    - Проанализируй архитектуру и определи базовые шаги
    
    - **Проверь наличие связанных артефактов**:
      - Для функции, которую планируется реализовать в шаге, проверь наличие:
        - **UI-дизайн** (если шаг связан с UI):
-         - Файл с описанием дизайна UI (`.madspec/ui-design.md`)
-         - HTML прототипы (`.madspec/ui-prototype/*.html`)
+         - Файл с описанием дизайна UI (`.madspec/<feature-branch>/ui-design.md`)
+         - HTML прототипы (`.madspec/<feature-branch>/ui-prototype/*.html`)
        - **Контракты API** (если шаг связан с API, интеграцией или обменом данными):
-         - Файлы контрактов в `.madspec/contracts/` (OpenAPI, GraphQL schema, gRPC proto)
-         - Основной файл контрактов `.madspec/contracts/openapi.yaml` (если используется REST API)
+         - Файлы контрактов в `.madspec/<feature-branch>/contracts/` (OpenAPI, GraphQL schema, gRPC proto)
+         - Основной файл контрактов `.madspec/<feature-branch>/contracts/openapi.yaml` (если используется REST API)
          - Определения endpoints, запросов и ответов
        - **Модели данных** (если шаг связан с данными):
-         - Схемы из `.madspec/data-model.md`
+         - Схемы из `.madspec/<feature-branch>/data-model.md`
      - Если такие файлы существуют, мы должны на них явно ссылаться в описании шага
    
    - **Создай только первый шаг**:
@@ -114,9 +130,9 @@ $ARGUMENTS
      - Убедись, что шаг не имеет зависимостей
        - **ВАЖНО**: Создавай только один шаг за запуск для соблюдения инкрементального подхода
        - **ВАЖНО**: Если для функции существуют связанные артефакты (UI-дизайн, контракты API, модели данных), включи ссылки на них в описание шага
-       - Если `.madspec/deployment.md` существует: добавляй в `tasks.md/tests.md/validation.md` требования, которые нужны для выбранного деплоя (например, контейнеризация, CI pipeline, конфигурация/секреты, миграции, healthchecks, логирование/метрики/алерты, стратегия отката), но не добавляй лишние задачи без необходимости
+       - Если `.madspec/<feature-branch>/deployment.md` существует: добавляй в `tasks.md/tests.md/validation.md` требования, которые нужны для выбранного деплоя (например, контейнеризация, CI pipeline, конфигурация/секреты, миграции, healthchecks, логирование/метрики/алерты, стратегия отката), но не добавляй лишние задачи без необходимости
    
-   - Инициализируй `.madspec/memory/progress.json`:
+   - Инициализируй `.madspec/<feature-branch>/memory/progress.json`:
      - Если файл не существует, создай на основе шаблона `.madspec/templates/planning-state-template.json`
      - Убедись, что структура включает:
        - `plannedSteps: []` на верхнем уровне
@@ -127,7 +143,7 @@ $ARGUMENTS
        - Подсчитай общее количество функций P1, P2, P3 из `concept.md`
        - Установи начальные значения: все функции непокрыты (covered: 0)
    
-   - **Создай кэш контекста**: Создай `.madspec/planning-context-cache.md`:
+   - **Создай кэш контекста**: Создай `.madspec/<feature-branch>/planning-context-cache.md`:
      - Загрузи шаблон `.madspec/templates/planning-context-cache-template.md`
      - Замени токены-заполнители в квадратных скобках (например, [ДАТА], [Основные компоненты, слои, взаимодействия]) на конкретные значения из концепции проекта
      - Заполни кратким резюме архитектуры проекта:
@@ -138,14 +154,14 @@ $ARGUMENTS
        - Основные зависимости между компонентами
      - Это будет использоваться в инкрементальном режиме для экономии контекста
    
-   - Создай или обнови `.madspec/implementation-plan.md`:
+   - Создай или обнови `.madspec/<feature-branch>/implementation-plan.md`:
      - Загрузи шаблон `.madspec/templates/implementation-plan-template.md`
      - Заполни заголовок и описание проекта
      - Добавь первый шаг в список шагов
      - Пока не заполняй полный список шагов - они будут добавляться инкрементально
    
    - Создай структуру первого шага:
-     - Создай директорию `.madspec/steps/step-01-[name]/`
+     - Создай директорию `.madspec/<feature-branch>/steps/step-01-[name]/`
      - Создай файлы: `description.md`, `tasks.md`, `tests.md`, `validation.md`
      - **ОБЯЗАТЕЛЬНО**: Создай `planning-context.md` из шаблона `.madspec/templates/planning-context-template.md`:
        - Заполни все поля шаблона:
@@ -154,8 +170,8 @@ $ARGUMENTS
          - Ключевые решения при планировании шага
          - Связанные артефакты (UI прототипы, API контракты, модели данных)
          - Размер и сложность шага
-       - Сохрани в `.madspec/steps/step-01-[name]/planning-context.md`
-     - Обнови `.madspec/memory/progress.json`: добавь шаг в `plannedSteps`
+       - Сохрани в `.madspec/<feature-branch>/steps/step-01-[name]/planning-context.md`
+     - Обнови `.madspec/<feature-branch>/memory/progress.json`: добавь шаг в `plannedSteps`
      - Обнови `planningMetadata.stepDependencies`
      - Обнови `planningMetadata.progressMetrics` с информацией о покрытии функций
    
@@ -164,13 +180,13 @@ $ARGUMENTS
 2. **Режим Incremental (последующие запуски)**:
    
    - Загрузи только необходимый контекст:
-     - `.madspec/concept.md` (для понимания функций и приоритетов)
-     - `.madspec/planning-context-cache.md` (для понимания структуры - используется вместо полного `architecture.md` для экономии контекста)
+     - `.madspec/<feature-branch>/concept.md` (для понимания функций и приоритетов)
+     - `.madspec/<feature-branch>/planning-context-cache.md` (для понимания структуры - используется вместо полного `architecture.md` для экономии контекста)
        - Если кэш не существует, загрузи `architecture.md` и создай кэш
        - Если кэш существует, но дата последнего обновления старше даты последнего изменения `architecture.md`, обнови кэш
-     - Если существует `.madspec/deployment.md` — загрузи его полностью и учитывай ограничения деплоя при планировании каждого шага
-     - `.madspec/implementation-plan.md` (для понимания уже запланированных шагов)
-     - Список уже запланированных шагов из `.madspec/memory/progress.json` (`plannedSteps` и `planningMetadata.stepDependencies`)
+     - Если существует `.madspec/<feature-branch>/deployment.md` — загрузи его полностью и учитывай ограничения деплоя при планировании каждого шага
+     - `.madspec/<feature-branch>/implementation-plan.md` (для понимания уже запланированных шагов)
+     - Список уже запланированных шагов из `.madspec/<feature-branch>/memory/progress.json` (`plannedSteps` и `planningMetadata.stepDependencies`)
    
    - **Определи следующий шаг** на основе:
      - Зависимостей из `planningMetadata.stepDependencies`
@@ -181,37 +197,37 @@ $ARGUMENTS
    - **Проверь наличие связанных артефактов**:
      - Для функции, которую планируется реализовать в шаге, проверь наличие:
        - **UI-дизайн** (если шаг связан с UI):
-         - Файл с описанием дизайна UI (`.madspec/ui-design.md`)
-         - HTML прототипы (`.madspec/ui-prototype/*.html`)
+         - Файл с описанием дизайна UI (`.madspec/<feature-branch>/ui-design.md`)
+         - HTML прототипы (`.madspec/<feature-branch>/ui-prototype/*.html`)
        - **Контракты API** (если шаг связан с API, интеграцией или обменом данными):
-         - Файлы контрактов в `.madspec/contracts/` (OpenAPI, GraphQL schema, gRPC proto)
-         - Основной файл контрактов `.madspec/contracts/openapi.yaml` (если используется REST API)
+         - Файлы контрактов в `.madspec/<feature-branch>/contracts/` (OpenAPI, GraphQL schema, gRPC proto)
+         - Основной файл контрактов `.madspec/<feature-branch>/contracts/openapi.yaml` (если используется REST API)
          - Определения endpoints, запросов и ответов
        - **Модели данных** (если шаг связан с данными):
-         - Схемы из `.madspec/data-model.md`
+         - Схемы из `.madspec/<feature-branch>/data-model.md`
      - Если такие файлы существуют, мы должны на них явно ссылаться в описании шага
    
    - **Создай только ОДИН новый шаг**:
-     - Создай директорию `.madspec/steps/step-[NN]-[name]/`
+     - Создай директорию `.madspec/<feature-branch>/steps/step-[NN]-[name]/`
      - Создай файлы: `description.md`, `tasks.md`, `tests.md`, `validation.md`
      - **ОБЯЗАТЕЛЬНО**: Если для функции существуют связанные артефакты, включи ссылки на них в `description.md` и `tasks.md`:
-       - Файлы UI-дизайна (`.madspec/ui-design.md`, `.madspec/ui-prototype/*.html`)
-       - Контракты API (`.madspec/contracts/openapi.yaml`, `.madspec/contracts/*.graphql`, `.madspec/contracts/*.proto`, и т.д.)
-       - Модели данных (`.madspec/data-model.md`)
-     - Если `.madspec/deployment.md` существует: добавь в `tasks.md/tests.md/validation.md` требования, которые нужны для выбранного деплоя (например, контейнеризация, CI pipeline, конфигурация/секреты, миграции, healthchecks, логирование/метрики/алерты, стратегия отката), но не добавляй лишние задачи без необходимости
-     - **ОБЯЗАТЕЛЬНО**: Создай `planning-context.md` из шаблона `.madspec/templates/planning-context-template.md`:
+       - Файлы UI-дизайна (`.madspec/<feature-branch>/ui-design.md`, `.madspec/<feature-branch>/ui-prototype/*.html`)
+       - Контракты API (`.madspec/<feature-branch>/contracts/openapi.yaml`, `.madspec/<feature-branch>/contracts/*.graphql`, `.madspec/<feature-branch>/contracts/*.proto`, и т.д.)
+       - Модели данных (`.madspec/<feature-branch>/data-model.md`)
+     - Если `.madspec/<feature-branch>/deployment.md` существует: добавь в `tasks.md/tests.md/validation.md` требования, которые нужны для выбранного деплоя (например, контейнеризация, CI pipeline, конфигурация/секреты, миграции, healthchecks, логирование/метрики/алерты, стратегия отката), но не добавляй лишние задачи без необходимости
+     - **ОБЯЗАТЕЛЬНО**: Создай `planning-context.md` из шаблона `.madspec/templates/planning-context-template.md` (шаблоны хранятся в корне `.madspec/templates/`):
        - Заполни все поля шаблона:
          - Почему этот шаг создан (обоснование выбора для текущей итерации)
          - Зависимости от других шагов и покрываемые функции из concept.md
          - Ключевые решения при планировании этого шага с альтернативами
          - Связанные артефакты (UI прототипы, API контракты, модели данных) - с конкретными ссылками
          - Размер и сложность шага (низкая/средняя/высокая) с обоснованием
-       - Сохрани в `.madspec/steps/step-[NN]-[name]/planning-context.md`
-     - Обнови `.madspec/memory/progress.json`: добавь шаг в `plannedSteps`
+       - Сохрани в `.madspec/<feature-branch>/steps/step-[NN]-[name]/planning-context.md`
+     - Обнови `.madspec/<feature-branch>/memory/progress.json`: добавь шаг в `plannedSteps`
      - Обнови `planningMetadata.stepDependencies` с новым шагом и его зависимостями
      - Обнови `planningMetadata.lastPlannedStep`
    
-   - Обнови `.madspec/implementation-plan.md`, добавив новый шаг в список
+   - Обнови `.madspec/<feature-branch>/implementation-plan.md`, добавив новый шаг в список
    
    - Обнови метрики прогресса в `planningMetadata.progressMetrics`:
      - Определи, какие функции покрыты новым шагом (сопоставь с функциями из `concept.md`)
@@ -250,7 +266,7 @@ $ARGUMENTS
 
 4. **Создание структуры шага**:
    
-   - Создай директорию `.madspec/steps/step-[NN]-[name]/`
+   - Создай директорию `.madspec/<feature-branch>/steps/step-[NN]-[name]/`
      - **Формат номера**: `step-XX` где XX - двузначное число с ведущим нулем (01, 02, ..., 10, 11, ...)
      - **Имя шага**: используй kebab-case (например, `step-01-setup`, `step-02-user-model`)
      - Определи номер шага на основе количества уже запланированных шагов: `NN = plannedSteps.length + 1`
@@ -270,7 +286,7 @@ $ARGUMENTS
 
 5. **Кэширование контекста** (для оптимизации инкрементального режима):
    
-   - После первого запуска (initial mode) создай файл `.madspec/planning-context-cache.md`:
+   - После первого запуска (initial mode) создай файл `.madspec/<feature-branch>/planning-context-cache.md`:
      - Краткое резюме архитектуры проекта
      - Основные компоненты и их взаимодействие
      - Ключевые технические решения
@@ -279,7 +295,7 @@ $ARGUMENTS
      - Основные зависимости между компонентами
    
    - В инкрементальном режиме используй кэш вместо полной загрузки `architecture.md`:
-     - Загружай только `.madspec/planning-context-cache.md` для понимания структуры
+     - Загружай только `.madspec/<feature-branch>/planning-context-cache.md` для понимания структуры
      - Это значительно уменьшит объем загружаемого контекста
      - Кэш должен обновляться при значительных изменениях архитектуры
    
@@ -348,9 +364,9 @@ $ARGUMENTS
    
    - [ ] **Шаг ссылается на контракты (если применимо)**
      - Если шаг связан с API, интеграцией или обменом данными между компонентами:
-       - В `description.md` есть ссылки на соответствующие контракты из `.madspec/contracts/`
+       - В `description.md` есть ссылки на соответствующие контракты из `.madspec/<feature-branch>/contracts/`
        - В `tasks.md` указано, какие endpoints/методы реализуются
-       - Контракты из `.madspec/contracts/` явно упомянуты (например, `.madspec/contracts/openapi.yaml` для REST API)
+       - Контракты из `.madspec/<feature-branch>/contracts/` явно упомянуты (например, `.madspec/<feature-branch>/contracts/openapi.yaml` для REST API)
      - **Если не выполнено**: добавь ссылки на контракты API
    
    - [ ] **Шаг разбит на управляемые части**
@@ -395,7 +411,7 @@ $ARGUMENTS
      - Укажи, какие функции еще не покрыты
 
 9. **Обновление project-context.md**:
-   - Обнови `.madspec/project-context.md`:
+   - Обнови `.madspec/<feature-branch>/project-context.md`:
      - Установи текущий этап: "plan"
      - Обнови статус планирования
      - Добавь информацию о запланированном шаге в раздел "Шаги реализации":
@@ -407,11 +423,11 @@ $ARGUMENTS
 
 10. **Отчет**:
     - Выведи путь к созданным файлам:
-      - `.madspec/steps/step-[NN]-[name]/` - директория нового шага
-      - `.madspec/steps/step-[NN]-[name]/planning-context.md` - контекст планирования шага
-      - `.madspec/implementation-plan.md` - обновленный план реализации
-      - `.madspec/memory/progress.json` - обновленный файл прогресса
-      - `.madspec/planning-context-cache.md` - кэш контекста (если создан)
+     - `.madspec/<feature-branch>/steps/step-[NN]-[name]/` - директория нового шага
+     - `.madspec/<feature-branch>/steps/step-[NN]-[name]/planning-context.md` - контекст планирования шага
+     - `.madspec/<feature-branch>/implementation-plan.md` - обновленный план реализации
+     - `.madspec/<feature-branch>/memory/progress.json` - обновленный файл прогресса
+     - `.madspec/<feature-branch>/planning-context-cache.md` - кэш контекста (если создан)
     
     - Покажи информацию о новом шаге:
       - Номер и название шага
@@ -426,11 +442,11 @@ $ARGUMENTS
     
     - **Если планирование завершено**:
       - Поздравь с завершением планирования
-      - Предложи перейти к `/madspec.implement` для начала реализации
+      - Предложи перейти к `/madspec.feature.implement` для начала реализации
     
     - **Если планирование не завершено**:
       - Покажи, какие функции еще не покрыты
-      - Предложи выполнить планирование следующего шага с помощью запуска команды `/madspec.plan`
+      - Предложи выполнить планирование следующего шага с помощью запуска команды `/madspec.feature.plan`
 
 ## Правила
 
@@ -451,12 +467,12 @@ $ARGUMENTS
 
 ## Выходные артефакты
 
-- `.madspec/implementation-plan.md` - основной план реализации (обновляется инкрементально)
-- `.madspec/steps/step-[NN]-[name]/` - директория с описанием нового шага
-- `.madspec/steps/step-[NN]-[name]/planning-context.md` - контекст планирования шага с решениями
-- `.madspec/memory/progress.json` - файл отслеживания прогресса (обновляется после каждого шага)
-- `.madspec/planning-context-cache.md` - кэш контекста планирования (создается в initial mode)
-- `.madspec/project-context.md` - обновленный контекст проекта (навигация и ссылки)
+- `.madspec/<feature-branch>/implementation-plan.md` - основной план реализации (обновляется инкрементально, где `feature-branch` - имя текущей ветки)
+- `.madspec/<feature-branch>/steps/step-[NN]-[name]/` - директория с описанием нового шага
+- `.madspec/<feature-branch>/steps/step-[NN]-[name]/planning-context.md` - контекст планирования шага с решениями
+- `.madspec/<feature-branch>/memory/progress.json` - файл отслеживания прогресса (обновляется после каждого шага)
+- `.madspec/<feature-branch>/planning-context-cache.md` - кэш контекста планирования (создается в initial mode)
+- `.madspec/<feature-branch>/project-context.md` - обновленный контекст проекта (навигация и ссылки)
 
 ## Подсказки и помощь
 

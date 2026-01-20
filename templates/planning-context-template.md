@@ -39,17 +39,17 @@
 Артефакты, которые необходимо использовать при реализации этого шага:
 
 - **UI прототипы**: 
-  - [Список HTML файлов из `.madspec/ui-prototype/`, если шаг связан с UI]
+  - [Список HTML файлов из `.madspec/<BRANCH>/ui-prototype/`, если шаг связан с UI]
   - [Если не применимо, указать "N/A"]
 
 - **API контракты**:
-  - [Список файлов контрактов из `.madspec/contracts/`, если шаг связан с API]
-  - [Например: `.madspec/contracts/openapi.yaml` - endpoints для [описание]]
+  - [Список файлов контрактов из `.madspec/<BRANCH>/contracts/`, если шаг связан с API]
+  - [Например: `.madspec/<BRANCH>/contracts/openapi.yaml` - endpoints для [описание]]
   - [Если не применимо, указать "N/A"]
 
 - **Модели данных**:
-  - [Ссылки на секции в `.madspec/data-model.md`, если шаг связан с данными]
-  - [Например: Сущность User из `.madspec/data-model.md`]
+  - [Ссылки на секции в `.madspec/<BRANCH>/data-model.md`, если шаг связан с данными]
+  - [Например: Сущность User из `.madspec/<BRANCH>/data-model.md`]
   - [Если не применимо, указать "N/A"]
 
 - **Другие артефакты**:

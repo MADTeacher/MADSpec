@@ -8,6 +8,51 @@
 
 Фреймворк поддерживает несколько AI-агентов, позволяя командам использовать предпочитаемые инструменты с сохранением консистентной структуры проекта и практик разработки.
 
+## Режимы работы
+
+MADSpec поддерживает два режима работы:
+
+### MVP режим (разработка с нуля)
+
+Команды с префиксом `madspec.mvp.*` предназначены для разработки нового проекта с нуля:
+- `madspec.mvp.concept` - создание концепции MVP
+- `madspec.mvp.design` - дизайн для MVP
+- `madspec.mvp.tech` - выбор технологий для MVP
+- `madspec.mvp.architecture` - архитектура MVP
+- `madspec.mvp.plan` - планирование MVP
+- `madspec.mvp.implement` - реализация MVP
+
+### Feature режим (добавление функциональности)
+
+Команды с префиксом `madspec.feature.*` предназначены для работы с существующим проектом:
+- `madspec.feature.init` - инициализация работы над новой функциональностью
+- `madspec.feature.plan` - планирование новой функциональности
+- `madspec.feature.implement` - реализация функциональности
+
+### Общие команды
+
+Команды без префикса работают с любой веткой:
+- `madspec.deploy` - план деплоя (работает с любой веткой)
+- `madspec.security` - проверка безопасности (работает с любой веткой)
+- `madspec.review` - ревью (работает с любой веткой)
+
+## Определение ветки
+
+Все команды автоматически определяют текущую ветку через скрипты в секции `scripts`:
+- Команды ссылаются на скрипты `scripts/bash/get-branch.sh` (для sh) или `scripts/powershell/get-branch.ps1` (для ps)
+- Скрипты выполняются из корня проекта и возвращают имя ветки через stdout
+- Логика определения ветки:
+  1. Сначала проверяется `.madspec/config.json` (если существует и содержит `currentBranch`)
+  2. Затем используется `git branch --show-current`
+  3. Fallback на `main` если git недоступен
+
+Артефакты сохраняются в `.madspec/<branch-name>/`, где `<branch-name>` - имя текущей ветки.
+
+**Структура скриптов:**
+- `scripts/bash/get-branch.sh` - скрипт для bash/sh окружений
+- `scripts/powershell/get-branch.ps1` - скрипт для PowerShell окружений
+- Скрипты должны быть исполняемыми (права на выполнение устанавливаются автоматически при инициализации проекта)
+
 ---
 
 ## General practices
@@ -114,6 +159,16 @@ case $agent in
 esac
 ```
 
+##### Generate MVP and Feature commands
+
+**IMPORTANT**: Скрипт должен генерировать команды с префиксами `madspec.mvp.*` и `madspec.feature.*`:
+
+- **MVP команды**: `madspec.mvp.concept`, `madspec.mvp.design`, `madspec.mvp.tech`, `madspec.mvp.architecture`, `madspec.mvp.plan`, `madspec.mvp.implement`
+- **Feature команды**: `madspec.feature.init`, `madspec.feature.plan`, `madspec.feature.implement`
+- **Общие команды**: `madspec.deploy`, `madspec.security`, `madspec.review`
+
+Все команды должны включать скрипты определения ветки в секции `scripts` (sh и ps).
+
 #### 5. Update GitHub Release Script
 
 Modify `.github/workflows/scripts/create-github-release.sh` to include the new agent's packages:
@@ -159,12 +214,14 @@ Used by: Cursor, opencode, Kilo Code, Roo Code, SourceCraft
 ---
 description: "Command description"
 scripts:
-  sh:
-  ps:
+  sh: scripts/bash/get-branch.sh
+  ps: scripts/powershell/get-branch.ps1
 ---
 
 Command content with $ARGUMENTS placeholder.
 ```
+
+**Важно:** Команды ссылаются на скрипты из директории `scripts/`, а не содержат встроенный код. Скрипты выполняются из корня проекта и возвращают значения через stdout.
 
 ## Directory Conventions
 

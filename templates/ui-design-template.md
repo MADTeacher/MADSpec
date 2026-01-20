@@ -1,6 +1,6 @@
 # Дизайн пользовательского интерфейса: [НАЗВАНИЕ ПРОЕКТА]
 
-**Основано на**: [Ссылка на concept.md]
+**Основано на**: [Ссылка на .madspec/<BRANCH>/concept.md]
 
 ## Обзор
 
@@ -8,15 +8,15 @@
 
 ## Прототип интерфейса
 
-**Главный файл прототипа**: [ui-prototype/index.html](ui-prototype/index.html)
+**Главный файл прототипа**: [.madspec/<BRANCH>/ui-prototype/index.html](.madspec/<BRANCH>/ui-prototype/index.html)
 
-**Инструкция по просмотру**: Откройте файл `ui-prototype/index.html` в браузере (можно использовать встроенный браузер Cursor: `Ctrl+Shift+P` → `Simple Browser: Show`)
+**Инструкция по просмотру**: Откройте файл `.madspec/<BRANCH>/ui-prototype/index.html` в браузере (можно использовать встроенный браузер Cursor: `Ctrl+Shift+P` → `Simple Browser: Show`)
 
 ## Основные экраны
 
 ### [ЭКРАН_1]: [НАЗВАНИЕ_ЭКРАНА]
 
-**Файл прототипа**: [ui-prototype/[screen-name].html](ui-prototype/[screen-name].html)
+**Файл прототипа**: [.madspec/<BRANCH>/ui-prototype/[screen-name].html](.madspec/<BRANCH>/ui-prototype/[screen-name].html)
 
 **Назначение**: [Для чего используется этот экран]
 

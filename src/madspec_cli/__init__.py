@@ -513,6 +513,68 @@ def is_git_repo(path: Path = None) -> bool:
         return False
 
 
+def get_current_branch(project_path: Path) -> str:
+    """Get current git branch name, or return 'main' as default.
+    
+    Args:
+        project_path: Path to the project directory
+        
+    Returns:
+        Current branch name or 'main' if git is not available
+    """
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        branch = result.stdout.strip()
+        if branch:
+            return branch
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    
+    # Fallback to main
+    return "main"
+
+
+def create_madspec_config(project_path: Path, branch_name: str) -> None:
+    """Create .madspec/config.json with current branch information.
+    
+    Args:
+        project_path: Path to the project directory
+        branch_name: Name of the current branch
+    """
+    madspec_dir = project_path / ".madspec"
+    madspec_dir.mkdir(exist_ok=True)
+    
+    config_file = madspec_dir / "config.json"
+    config = {
+        "currentBranch": branch_name,
+        "version": "1.0.0"
+    }
+    
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+
+
+def ensure_branch_dir(project_path: Path, branch_name: str) -> Path:
+    """Ensure branch directory exists in .madspec/<branch_name>/.
+    
+    Args:
+        project_path: Path to the project directory
+        branch_name: Name of the branch
+        
+    Returns:
+        Path to the branch directory
+    """
+    branch_dir = project_path / ".madspec" / branch_name
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    return branch_dir
+
+
 def init_git_repo(
     project_path: Path, quiet: bool = False
 ) -> Tuple[bool, Optional[str]]:
@@ -973,41 +1035,73 @@ def download_and_extract_template(
 def ensure_executable_scripts(
     project_path: Path, tracker: StepTracker | None = None
 ) -> None:
-    """Ensure POSIX .sh scripts under .madspec/scripts (recursively) have execute bits (no-op on Windows)."""
+    """Ensure POSIX .sh scripts under scripts/ and .madspec/scripts (recursively) have execute bits (no-op on Windows)."""
     if os.name == "nt":
         return  # Windows: skip silently
-    scripts_root = project_path / ".madspec" / "scripts"
-    if not scripts_root.is_dir():
-        return
     failures: list[str] = []
     updated = 0
-    for script in scripts_root.rglob("*.sh"):
-        try:
-            if script.is_symlink() or not script.is_file():
-                continue
+    
+    # Check scripts/ in project root (for branch detection scripts)
+    scripts_root = project_path / "scripts"
+    if scripts_root.is_dir():
+        for script in scripts_root.rglob("*.sh"):
             try:
-                with script.open("rb") as f:
-                    if f.read(2) != b"#!":
-                        continue
-            except Exception:
-                continue
-            st = script.stat()
-            mode = st.st_mode
-            if mode & 0o111:
-                continue
-            new_mode = mode
-            if mode & 0o400:
-                new_mode |= 0o100
-            if mode & 0o040:
-                new_mode |= 0o010
-            if mode & 0o004:
-                new_mode |= 0o001
-            if not (new_mode & 0o100):
-                new_mode |= 0o100
-            os.chmod(script, new_mode)
-            updated += 1
-        except Exception as e:
-            failures.append(f"{script.relative_to(scripts_root)}: {e}")
+                if script.is_symlink() or not script.is_file():
+                    continue
+                try:
+                    with script.open("rb") as f:
+                        if f.read(2) != b"#!":
+                            continue
+                except Exception:
+                    continue
+                st = script.stat()
+                mode = st.st_mode
+                if mode & 0o111:
+                    continue
+                new_mode = mode
+                if mode & 0o400:
+                    new_mode |= 0o100
+                if mode & 0o040:
+                    new_mode |= 0o010
+                if mode & 0o004:
+                    new_mode |= 0o001
+                if not (new_mode & 0o100):
+                    new_mode |= 0o100
+                os.chmod(script, new_mode)
+                updated += 1
+            except Exception as e:
+                failures.append(f"{script.relative_to(scripts_root)}: {e}")
+    
+    # Check .madspec/scripts (legacy location, for backward compatibility)
+    madspec_scripts_root = project_path / ".madspec" / "scripts"
+    if madspec_scripts_root.is_dir():
+        for script in madspec_scripts_root.rglob("*.sh"):
+            try:
+                if script.is_symlink() or not script.is_file():
+                    continue
+                try:
+                    with script.open("rb") as f:
+                        if f.read(2) != b"#!":
+                            continue
+                except Exception:
+                    continue
+                st = script.stat()
+                mode = st.st_mode
+                if mode & 0o111:
+                    continue
+                new_mode = mode
+                if mode & 0o400:
+                    new_mode |= 0o100
+                if mode & 0o040:
+                    new_mode |= 0o010
+                if mode & 0o004:
+                    new_mode |= 0o001
+                if not (new_mode & 0o100):
+                    new_mode |= 0o100
+                os.chmod(script, new_mode)
+                updated += 1
+            except Exception as e:
+                failures.append(f"{script.relative_to(madspec_scripts_root)}: {e}")
     if tracker:
         detail = f"{updated} updated" + (
             f", {len(failures)} failed" if failures else ""
@@ -1264,6 +1358,17 @@ def init(
 
             ensure_executable_scripts(project_path, tracker=tracker)
 
+            # Create .madspec/config.json and branch directory structure
+            tracker.add("madspec-config", "Create MADSpec config")
+            try:
+                current_branch = get_current_branch(project_path)
+                create_madspec_config(project_path, current_branch)
+                ensure_branch_dir(project_path, current_branch)
+                tracker.complete("madspec-config", f"branch: {current_branch}")
+            except Exception as e:
+                # If config creation fails, continue anyway - scripts will handle it
+                tracker.error("madspec-config", f"config creation failed: {e}")
+
             if not no_git:
                 tracker.start("git")
                 if is_git_repo(project_path):
@@ -1358,15 +1463,23 @@ def init(
 
     steps_lines.append(f"{step_num}. Start using PLDF commands with your AI agent:")
 
-    steps_lines.append("   2.1 [cyan]/madspec.concept[/] - Create project concept")
-    steps_lines.append("   2.2 [cyan]/madspec.design[/] - Design UI with prototypes")
-    steps_lines.append("   2.3 [cyan]/madspec.tech[/] - Choose technology stack")
-    steps_lines.append("   2.4 [cyan]/madspec.architecture[/] - Design architecture")
+    steps_lines.append("   [bold]MVP режим (разработка с нуля):[/bold]")
+    steps_lines.append("   2.1 [cyan]/madspec.mvp.concept[/] - Create project concept")
+    steps_lines.append("   2.2 [cyan]/madspec.mvp.design[/] - Design UI with prototypes")
+    steps_lines.append("   2.3 [cyan]/madspec.mvp.tech[/] - Choose technology stack")
+    steps_lines.append("   2.4 [cyan]/madspec.mvp.architecture[/] - Design architecture")
+    steps_lines.append("   2.5 [cyan]/madspec.mvp.plan[/] - Create implementation plan")
+    steps_lines.append("   2.6 [cyan]/madspec.mvp.implement[/] - Execute implementation")
+    steps_lines.append("")
+    steps_lines.append("   [bold]Feature режим (добавление функциональности):[/bold]")
+    steps_lines.append("   2.7 [cyan]/madspec.feature.init[/] - Initialize feature work")
+    steps_lines.append("   2.8 [cyan]/madspec.feature.plan[/] - Plan feature implementation")
+    steps_lines.append("   2.9 [cyan]/madspec.feature.implement[/] - Implement feature")
+    steps_lines.append("")
+    steps_lines.append("   [bold]Общие команды:[/bold]")
     steps_lines.append(
-        "   2.5 [cyan]/madspec.deploy[/] - Plan deployment (environments, CI/CD, secrets, observability)"
+        "   2.10 [cyan]/madspec.deploy[/] - Plan deployment (environments, CI/CD, secrets, observability)"
     )
-    steps_lines.append("   2.6 [cyan]/madspec.plan[/] - Create implementation plan")
-    steps_lines.append("   2.7 [cyan]/madspec.implement[/] - Execute implementation")
 
     steps_panel = Panel(
         "\n".join(steps_lines), title="Next Steps", border_style="cyan", padding=(1, 2)
@@ -1401,6 +1514,129 @@ def init(
     )
     console.print()
     console.print(safety_panel)
+
+
+@app.command()
+def branch(
+    action: str = typer.Argument(..., help="Action: get, set, or list"),
+    branch_name: str = typer.Argument(None, help="Branch name (required for 'set' action)"),
+):
+    """Manage MADSpec branch configuration.
+    
+    Actions:
+    - get: Show current working branch
+    - set <branch-name>: Set working branch in .madspec/config.json
+    - list: List all branches with artifacts
+    """
+    show_banner()
+    
+    project_path = Path.cwd()
+    config_file = project_path / ".madspec" / "config.json"
+    
+    if action == "get":
+        current_branch = get_current_branch(project_path)
+        console.print(f"[green]Current branch:[/green] {current_branch}")
+        if config_file.exists():
+            with open(config_file, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                if "currentBranch" in config:
+                    console.print(f"[dim]Configured in .madspec/config.json:[/dim] {config['currentBranch']}")
+    
+    elif action == "set":
+        if not branch_name:
+            console.print("[red]Error:[/red] Branch name is required for 'set' action")
+            raise typer.Exit(1)
+        
+        create_madspec_config(project_path, branch_name)
+        ensure_branch_dir(project_path, branch_name)
+        console.print(f"[green]Branch set to:[/green] {branch_name}")
+        console.print(f"[dim]Branch directory created:[/dim] .madspec/{branch_name}/")
+    
+    elif action == "list":
+        madspec_dir = project_path / ".madspec"
+        if not madspec_dir.exists():
+            console.print("[yellow]No .madspec directory found[/yellow]")
+            return
+        
+        branches = []
+        for item in madspec_dir.iterdir():
+            if item.is_dir() and item.name not in ["templates", "scripts"]:
+                branches.append(item.name)
+        
+        if branches:
+            console.print("[cyan]Branches with artifacts:[/cyan]")
+            for branch in sorted(branches):
+                branch_dir = madspec_dir / branch
+                artifact_count = sum(1 for _ in branch_dir.rglob("*") if _.is_file())
+                console.print(f"  • {branch} ({artifact_count} files)")
+        else:
+            console.print("[yellow]No branches with artifacts found[/yellow]")
+    
+    else:
+        console.print(f"[red]Error:[/red] Unknown action '{action}'. Use: get, set, or list")
+        raise typer.Exit(1)
+
+
+@app.command()
+def migrate():
+    """Migrate existing project from .madspec/ to .madspec/<branch>/ structure.
+    
+    This command moves artifacts from .madspec/ root to .madspec/<branch>/
+    where <branch> is determined from git or defaults to 'main'.
+    """
+    show_banner()
+    
+    project_path = Path.cwd()
+    madspec_dir = project_path / ".madspec"
+    
+    if not madspec_dir.exists():
+        console.print("[yellow]No .madspec directory found. Nothing to migrate.[/yellow]")
+        return
+    
+    # Determine target branch
+    target_branch = get_current_branch(project_path)
+    
+    # Check if migration is needed
+    artifacts_in_root = []
+    exclude_dirs = {"templates", "scripts", target_branch}
+    
+    for item in madspec_dir.iterdir():
+        if item.is_file() or (item.is_dir() and item.name not in exclude_dirs):
+            artifacts_in_root.append(item)
+    
+    if not artifacts_in_root:
+        console.print(f"[green]No migration needed. Artifacts already in .madspec/{target_branch}/[/green]")
+        return
+    
+    console.print(f"[cyan]Found {len(artifacts_in_root)} items in .madspec/ root[/cyan]")
+    console.print(f"[cyan]Will migrate to: .madspec/{target_branch}/[/cyan]")
+    
+    response = typer.confirm("Do you want to proceed with migration?")
+    if not response:
+        console.print("[yellow]Migration cancelled[/yellow]")
+        return
+    
+    # Create target branch directory
+    target_dir = ensure_branch_dir(project_path, target_branch)
+    
+    # Move artifacts
+    moved_count = 0
+    for item in artifacts_in_root:
+        try:
+            target_path = target_dir / item.name
+            if target_path.exists():
+                console.print(f"[yellow]Skipping {item.name} (already exists in target)[/yellow]")
+                continue
+            shutil.move(str(item), str(target_path))
+            moved_count += 1
+        except Exception as e:
+            console.print(f"[red]Error moving {item.name}: {e}[/red]")
+    
+    # Update config
+    create_madspec_config(project_path, target_branch)
+    
+    console.print(f"[green]Migration complete:[/green] {moved_count} items moved to .madspec/{target_branch}/")
+    console.print(f"[dim]Config updated:[/dim] .madspec/config.json")
 
 
 @app.command()
