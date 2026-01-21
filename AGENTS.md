@@ -2,76 +2,31 @@
 
 ## About MADSpec and MADSpec CLI
 
-**MADSpec (MADSpec Framework)** - это фреймворк для разработки программного обеспечения с помощью LLM-агентов. Фреймворк помогает понимать "ПОЧЕМУ" принимаются те или иные решения.
+**MADSpec (MADSpec Framework)** - is an experimental framework for software development using LLM agents.
 
-**MADSpec CLI** - это интерфейс командной строки, который загружает проекты с шаблонами MADSpec. Он настраивает необходимые структуры директорий, шаблоны и интеграции AI агентов.
+**MADSpec CLI** - is a command-line interface that loads projects with MADSpec templates. It sets up the necessary directory structures, templates, and AI agent integrations.
 
-Фреймворк поддерживает несколько AI-агентов, позволяя командам использовать предпочитаемые инструменты с сохранением консистентной структуры проекта и практик разработки.
-
-## Режимы работы
-
-MADSpec поддерживает два режима работы:
-
-### MVP режим (разработка с нуля)
-
-Команды с префиксом `madspec.mvp.*` предназначены для разработки нового проекта с нуля:
-- `madspec.mvp.concept` - создание концепции MVP
-- `madspec.mvp.design` - дизайн для MVP
-- `madspec.mvp.tech` - выбор технологий для MVP
-- `madspec.mvp.architecture` - архитектура MVP
-- `madspec.mvp.plan` - планирование MVP
-- `madspec.mvp.implement` - реализация MVP
-
-### Feature режим (добавление функциональности)
-
-Команды с префиксом `madspec.feature.*` предназначены для работы с существующим проектом:
-- `madspec.feature.init` - инициализация работы над новой функциональностью
-- `madspec.feature.plan` - планирование новой функциональности
-- `madspec.feature.implement` - реализация функциональности
-
-### Общие команды
-
-Команды без префикса работают с любой веткой:
-- `madspec.deploy` - план деплоя (работает с любой веткой)
-- `madspec.security` - проверка безопасности (работает с любой веткой)
-- `madspec.review` - ревью (работает с любой веткой)
-
-## Определение ветки
-
-Все команды автоматически определяют текущую ветку через скрипты в секции `scripts`:
-- Команды ссылаются на скрипты `scripts/bash/get-branch.sh` (для sh) или `scripts/powershell/get-branch.ps1` (для ps)
-- Скрипты выполняются из корня проекта и возвращают имя ветки через stdout
-- Логика определения ветки:
-  1. Сначала проверяется `.madspec/config.json` (если существует и содержит `currentBranch`)
-  2. Затем используется `git branch --show-current`
-  3. Fallback на `main` если git недоступен
-
-Артефакты сохраняются в `.madspec/<branch-name>/`, где `<branch-name>` - имя текущей ветки.
-
-**Структура скриптов:**
-- `scripts/bash/get-branch.sh` - скрипт для bash/sh окружений
-- `scripts/powershell/get-branch.ps1` - скрипт для PowerShell окружений
-- Скрипты должны быть исполняемыми (права на выполнение устанавливаются автоматически при инициализации проекта)
+The framework supports multiple AI agents, allowing teams to use their preferred tools while maintaining a consistent project structure and development practices.
 
 ---
 
 ## General practices
 
-- Любые изменения в `__init__.py` для MADSpec CLI требуют обновления версии в `pyproject.toml`
-- Все изменения команд требуют тестирования с каждым поддерживаемым агентом
+- Any changes to `__init__.py` for MADSpec CLI require updating the version in `pyproject.toml`
+- All command changes require testing with each supported agent
 
 ## Adding New Agent Support
 
-Этот раздел объясняет, как добавить поддержку новых AI агентов/ассистентов в MADSpec CLI. Используйте это руководство при интеграции новых AI инструментов.
+This section explains how to add support for new AI agents/assistants to MADSpec CLI. Use this guide when integrating new AI tools.
 
 ### Overview
 
-MADSpec поддерживает несколько AI агентов путем генерации специфичных для агента файлов команд и структур директорий при инициализации проектов. Каждый агент имеет свои конвенции для:
+MADSpec supports multiple AI agents by generating agent-specific command files and directory structures when initializing projects. Each agent has its own conventions for:
 
-- **Форматов файлов команд** (Markdown, TOML, и т.д.)
-- **Структур директорий** (`.cursor/commands/`, `.codeassistant/commands/`, и т.д.)
-- **Паттернов вызова команд** (slash commands, CLI tools, и т.д.)
-- **Конвенций передачи аргументов** (`$ARGUMENTS`, `{{args}}`, и т.д.)
+- **Command file formats** (Markdown, TOML, etc.)
+- **Directory structures** (`.cursor/commands/`, `.codeassistant/commands/`, etc.)
+- **Command invocation patterns** (slash commands, CLI tools, etc.)
+- **Argument passing conventions** (`$ARGUMENTS`, `{{args}}`, etc.)
 
 ### Current Supported Agents
 
@@ -132,7 +87,7 @@ Also update any function docstrings, examples, and error messages that list avai
 
 #### 3. Update README Documentation
 
-Update the **Поддерживаемые AI агенты** section in `README.md` to include the new agent:
+Update the **Supported AI Agents** section in `README.md` to include the new agent:
 
 - Add the new agent to the table
 - Include the agent's official website link
@@ -162,13 +117,13 @@ esac
 
 ##### Generate MVP and Feature commands
 
-**IMPORTANT**: Скрипт должен генерировать команды с префиксами `madspec.mvp.*` и `madspec.feature.*`:
+**IMPORTANT**: The script must generate commands with prefixes `madspec.mvp.*` and `madspec.feature.*`:
 
-- **MVP команды**: `madspec.mvp.concept`, `madspec.mvp.design`, `madspec.mvp.tech`, `madspec.mvp.architecture`, `madspec.mvp.plan`, `madspec.mvp.implement`
-- **Feature команды**: `madspec.feature.init`, `madspec.feature.plan`, `madspec.feature.implement`
-- **Общие команды**: `madspec.deploy`, `madspec.security`, `madspec.review`
+- **MVP commands**: `madspec.mvp.concept`, `madspec.mvp.design`, `madspec.mvp.tech`, `madspec.mvp.architecture`, `madspec.mvp.plan`, `madspec.mvp.implement`
+- **Feature commands**: `madspec.feature.init`, `madspec.feature.plan`, `madspec.feature.implement`
+- **General commands**: `madspec.deploy`, `madspec.security`, `madspec.review`
 
-Все команды должны включать скрипты определения ветки в секции `scripts` (sh и ps).
+All commands must include branch detection scripts in the `scripts` section (sh and ps).
 
 #### 5. Update GitHub Release Script
 
@@ -222,7 +177,7 @@ scripts:
 Command content with $ARGUMENTS placeholder.
 ```
 
-**Важно:** Команды ссылаются на скрипты из директории `scripts/`, а не содержат встроенный код. Скрипты выполняются из корня проекта и возвращают значения через stdout.
+**Important:** Commands reference scripts from the `scripts/` directory, rather than containing inline code. Scripts are executed from the project root and return values via stdout.
 
 ## Directory Conventions
 
@@ -231,6 +186,7 @@ Command content with $ARGUMENTS placeholder.
 - **Kilo Code**: `.kilocode/rules/`
 - **Roo Code**: `.roo/rules/`
 - **SourceCraft**: `.codeassistant/commands/`
+- **GitHub Copilot**: `.github/agents/`  
 
 ## Argument Patterns
 
