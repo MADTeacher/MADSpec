@@ -33,6 +33,26 @@ rewrite_paths() {
     -e '/\.madspec\/templates\//!s@(^|[[:space:]]|`)(/?)templates/@\1.madspec/templates/@g'
 }
 
+generate_copilot_prompts() {
+  local agents_dir=$1 prompts_dir=$2
+  mkdir -p "$prompts_dir"
+
+  # Generate a .prompt.md file for each .agent.md file
+  for agent_file in "$agents_dir"/*.agent.md; do
+    [[ -f "$agent_file" ]] || continue
+
+    local basename=$(basename "$agent_file" .agent.md)
+    local prompt_file="$prompts_dir/${basename}.prompt.md"
+
+    # Create prompt file with agent frontmatter
+    cat > "$prompt_file" <<EOF
+---
+agent: ${basename}
+---
+EOF
+  done
+}
+
 generate_commands() {
   local agent=$1 ext=$2 arg_format=$3 output_dir=$4 script_variant=$5
   mkdir -p "$output_dir"
@@ -69,9 +89,11 @@ generate_commands() {
     
     # Apply other substitutions
     body=$(sed "s/{ARGS}/$arg_format/g; s/__AGENT__/$agent/g" <<< "$body" | rewrite_paths)
-    
+
     case $ext in
       md)
+        echo "$body" > "$output_dir/$name.$ext" ;;
+      agent.md)
         echo "$body" > "$output_dir/$name.$ext" ;;
     esac
   done
@@ -109,22 +131,39 @@ build_variant() {
   case $agent in
     cursor-agent)
       mkdir -p "$base_dir/.cursor/commands"
-      generate_commands cursor-agent md "\$ARGUMENTS" "$base_dir/.cursor/commands" "$script" ;;
+      generate_commands cursor-agent md "\$ARGUMENTS" "$base_dir/.cursor/commands" "$script"
+      [[ -d skills ]] && { mkdir -p "$base_dir/.cursor/skills"; cp -r skills/* "$base_dir/.cursor/skills/"; echo "Copied skills -> .cursor/skills"; }
+      ;;
     opencode)
       mkdir -p "$base_dir/.opencode/command"
-      generate_commands opencode md "\$ARGUMENTS" "$base_dir/.opencode/command" "$script" ;;
+      generate_commands opencode md "\$ARGUMENTS" "$base_dir/.opencode/command" "$script"
+      [[ -d skills ]] && { mkdir -p "$base_dir/.opencode/skills"; cp -r skills/* "$base_dir/.opencode/skills/"; echo "Copied skills -> .opencode/skills"; }
+      ;;
     kilocode)
       mkdir -p "$base_dir/.kilocode/rules"
-      generate_commands kilocode md "\$ARGUMENTS" "$base_dir/.kilocode/rules" "$script" ;;
+      generate_commands kilocode md "\$ARGUMENTS" "$base_dir/.kilocode/rules" "$script"
+      [[ -d skills ]] && { mkdir -p "$base_dir/.kilocode/skills"; cp -r skills/* "$base_dir/.kilocode/skills/"; echo "Copied skills -> .kilocode/skills"; }
+      ;;
     roo)
       mkdir -p "$base_dir/.roo/rules"
-      generate_commands roo md "\$ARGUMENTS" "$base_dir/.roo/rules" "$script" ;;
+      generate_commands roo md "\$ARGUMENTS" "$base_dir/.roo/rules" "$script"
+      [[ -d skills ]] && { mkdir -p "$base_dir/.roo/skills"; cp -r skills/* "$base_dir/.roo/skills/"; echo "Copied skills -> .roo/skills"; }
+      ;;
     sourcecraft)
       mkdir -p "$base_dir/.codeassistant/commands"
-      generate_commands sourcecraft md "\$ARGUMENTS" "$base_dir/.codeassistant/commands" "$script" ;;
+      generate_commands sourcecraft md "\$ARGUMENTS" "$base_dir/.codeassistant/commands" "$script"
+      [[ -d skills ]] && { mkdir -p "$base_dir/.codeassistant/skills"; cp -r skills/* "$base_dir/.codeassistant/skills/"; echo "Copied skills -> .codeassistant/skills"; }
+      ;;
     copilot)
       mkdir -p "$base_dir/.github/agents"
-      generate_commands copilot md "\$ARGUMENTS" "$base_dir/.github/agents" "$script" ;;
+      generate_commands copilot agent.md "\$ARGUMENTS" "$base_dir/.github/agents" "$script"
+      # Generate companion prompt files
+      generate_copilot_prompts "$base_dir/.github/agents" "$base_dir/.github/prompts"
+      # Create VS Code workspace settings
+      mkdir -p "$base_dir/.vscode"
+      [[ -f templates/vscode-settings.json ]] && cp templates/vscode-settings.json "$base_dir/.vscode/settings.json"
+      [[ -d skills ]] && { mkdir -p "$base_dir/.github/skills"; cp -r skills/* "$base_dir/.github/skills/"; echo "Copied skills -> .github/skills"; }
+      ;;
   esac
   ( cd "$base_dir" && zip -r "../madspec-template-${agent}-${script}-${NEW_VERSION}.zip" . )
   echo "Created $GENRELEASES_DIR/madspec-template-${agent}-${script}-${NEW_VERSION}.zip"

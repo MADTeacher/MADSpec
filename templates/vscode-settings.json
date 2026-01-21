@@ -1,0 +1,20 @@
+{
+    "chat.promptFilesRecommendations": {
+        "madspec.mvp.concept": true,
+        "madspec.mvp.design": true,
+        "madspec.mvp.tech": true,
+        "madspec.mvp.architecture": true,
+        "madspec.mvp.plan": true,
+        "madspec.mvp.implement": true,
+        "madspec.feature.init": true,
+        "madspec.feature.plan": true,
+        "madspec.feature.implement": true,
+        "madspec.deploy": true,
+        "madspec.review": true,
+        "madspec.security": true
+    },
+    "chat.tools.terminal.autoApprove": {
+        ".madspec/scripts/bash/": true,
+        ".madspec/scripts/powershell/": true
+    }
+}
