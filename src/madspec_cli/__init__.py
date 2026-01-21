@@ -710,7 +710,7 @@ def download_template_from_github(
     github_token: str = None,
 ) -> Tuple[Path, dict]:
     repo_owner = "MADTeacher"
-    repo_name = "pldf"
+    repo_name = "MADSpec"
     if client is None:
         client = httpx.Client(verify=ssl_context)
 
