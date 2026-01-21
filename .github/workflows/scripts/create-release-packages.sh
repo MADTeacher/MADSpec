@@ -114,14 +114,14 @@ build_variant() {
     mkdir -p "$MADSPEC_DIR/scripts"
     case $script in
       sh)
-        [[ -d scripts/bash ]] && { cp -r scripts/bash "$MADSPEC_DIR/scripts/"; echo "Copied scripts/bash -> .madspec/scripts"; }
+        [[ -d scripts/bash ]] && { cp -rp scripts/bash "$MADSPEC_DIR/scripts/"; echo "Copied scripts/bash -> .madspec/scripts"; }
         # Copy any script files that aren't in variant-specific directories
-        find scripts -maxdepth 1 -type f -exec cp {} "$MADSPEC_DIR/scripts/" \; 2>/dev/null || true
+        find scripts -maxdepth 1 -type f -exec cp -p {} "$MADSPEC_DIR/scripts/" \; 2>/dev/null || true
         ;;
       ps)
-        [[ -d scripts/powershell ]] && { cp -r scripts/powershell "$MADSPEC_DIR/scripts/"; echo "Copied scripts/powershell -> .madspec/scripts"; }
+        [[ -d scripts/powershell ]] && { cp -rp scripts/powershell "$MADSPEC_DIR/scripts/"; echo "Copied scripts/powershell -> .madspec/scripts"; }
         # Copy any script files that aren't in variant-specific directories
-        find scripts -maxdepth 1 -type f -exec cp {} "$MADSPEC_DIR/scripts/" \; 2>/dev/null || true
+        find scripts -maxdepth 1 -type f -exec cp -p {} "$MADSPEC_DIR/scripts/" \; 2>/dev/null || true
         ;;
     esac
   fi
@@ -165,6 +165,13 @@ build_variant() {
       [[ -d skills ]] && { mkdir -p "$base_dir/.github/skills"; cp -r skills/* "$base_dir/.github/skills/"; echo "Copied skills -> .github/skills"; }
       ;;
   esac
+  
+  # Ensure all .sh scripts have execute permissions before packaging
+  if [[ -d "$MADSPEC_DIR/scripts" ]]; then
+    find "$MADSPEC_DIR/scripts" -type f -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+    echo "Set execute permissions on .sh scripts"
+  fi
+  
   ( cd "$base_dir" && zip -r "../madspec-template-${agent}-${script}-${NEW_VERSION}.zip" . )
   echo "Created $GENRELEASES_DIR/madspec-template-${agent}-${script}-${NEW_VERSION}.zip"
 }

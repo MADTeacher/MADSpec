@@ -93,8 +93,8 @@ $ARGUMENTS
 2. **Определение начального шага:**
 
    Из `progress.json`:
-   - Если `currentStep` указан → этот шаг
-   - Если `currentStep` null → первый шаг из `plannedSteps`
+   - Если `currentImplementStep` указан → этот шаг
+   - Если `currentImplementStep` null → первый шаг из `plannedSteps`
    - Если пользователь указал в `$ARGUMENTS` → этот шаг
 
 3. **Выполнение шага:**
@@ -164,7 +164,7 @@ $ARGUMENTS
    
    ```json
    {
-     "currentStep": "step-[NN]-[name]",
+     "currentImplementStep": "step-[NN]-[name]",
      "completedSteps": [..., "step-[NN]-[name]"],
      "plannedSteps": [...],
      "stepStatus": {

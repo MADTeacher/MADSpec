@@ -72,8 +72,8 @@ $ARGUMENTS
      - Убедись, что реализованный интерфейс соответствует прототипу
 
 2. **Определение начального шага**:
-   - Если `.madspec/<BRANCH>/memory/progress.json` указывает на `currentStep`, начните с него
-   - Если `currentStep` равен `null`, начните с первого шага
+   - Если `.madspec/<BRANCH>/memory/progress.json` указывает на `currentImplementStep`, начните с него
+   - Если `currentImplementStep` равен `null`, начните с первого шага
    - Если пользователь указал конкретный шаг в `$ARGUMENTS`, используй его
 
 3. **Проверка зависимостей**:
@@ -92,7 +92,7 @@ $ARGUMENTS
      - **Название шага `[name]`** берется из:
        - `.madspec/<BRANCH>/implementation-plan.md` (название шага в плане)
        - Названия директории в `.madspec/<BRANCH>/steps/` (если директория уже существует)
-       - `.madspec/<BRANCH>/memory/progress.json` (поле `plannedSteps` или `currentStep`)
+       - `.madspec/<BRANCH>/memory/progress.json` (поле `plannedSteps` или `currentImplementStep`)
    - Примеры: `step-01-setup`, `step-02-user-model`, `step-03-auth`, `step-10-api-integration`
    - **ВАЖНО**: При определении текущего шага используй точное имя из `.madspec/<BRANCH>/memory/progress.json` или `implementation-plan.md`, не придумывай формат самостоятельно
 
@@ -184,8 +184,8 @@ $ARGUMENTS
         - Или найди следующий шаг из `implementation-plan.md`, который еще не завершен
         - Учитывай зависимости: следующий шаг должен иметь все зависимости в `completedSteps`
         - Если зависимости указаны в `planningMetadata.stepDependencies`, проверь их там
-        - Если следующий шаг найден и все его зависимости завершены, установи `currentStep = "step-[NN]-[name]"`
-        - Если все шаги завершены, установи `currentStep = null`
+        - Если следующий шаг найден и все его зависимости завершены, установи `currentImplementStep = "step-[NN]-[name]"`
+        - Если все шаги завершены, установи `currentImplementStep = null`
      
      d. **Сохрани обновленный `.madspec/<BRANCH>/memory/progress.json`**:
         - Убедись, что JSON валиден (правильный синтаксис, запятые, кавычки)
@@ -196,7 +196,7 @@ $ARGUMENTS
    До обновления:
    ```json
    {
-     "currentStep": "step-01-setup",
+     "currentImplementStep": "step-01-setup",
      "completedSteps": [],
      "plannedSteps": ["step-01-setup", "step-02-user-model", "step-03-auth"],
      "stepStatus": {},
@@ -212,7 +212,7 @@ $ARGUMENTS
    После обновления (после завершения step-01-setup):
    ```json
    {
-     "currentStep": "step-02-user-model",
+     "currentImplementStep": "step-02-user-model",
      "completedSteps": ["step-01-setup"],
      "plannedSteps": ["step-01-setup", "step-02-user-model", "step-03-auth"],
      "stepStatus": {
@@ -230,7 +230,7 @@ $ARGUMENTS
    }
    ```
    
-   **Примечание**: Поле `plannedSteps` и `planningMetadata` обычно не изменяются на этапе реализации, они создаются на этапе планирования. Обновляй только `currentStep`, `completedSteps` и `stepStatus`.
+   **Примечание**: Поле `plannedSteps` и `planningMetadata` обычно не изменяются на этапе реализации, они создаются на этапе планирования. Обновляй только `currentImplementStep`, `completedSteps` и `stepStatus`.
    
    **ВАЖНО**: 
    - Обновляй `.madspec/<BRANCH>/memory/progress.json` только после успешной валидации шага
