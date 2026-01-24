@@ -6,6 +6,7 @@ on:
     paths:
       - 'scripts/**'
       - 'templates/**'
+      - 'skills/**'
       - '.github/workflows/**'
   workflow_dispatch:
 
