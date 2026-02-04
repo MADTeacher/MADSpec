@@ -80,6 +80,13 @@ madspec.feature.implement
 | `madspec.review` | Проверить качество кода |
 | `madspec.security` | Проверить безопасность |
 
+## Агентские навыки
+
+При инициализации MADSpec копирует навыки в вашу среду (например, `.cursor/skills/`):
+
+- **generate-agents-md** — генерация AGENTS.md по лучшим практикам
+- **subagents_orchestrator** — распределение задач между субагентами
+
 ## Что вы получаете
 
 - **Структурированный проект** — понятная организация кода
@@ -94,4 +101,3 @@ madspec.feature.implement
 ```bash
 madspec --help
 ```
-
