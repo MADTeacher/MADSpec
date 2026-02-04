@@ -365,7 +365,6 @@ madspec version
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/tech-stack.md` - выбранный стек
-- `.madspec/<BRANCH>/tech-rationale.md` - детальное обоснование
 - `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта
 
 ### Этап 3: Архитектура (`madspec.mvp.architecture`)
@@ -511,7 +510,6 @@ madspec version
 │   ├── concept.md        # Концепция проекта (с ключевыми решениями)
 │   ├── ui-design.md      # Описание дизайна (с ключевыми решениями)
 │   ├── tech-stack.md     # Выбранный стек технологий (с ключевыми решениями)
-│   ├── tech-rationale.md # Обоснование выбора технологий
 │   ├── architecture.md  # Архитектура проекта (с ключевыми решениями)
 │   ├── data-model.md     # Модель данных
 │   ├── deployment.md     # План деплоя и эксплуатации (создается командой madspec.deploy)
