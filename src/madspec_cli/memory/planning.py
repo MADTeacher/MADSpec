@@ -1,0 +1,355 @@
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from .records import STEP_ID_PATTERN, make_record
+from .storage import (
+    _default_active_session,
+    _default_progress_state,
+    append_jsonl,
+    get_memory_paths,
+    read_json,
+    now_iso,
+    write_json,
+)
+
+
+@dataclass(frozen=True)
+class NextStepDecision:
+    branch: str
+    stage: str
+    candidate_step: str | None
+    dependencies: list[str]
+    accepted: bool
+    reason: str
+    errors: list[str]
+    selected_step: str | None = None
+    executable_steps: list[str] | None = None
+
+    def to_payload(self) -> dict[str, Any]:
+        payload = {
+            "branch": self.branch,
+            "stage": self.stage,
+            "candidate_step": self.candidate_step,
+            "dependencies": self.dependencies,
+            "accepted": self.accepted,
+            "errors": self.errors,
+            "reason": self.reason,
+        }
+        if self.selected_step is not None:
+            payload["selected_step"] = self.selected_step
+        if self.executable_steps is not None:
+            payload["executable_steps"] = self.executable_steps
+        return payload
+
+
+@dataclass(frozen=True)
+class RegisterStepResult:
+    accepted: bool
+    step_id: str
+    errors: list[str]
+    depends_on: list[str] | None = None
+    covers: dict[str, list[str]] | None = None
+    progress_metrics: dict[str, Any] | None = None
+
+    def to_payload(self) -> dict[str, Any]:
+        payload = {
+            "accepted": self.accepted,
+            "step_id": self.step_id,
+        }
+        if self.errors:
+            payload["errors"] = self.errors
+        if self.depends_on is not None:
+            payload["depends_on"] = self.depends_on
+        if self.covers is not None:
+            payload["covers"] = self.covers
+        if self.progress_metrics is not None:
+            payload["progressMetrics"] = self.progress_metrics
+        return payload
+
+
+def _extract_mvp_functions(concept_path: Path) -> dict[str, list[str]]:
+    priorities = {"p1": [], "p2": [], "p3": []}
+    if not concept_path.exists():
+        return priorities
+
+    current_priority: str | None = None
+    for raw_line in concept_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("### Приоритет 1"):
+            current_priority = "p1"
+            continue
+        if line.startswith("### Приоритет 2"):
+            current_priority = "p2"
+            continue
+        if line.startswith("### Приоритет 3"):
+            current_priority = "p3"
+            continue
+        if not current_priority or not line.startswith("- "):
+            continue
+        value = line[2:].strip()
+        if ":" in value:
+            value = value.split(":", 1)[0].strip()
+        priorities[current_priority].append(value)
+    return priorities
+
+
+def _extract_feature_functions(analysis_path: Path) -> dict[str, list[str]]:
+    priorities = {"p1": [], "p2": [], "p3": []}
+    if not analysis_path.exists():
+        return priorities
+
+    current_priority: str | None = None
+    for raw_line in analysis_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("### P1"):
+            current_priority = "p1"
+            continue
+        if line.startswith("### P2"):
+            current_priority = "p2"
+            continue
+        if line.startswith("### P3"):
+            current_priority = "p3"
+            continue
+        if not current_priority or not line.startswith("- **"):
+            continue
+        match = re.match(r"- \*\*([^*]+)\*\*:", line)
+        if match:
+            priorities[current_priority].append(match.group(1).strip())
+    return priorities
+
+
+def extract_function_catalog(project_path: Path, branch_name: str, stage: str) -> dict[str, list[str]]:
+    branch_dir = get_memory_paths(project_path, branch_name).branch_dir
+    stage_lower = stage.lower()
+    if "feature." in stage_lower:
+        return _extract_feature_functions(branch_dir / "project-analysis.md")
+    return _extract_mvp_functions(branch_dir / "concept.md")
+
+
+def _compute_progress_metrics(
+    catalog: dict[str, list[str]],
+    covers_functions: dict[str, dict[str, list[str]]],
+) -> dict[str, Any]:
+    metrics: dict[str, Any] = {}
+    weights = {"p1": 0.5, "p2": 0.3, "p3": 0.2}
+    overall = 0.0
+    for priority in ("p1", "p2", "p3"):
+        total = len(catalog.get(priority, []))
+        covered_names: set[str] = set()
+        for step_coverage in covers_functions.values():
+            covered_names.update(step_coverage.get(priority, []))
+        covered = len(covered_names.intersection(set(catalog.get(priority, []))))
+        percentage = int(round((covered / total) * 100)) if total else 0
+        metrics[f"{priority}Coverage"] = {
+            "covered": covered,
+            "total": total,
+            "percentage": percentage,
+        }
+        overall += percentage * weights[priority]
+    metrics["overallProgress"] = int(round(overall))
+    return metrics
+
+
+def determine_next_step(
+    project_path: Path,
+    branch_name: str,
+    stage: str,
+    *,
+    candidate_step: str | None = None,
+    candidate_dependencies: list[str] | None = None,
+    allow_completed_dependencies: bool = True,
+) -> dict[str, Any]:
+    paths = get_memory_paths(project_path, branch_name)
+    progress = read_json(paths.progress, _default_progress_state())
+    planned_steps = progress.get("plannedSteps", [])
+    completed_steps = set(progress.get("completedSteps", []))
+    step_status = progress.get("stepStatus", {})
+    step_dependencies = progress.get("planningMetadata", {}).get("stepDependencies", {})
+    stage_lower = stage.lower()
+
+    def _step_ready(step_id: str) -> bool:
+        return all(dependency in completed_steps for dependency in step_dependencies.get(step_id, []))
+
+    if candidate_step:
+        errors: list[str] = []
+        normalized_dependencies = candidate_dependencies or []
+        if not STEP_ID_PATTERN.match(candidate_step):
+            errors.append("candidate step id must match step-XX-kebab-case")
+        if candidate_step in planned_steps:
+            errors.append("candidate step id already exists in plannedSteps")
+        if len(set(normalized_dependencies)) != len(normalized_dependencies):
+            errors.append("candidate dependencies must be unique")
+        for dependency in normalized_dependencies:
+            if dependency not in planned_steps:
+                errors.append(f"dependency '{dependency}' is not present in plannedSteps")
+            elif not allow_completed_dependencies and dependency in completed_steps:
+                errors.append(
+                    f"dependency '{dependency}' is already completed and not allowed by current policy"
+                )
+        if candidate_step in normalized_dependencies:
+            errors.append("candidate step cannot depend on itself")
+
+        decision = NextStepDecision(
+            branch=branch_name,
+            stage=stage,
+            candidate_step=candidate_step,
+            dependencies=normalized_dependencies,
+            accepted=not errors,
+            errors=errors,
+            reason="validated candidate" if not errors else "candidate rejected",
+        )
+        return decision.to_payload()
+
+    executable_steps = []
+    for step_id in planned_steps:
+        status = step_status.get(step_id, {}).get("status")
+        if step_id in completed_steps or status == "completed":
+            continue
+        if _step_ready(step_id):
+            executable_steps.append(step_id)
+
+    selected_step = executable_steps[0] if executable_steps else None
+    reason = (
+        "next executable planned step for reference"
+        if "plan" in stage_lower and selected_step
+        else "next executable implementation step"
+        if selected_step
+        else "no executable planned step found"
+        if "plan" in stage_lower
+        else "no executable implementation step found"
+    )
+
+    decision = NextStepDecision(
+        branch=branch_name,
+        stage=stage,
+        candidate_step=None,
+        dependencies=step_dependencies.get(selected_step, []) if selected_step else [],
+        accepted=selected_step is not None,
+        selected_step=selected_step,
+        errors=[] if selected_step else ["no executable step available"],
+        reason=reason,
+        executable_steps=executable_steps,
+    )
+    return decision.to_payload()
+
+
+def register_planned_step(
+    project_path: Path,
+    branch_name: str,
+    stage: str,
+    *,
+    step_id: str,
+    covers: list[str],
+    depends_on: list[str] | None = None,
+    summary: str | None = None,
+) -> dict[str, Any]:
+    paths = get_memory_paths(project_path, branch_name)
+    progress = read_json(paths.progress, _default_progress_state())
+    decision = determine_next_step(
+        project_path,
+        branch_name,
+        stage,
+        candidate_step=step_id,
+        candidate_dependencies=depends_on or [],
+    )
+    if not decision["accepted"]:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=decision["errors"],
+        ).to_payload()
+
+    catalog = extract_function_catalog(project_path, branch_name, stage)
+    known_functions = {
+        item: priority for priority, items in catalog.items() for item in items
+    }
+    if not known_functions:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["no functions catalog found for the target stage"],
+        ).to_payload()
+
+    unknown = [item for item in covers if item not in known_functions]
+    if unknown:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=[f"unknown covered functions: {', '.join(unknown)}"],
+        ).to_payload()
+    if not covers:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["at least one covered function must be provided"],
+        ).to_payload()
+
+    planned_steps = progress.setdefault("plannedSteps", [])
+    if step_id not in planned_steps:
+        planned_steps.append(step_id)
+
+    progress.setdefault("stepStatus", {})[step_id] = {
+        "status": "planned",
+        "completedAt": None,
+    }
+
+    step_dependencies = progress.setdefault("planningMetadata", {}).setdefault(
+        "stepDependencies", {}
+    )
+    step_dependencies[step_id] = list(depends_on or [])
+    progress["planningMetadata"]["lastPlannedStep"] = step_id
+    progress["planningMetadata"]["planningPhase"] = (
+        "initial" if len(planned_steps) == 1 else "incremental"
+    )
+
+    covers_functions = progress.setdefault("coversFunctions", {})
+    covers_functions[step_id] = {"p1": [], "p2": [], "p3": []}
+    for item in covers:
+        covers_functions[step_id][known_functions[item]].append(item)
+
+    progress["planningMetadata"]["progressMetrics"] = _compute_progress_metrics(
+        catalog,
+        covers_functions,
+    )
+    write_json(paths.progress, progress)
+
+    active_session = read_json(paths.active_session, _default_active_session(branch_name))
+    active_session["stage"] = stage
+    active_session["current_step"] = step_id
+    active_session["last_checkpoint_at"] = now_iso()
+    active_session["updated_at"] = active_session["last_checkpoint_at"]
+    write_json(paths.active_session, active_session)
+
+    append_jsonl(
+        paths.decision_log,
+        [
+            make_record(
+                branch_name,
+                stage,
+                "memory.register-step",
+                summary or f"Registered planned step {step_id}",
+                step_id=step_id,
+                status="validated",
+                evidence=[str(paths.progress.relative_to(project_path))],
+                semantic_kind="decision",
+                record_type="planned_step",
+                metadata={
+                    "depends_on": list(depends_on or []),
+                    "covers": list(covers),
+                },
+            )
+        ],
+    )
+
+    return RegisterStepResult(
+        accepted=True,
+        step_id=step_id,
+        errors=[],
+        depends_on=list(depends_on or []),
+        covers=covers_functions[step_id],
+        progress_metrics=progress["planningMetadata"]["progressMetrics"],
+    ).to_payload()

@@ -6,6 +6,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 import madspec_cli as cli
+from madspec_cli import initializer
 from madspec_cli.memory import append_jsonl, get_memory_paths, make_record
 
 
@@ -34,7 +35,7 @@ def _fake_download(
 
 def test_init_creates_structured_memory_layout(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(cli, "download_and_extract_template", _fake_download)
+    monkeypatch.setattr(initializer, "download_and_extract_template", _fake_download)
     result = runner.invoke(
         cli.app,
         ["init", "demo", "--ai", "cursor-agent", "--script", "sh", "--no-git"],
