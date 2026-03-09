@@ -31,6 +31,7 @@ $ARGUMENTS
 - `planning-context.md` и `project-context.md` являются generated views.
 - После изменения памяти запускай `madspec memory consolidate` и `madspec memory validate`.
 - Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage feature.plan --candidate-step <step-id> --depends-on <dependency>...`.
+- Для записи нового planned step в canonical state используй `madspec memory register-step --stage feature.plan --step-id <step-id> --covers <function-id> ...`, а не ручное редактирование `progress.json`.
 
 ## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
 
@@ -206,32 +207,25 @@ $ARGUMENTS
 
 5. **Обновление прогресса:**
 
-    Обнови `.madspec/feature/<feature-branch>/memory/progress.json`:
-    
-    **КРИТИЧЕСКИ ВАЖНО**: При обновлении файла **НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ НЕ ИЗМЕНЯЙ** значение поля `currentImplementStep`. Прочитай текущее значение `currentImplementStep` из файла и сохрани его без изменений.
-    
-    ```json
-    {
-      "currentImplementStep": null,
-      "completedSteps": [],
-      "plannedSteps": ["step-01-...", "step-02-...", "step-[NN]-[name]"],
-      "stepStatus": {},
-      "planningMetadata": {
-        "lastPlannedStep": "step-[NN]-[name]",
-        "planningPhase": "incremental",
-        "totalStepsEstimated": null,
-        "stepDependencies": {
-          "step-[NN]-[name]": ["step-01-...", "step-02-..."]
-        },
-        "progressMetrics": {
-          "p1Coverage": {"covered": 0, "total": 0, "percentage": 0},
-          "p2Coverage": {"covered": 0, "total": 0, "percentage": 0},
-          "p3Coverage": {"covered": 0, "total": 0, "percentage": 0},
-          "overallProgress": 0
-        }
-      }
-    }
+    Зарегистрируй шаг через:
+
+    ```bash
+    madspec memory register-step \
+      --stage feature.plan \
+      --step-id step-[NN]-[name] \
+      --covers F01 \
+      --covers F02 \
+      --depends-on step-01-...
     ```
+
+    Команда должна автоматически:
+    - сохранить `currentImplementStep` без изменений
+    - добавить шаг в `plannedSteps`
+    - обновить `stepStatus`
+    - записать `coversFunctions`
+    - обновить `planningMetadata.stepDependencies`
+    - обновить `planningMetadata.lastPlannedStep`
+    - пересчитать `planningMetadata.progressMetrics`
 
 6. **Обновление implementation-plan.md:**
 

@@ -3,6 +3,7 @@
   "completedSteps": [],
   "plannedSteps": [],
   "stepStatus": {},
+  "coversFunctions": {},
   "planningMetadata": {
     "lastPlannedStep": null,
     "planningPhase": "initial",
@@ -16,4 +17,3 @@
     }
   }
 }
-

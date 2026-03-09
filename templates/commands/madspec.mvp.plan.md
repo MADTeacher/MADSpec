@@ -31,6 +31,7 @@ $ARGUMENTS
 - `planning-context-cache.md`, `planning-context.md` и `project-context.md` являются generated views.
 - После обновления structured memory обязательно запускай `madspec memory consolidate` и `madspec memory validate`.
 - Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage mvp.plan --candidate-step <step-id> --depends-on <dependency>...`.
+- Для записи нового planned step в canonical state используй `madspec memory register-step --stage mvp.plan --step-id <step-id> --covers <function> ...`, а не ручное редактирование `progress.json`.
 
 ## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
 
@@ -184,9 +185,8 @@ $ARGUMENTS
          - Связанные артефакты (UI прототипы, API контракты, модели данных)
          - Размер и сложность шага
        - Сохрани в `.madspec/<BRANCH>/steps/step-01-[name]/planning-context.md`
-     - Обнови `.madspec/<BRANCH>/memory/progress.json`: добавь шаг в `plannedSteps`
-     - Обнови `planningMetadata.stepDependencies`
-     - Обнови `planningMetadata.progressMetrics` с информацией о покрытии функций
+     - Зарегистрируй шаг через `madspec memory register-step --stage mvp.plan --step-id step-01-[name] --covers <function> ...`
+     - Команда должна автоматически обновить `plannedSteps`, `stepStatus`, `coversFunctions`, `planningMetadata.stepDependencies`, `planningMetadata.lastPlannedStep` и `planningMetadata.progressMetrics`
    
    - Отобрази визуализацию прогресса планирования (см. раздел 6)
 
@@ -236,20 +236,13 @@ $ARGUMENTS
          - Связанные артефакты (UI прототипы, API контракты, модели данных) - с конкретными ссылками
          - Размер и сложность шага (низкая/средняя/высокая) с обоснованием
        - Сохрани в `.madspec/<BRANCH>/steps/step-[NN]-[name]/planning-context.md`
-     - Обнови `.madspec/<BRANCH>/memory/progress.json`: добавь шаг в `plannedSteps`
-       - **КРИТИЧЕСКИ ВАЖНО**: При обновлении файла **НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ НЕ ИЗМЕНЯЙ** значение поля `currentImplementStep`. Прочитай текущее значение `currentImplementStep` из файла и сохрани его без изменений.
-     - Обнови `planningMetadata.stepDependencies` с новым шагом и его зависимостями
-     - Обнови `planningMetadata.lastPlannedStep`
+     - Зарегистрируй шаг через `madspec memory register-step --stage mvp.plan --step-id step-[NN]-[name] --covers <function> ... --depends-on <dep>`
+       - Команда **обязана** сохранить `currentImplementStep` без изменений
+       - Команда **обязана** автоматически обновить `plannedSteps`, `stepStatus`, `coversFunctions`, `planningMetadata.stepDependencies`, `planningMetadata.lastPlannedStep` и `planningMetadata.progressMetrics`
    
    - Обнови `.madspec/<BRANCH>/implementation-plan.md`, добавив новый шаг в список
    
-   - Обнови метрики прогресса в `planningMetadata.progressMetrics`:
-     - Определи, какие функции покрыты новым шагом (сопоставь с функциями из `concept.md`)
-     - Обнови `p1Coverage`, `p2Coverage`, `p3Coverage`:
-       - Увеличь `covered` для соответствующего приоритета
-       - Вычисли `percentage = (covered / total) * 100`
-     - Вычисли `overallProgress` как взвешенное среднее:
-       - `overallProgress = (p1Coverage.percentage * 0.5 + p2Coverage.percentage * 0.3 + p3Coverage.percentage * 0.2)`
+   - Проверь, что `madspec memory register-step` пересчитал метрики в `planningMetadata.progressMetrics` и записал покрытие в `coversFunctions`
    
    - Отобрази визуализацию прогресса планирования (см. раздел 6)
 

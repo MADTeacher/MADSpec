@@ -59,8 +59,10 @@
 ### 8. Обновление .madspec/memory/progress.json
 - [ ] Шаг добавлен в `plannedSteps`
 - [ ] Статус шага добавлен в `stepStatus` со значением `"planned"`
+- [ ] Шаг зарегистрирован через `madspec memory register-step`
 - [ ] Зависимости добавлены в `planningMetadata.stepDependencies`
 - [ ] Обновлен `planningMetadata.lastPlannedStep`
+- [ ] `coversFunctions` обновлен автоматически
 - [ ] Обновлены метрики прогресса в `planningMetadata.progressMetrics`
 
 ### 9. Обновление implementation-plan.md
@@ -99,4 +101,3 @@
 ---
 **Дата создания**: 2025-01-27  
 **Последнее обновление**: 2025-01-27
-

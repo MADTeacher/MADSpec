@@ -12,6 +12,7 @@ from madspec_cli.memory import (
     learn_from_outcomes,
     make_record,
     promote_validated_records,
+    register_planned_step,
     retrieve_memory_context,
     validate_branch_memory,
     write_json,
@@ -29,6 +30,24 @@ def _bootstrap_project(tmp_path: Path, branch: str = "main") -> dict[str, Path]:
     )
     ensure_memory_layout(project_path, branch)
     return get_memory_paths(project_path, branch)
+
+
+def _write_mvp_concept(branch_dir: Path) -> None:
+    (branch_dir / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- User authentication: sign in users
+- Session persistence: keep users logged in
+
+### Приоритет 2
+- Profile customization: update display name
+
+### Приоритет 3
+- Export settings: download preferences
+""",
+        encoding="utf-8",
+    )
 
 
 def test_consolidate_is_deterministic_for_same_memory_state(tmp_path: Path) -> None:
@@ -58,6 +77,9 @@ def test_consolidate_is_deterministic_for_same_memory_state(tmp_path: Path) -> N
             "plannedSteps": ["step-01-bootstrap"],
             "stepStatus": {
                 "step-01-bootstrap": {"status": "planned", "completedAt": None}
+            },
+            "coversFunctions": {
+                "step-01-bootstrap": {"p1": ["User authentication"], "p2": [], "p3": []}
             },
             "planningMetadata": {
                 "lastPlannedStep": "step-01-bootstrap",
@@ -132,6 +154,7 @@ def test_validate_reports_invalid_status_and_broken_step_reference(tmp_path: Pat
             "completedSteps": ["step-01-bootstrap"],
             "plannedSteps": ["step-01-bootstrap"],
             "stepStatus": {"step-ghost": {"status": "completed", "completedAt": "2026-03-10"}},
+            "coversFunctions": {},
             "planningMetadata": {
                 "lastPlannedStep": "step-01-bootstrap",
                 "planningPhase": "incremental",
@@ -250,6 +273,11 @@ def test_determine_next_step_validates_candidate_and_selects_ready_step(tmp_path
                 "step-02-api": {"status": "planned", "completedAt": None},
                 "step-03-ui": {"status": "planned", "completedAt": None},
             },
+            "coversFunctions": {
+                "step-01-bootstrap": {"p1": ["User authentication"], "p2": [], "p3": []},
+                "step-02-api": {"p1": ["Session persistence"], "p2": [], "p3": []},
+                "step-03-ui": {"p1": [], "p2": ["Profile customization"], "p3": []},
+            },
             "planningMetadata": {
                 "lastPlannedStep": "step-03-ui",
                 "planningPhase": "incremental",
@@ -289,3 +317,44 @@ def test_determine_next_step_validates_candidate_and_selects_ready_step(tmp_path
     assert any("must match step-XX-kebab-case" in error for error in invalid_candidate["errors"])
     assert selected["selected_step"] == "step-02-api"
     assert "step-03-ui" not in selected["executable_steps"]
+
+
+def test_register_planned_step_updates_coverage_metrics(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+
+    first = register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-01-authentication",
+        covers=["User authentication"],
+        summary="Plan authentication bootstrap",
+    )
+    second = register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-02-session-persistence",
+        covers=["Session persistence", "Profile customization"],
+        depends_on=["step-01-authentication"],
+    )
+
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+
+    assert first["accepted"] is True
+    assert second["accepted"] is True
+    assert progress["planningMetadata"]["lastPlannedStep"] == "step-02-session-persistence"
+    assert progress["planningMetadata"]["progressMetrics"]["p1Coverage"] == {
+        "covered": 2,
+        "total": 2,
+        "percentage": 100,
+    }
+    assert progress["planningMetadata"]["progressMetrics"]["p2Coverage"] == {
+        "covered": 1,
+        "total": 1,
+        "percentage": 100,
+    }
+    assert progress["planningMetadata"]["progressMetrics"]["overallProgress"] == 80
+    assert progress["coversFunctions"]["step-02-session-persistence"]["p2"] == ["Profile customization"]
+    assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []

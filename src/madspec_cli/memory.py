@@ -83,6 +83,7 @@ def _default_progress_state() -> dict[str, Any]:
         "completedSteps": [],
         "plannedSteps": [],
         "stepStatus": {},
+        "coversFunctions": {},
         "planningMetadata": {
             "lastPlannedStep": None,
             "planningPhase": "initial",
@@ -204,6 +205,22 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
             path.write_text("", encoding="utf-8")
             created.append(path)
 
+    progress = read_json(paths["progress"], _default_progress_state())
+    if isinstance(progress, dict):
+        catalog: dict[str, list[str]] = {}
+        for stage_name in ("mvp.plan", "feature.plan"):
+            stage_catalog = extract_function_catalog(project_path, branch_name, stage_name)
+            if any(stage_catalog.values()):
+                catalog = stage_catalog
+                break
+        if catalog:
+            planning_metadata = progress.setdefault("planningMetadata", {})
+            covers_functions = progress.setdefault("coversFunctions", {})
+            expected_metrics = _compute_progress_metrics(catalog, covers_functions)
+            if planning_metadata.get("progressMetrics") != expected_metrics:
+                planning_metadata["progressMetrics"] = expected_metrics
+                write_json(paths["progress"], progress)
+
     created.extend(ensure_procedures_layout(project_path))
     return created
 
@@ -264,7 +281,7 @@ def _validate_record(record: dict[str, Any], *, allow_semantic_kind: bool = True
 
 def _validate_progress(progress: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    for key in ("currentImplementStep", "completedSteps", "plannedSteps", "stepStatus", "planningMetadata"):
+    for key in ("currentImplementStep", "completedSteps", "plannedSteps", "stepStatus", "coversFunctions", "planningMetadata"):
         if key not in progress:
             errors.append(f"progress.json missing '{key}'")
 
@@ -274,6 +291,7 @@ def _validate_progress(progress: dict[str, Any]) -> list[str]:
     completed_steps = progress["completedSteps"]
     planned_steps = progress["plannedSteps"]
     step_status = progress["stepStatus"]
+    covers_functions = progress["coversFunctions"]
     planning_metadata = progress["planningMetadata"]
 
     if not isinstance(completed_steps, list) or not all(isinstance(item, str) for item in completed_steps):
@@ -282,6 +300,8 @@ def _validate_progress(progress: dict[str, Any]) -> list[str]:
         errors.append("plannedSteps must be a list of strings")
     if not isinstance(step_status, dict):
         errors.append("stepStatus must be an object")
+    if not isinstance(covers_functions, dict):
+        errors.append("coversFunctions must be an object")
     if not isinstance(planning_metadata, dict):
         errors.append("planningMetadata must be an object")
 
@@ -321,6 +341,20 @@ def _validate_progress(progress: dict[str, Any]) -> list[str]:
         if status not in {"planned", "in_progress", "completed"}:
             errors.append(f"stepStatus['{step_id}'].status must be planned/in_progress/completed")
 
+    for step_id, coverage in covers_functions.items():
+        if step_id not in planned_steps:
+            errors.append(f"coversFunctions key '{step_id}' is not present in plannedSteps")
+        if not isinstance(coverage, dict):
+            errors.append(f"coversFunctions['{step_id}'] must be an object")
+            continue
+        for priority in ("p1", "p2", "p3"):
+            if priority not in coverage:
+                errors.append(f"coversFunctions['{step_id}'] missing '{priority}'")
+                continue
+            values = coverage[priority]
+            if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
+                errors.append(f"coversFunctions['{step_id}']['{priority}'] must be a list of strings")
+
     visiting: set[str] = set()
     visited: set[str] = set()
 
@@ -351,6 +385,25 @@ def validate_branch_memory(project_path: Path, branch_name: str) -> list[str]:
         errors.append("progress.json must contain a JSON object")
     else:
         errors.extend(_validate_progress(progress))
+        catalog: dict[str, list[str]] = {}
+        for stage_name in ("mvp.plan", "feature.plan"):
+            stage_catalog = extract_function_catalog(project_path, branch_name, stage_name)
+            if any(stage_catalog.values()):
+                catalog = stage_catalog
+                break
+        if catalog:
+            known_functions = {item for values in catalog.values() for item in values}
+            for step_id, coverage in progress.get("coversFunctions", {}).items():
+                for priority, values in coverage.items():
+                    for value in values:
+                        if value not in known_functions:
+                            errors.append(
+                                f"coversFunctions['{step_id}']['{priority}'] references unknown function '{value}'"
+                            )
+            expected_metrics = _compute_progress_metrics(catalog, progress.get("coversFunctions", {}))
+            current_metrics = progress.get("planningMetadata", {}).get("progressMetrics", {})
+            if current_metrics != expected_metrics:
+                errors.append("planningMetadata.progressMetrics is out of sync with coversFunctions")
 
     active_session = read_json(paths["active_session"], None)
     if not isinstance(active_session, dict):
@@ -715,6 +768,197 @@ def retrieve_memory_context(
         },
         "episodes": _trim(scoped_events),
         "decision_log": _trim(scoped_decisions),
+    }
+
+
+def _extract_mvp_functions(concept_path: Path) -> dict[str, list[str]]:
+    priorities = {"p1": [], "p2": [], "p3": []}
+    if not concept_path.exists():
+        return priorities
+
+    current_priority: str | None = None
+    for raw_line in concept_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("### Приоритет 1"):
+            current_priority = "p1"
+            continue
+        if line.startswith("### Приоритет 2"):
+            current_priority = "p2"
+            continue
+        if line.startswith("### Приоритет 3"):
+            current_priority = "p3"
+            continue
+        if not current_priority or not line.startswith("- "):
+            continue
+        value = line[2:].strip()
+        if ":" in value:
+            value = value.split(":", 1)[0].strip()
+        priorities[current_priority].append(value)
+    return priorities
+
+
+def _extract_feature_functions(analysis_path: Path) -> dict[str, list[str]]:
+    priorities = {"p1": [], "p2": [], "p3": []}
+    if not analysis_path.exists():
+        return priorities
+
+    current_priority: str | None = None
+    for raw_line in analysis_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("### P1"):
+            current_priority = "p1"
+            continue
+        if line.startswith("### P2"):
+            current_priority = "p2"
+            continue
+        if line.startswith("### P3"):
+            current_priority = "p3"
+            continue
+        if not current_priority or not line.startswith("- **"):
+            continue
+        match = re.match(r"- \*\*([^*]+)\*\*:", line)
+        if match:
+            priorities[current_priority].append(match.group(1).strip())
+    return priorities
+
+
+def extract_function_catalog(project_path: Path, branch_name: str, stage: str) -> dict[str, list[str]]:
+    branch_dir = get_memory_paths(project_path, branch_name)["branch_dir"]
+    stage_lower = stage.lower()
+    if "feature." in stage_lower:
+        return _extract_feature_functions(branch_dir / "project-analysis.md")
+    return _extract_mvp_functions(branch_dir / "concept.md")
+
+
+def _compute_progress_metrics(
+    catalog: dict[str, list[str]],
+    covers_functions: dict[str, dict[str, list[str]]],
+) -> dict[str, Any]:
+    metrics: dict[str, Any] = {}
+    weights = {"p1": 0.5, "p2": 0.3, "p3": 0.2}
+    overall = 0.0
+    for priority in ("p1", "p2", "p3"):
+        total = len(catalog.get(priority, []))
+        covered_names: set[str] = set()
+        for step_coverage in covers_functions.values():
+            covered_names.update(step_coverage.get(priority, []))
+        covered = len(covered_names.intersection(set(catalog.get(priority, []))))
+        percentage = int(round((covered / total) * 100)) if total else 0
+        metrics[f"{priority}Coverage"] = {
+            "covered": covered,
+            "total": total,
+            "percentage": percentage,
+        }
+        overall += percentage * weights[priority]
+    metrics["overallProgress"] = int(round(overall))
+    return metrics
+
+
+def register_planned_step(
+    project_path: Path,
+    branch_name: str,
+    stage: str,
+    *,
+    step_id: str,
+    covers: list[str],
+    depends_on: list[str] | None = None,
+    summary: str | None = None,
+) -> dict[str, Any]:
+    paths = get_memory_paths(project_path, branch_name)
+    progress = read_json(paths["progress"], _default_progress_state())
+    decision = determine_next_step(
+        project_path,
+        branch_name,
+        stage,
+        candidate_step=step_id,
+        candidate_dependencies=depends_on or [],
+    )
+    if not decision["accepted"]:
+        return {
+            "accepted": False,
+            "errors": decision["errors"],
+            "step_id": step_id,
+        }
+
+    catalog = extract_function_catalog(project_path, branch_name, stage)
+    known_functions = {item: priority for priority, items in catalog.items() for item in items}
+    if not known_functions:
+        return {
+            "accepted": False,
+            "errors": ["no functions catalog found for the target stage"],
+            "step_id": step_id,
+        }
+
+    unknown = [item for item in covers if item not in known_functions]
+    if unknown:
+        return {
+            "accepted": False,
+            "errors": [f"unknown covered functions: {', '.join(unknown)}"],
+            "step_id": step_id,
+        }
+    if not covers:
+        return {
+            "accepted": False,
+            "errors": ["at least one covered function must be provided"],
+            "step_id": step_id,
+        }
+
+    planned_steps = progress.setdefault("plannedSteps", [])
+    if step_id not in planned_steps:
+        planned_steps.append(step_id)
+
+    progress.setdefault("stepStatus", {})[step_id] = {
+        "status": "planned",
+        "completedAt": None,
+    }
+
+    step_dependencies = progress.setdefault("planningMetadata", {}).setdefault("stepDependencies", {})
+    step_dependencies[step_id] = list(depends_on or [])
+    progress["planningMetadata"]["lastPlannedStep"] = step_id
+    progress["planningMetadata"]["planningPhase"] = "initial" if len(planned_steps) == 1 else "incremental"
+
+    covers_functions = progress.setdefault("coversFunctions", {})
+    covers_functions[step_id] = {"p1": [], "p2": [], "p3": []}
+    for item in covers:
+        covers_functions[step_id][known_functions[item]].append(item)
+
+    progress["planningMetadata"]["progressMetrics"] = _compute_progress_metrics(catalog, covers_functions)
+    write_json(paths["progress"], progress)
+
+    active_session = read_json(paths["active_session"], _default_active_session(branch_name))
+    active_session["stage"] = stage
+    active_session["current_step"] = step_id
+    active_session["last_checkpoint_at"] = now_iso()
+    active_session["updated_at"] = active_session["last_checkpoint_at"]
+    write_json(paths["active_session"], active_session)
+
+    append_jsonl(
+        paths["decision_log"],
+        [
+            make_record(
+                branch_name,
+                stage,
+                "memory.register-step",
+                summary or f"Registered planned step {step_id}",
+                step_id=step_id,
+                status="validated",
+                evidence=[str(paths["progress"].relative_to(project_path))],
+                semantic_kind="decision",
+                record_type="planned_step",
+                metadata={
+                    "depends_on": list(depends_on or []),
+                    "covers": list(covers),
+                },
+            )
+        ],
+    )
+
+    return {
+        "accepted": True,
+        "step_id": step_id,
+        "depends_on": list(depends_on or []),
+        "covers": covers_functions[step_id],
+        "progressMetrics": progress["planningMetadata"]["progressMetrics"],
     }
 
 

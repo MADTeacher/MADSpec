@@ -295,6 +295,7 @@ madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--json-output]
 madspec memory next-step --stage <stage> [--candidate-step <id>] [--depends-on <id>] [--json-output]
+madspec memory register-step --stage <stage> --step-id <id> --covers <function> [--depends-on <id>] [--json-output]
 madspec memory promote [--branch <name>] [--json-output]
 madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-output]
 ```
@@ -306,6 +307,7 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory validate` - проверяет schema, state transitions и согласованность views
 - `memory retrieve` - возвращает минимальный контекст для stage/step
 - `memory next-step` - детерминированно выбирает следующий исполнимый шаг или валидирует нового кандидата для planning
+- `memory register-step` - канонически регистрирует новый planned step и автоматически обновляет coverage metadata в `progress.json`
 - `memory promote` - переносит validated records в semantic memory
 - `memory learn` - превращает test/review outcomes в learning records
 

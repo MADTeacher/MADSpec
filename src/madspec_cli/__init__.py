@@ -62,6 +62,7 @@ from .memory import (
     promote_validated_records,
     read_json,
     read_jsonl,
+    register_planned_step,
     determine_next_step,
     retrieve_memory_context,
     validate_branch_memory,
@@ -654,6 +655,66 @@ def memory_next_step(
         for error in payload["errors"]:
             console.print(f"[red]- {error}[/red]")
         raise typer.Exit(1)
+
+
+@memory_app.command("register-step")
+def memory_register_step(
+    stage: str = typer.Option(..., "--stage", help="Planning stage, e.g. mvp.plan or feature.plan"),
+    step_id: str = typer.Option(..., "--step-id", help="New step identifier"),
+    covers: list[str] = typer.Option(..., "--covers", help="Covered function ids/labels; repeat the option for multiple values"),
+    branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
+    depends_on: list[str] = typer.Option(None, "--depends-on", help="Dependency step ids"),
+    summary: str = typer.Option(None, "--summary", help="Optional summary for the decision log"),
+    json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+):
+    """Register a planned step and update coverage metadata in progress.json."""
+    project_path = Path.cwd()
+    target_branch = _resolve_branch_name(project_path, branch_name)
+    ensure_memory_layout(project_path, target_branch)
+    payload = register_planned_step(
+        project_path,
+        target_branch,
+        stage,
+        step_id=step_id,
+        covers=covers,
+        depends_on=depends_on or [],
+        summary=summary,
+    )
+    if payload.get("accepted"):
+        consolidate_branch_memory(project_path, target_branch)
+        validation_errors = validate_branch_memory(project_path, target_branch)
+        if validation_errors:
+            payload = {
+                "accepted": False,
+                "step_id": step_id,
+                "errors": validation_errors,
+            }
+
+    if json_output:
+        _emit_json(payload)
+        if not payload.get("accepted"):
+            raise typer.Exit(1)
+        return
+
+    show_banner()
+    console.print(f"[cyan]Branch:[/cyan] {target_branch}")
+    console.print(f"[cyan]Stage:[/cyan] {stage}")
+    console.print(f"[cyan]Step:[/cyan] {step_id}")
+    if payload.get("accepted"):
+        metrics = payload["progressMetrics"]
+        console.print(f"[green]Registered step:[/green] {step_id}")
+        console.print(
+            "[cyan]Coverage:[/cyan] "
+            f"P1={metrics['p1Coverage']['covered']}/{metrics['p1Coverage']['total']} "
+            f"P2={metrics['p2Coverage']['covered']}/{metrics['p2Coverage']['total']} "
+            f"P3={metrics['p3Coverage']['covered']}/{metrics['p3Coverage']['total']} "
+            f"overall={metrics['overallProgress']}%"
+        )
+        return
+
+    for error in payload.get("errors", []):
+        console.print(f"[red]- {error}[/red]")
+    raise typer.Exit(1)
 
 
 @memory_app.command("promote")

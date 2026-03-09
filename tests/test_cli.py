@@ -136,3 +136,67 @@ def test_memory_commands_support_validation_and_retrieve_json(tmp_path: Path, mo
     assert next_step_select.exit_code == 0, next_step_select.stdout
     next_step_payload = json.loads(next_step_select.stdout)
     assert next_step_payload["selected_step"] == "step-02-auth-flow"
+
+
+def test_memory_register_step_updates_progress_and_views(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = project_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- Authentication: sign in users
+- Sessions: keep users logged in
+
+### Приоритет 2
+- Profile: edit user profile
+
+### Приоритет 3
+- Export: download settings
+""",
+        encoding="utf-8",
+    )
+
+    init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    register_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-authentication",
+            "--covers",
+            "Authentication",
+            "--covers",
+            "Profile",
+            "--json-output",
+        ],
+    )
+    assert register_result.exit_code == 0, register_result.stdout
+    payload = json.loads(register_result.stdout)
+    paths = get_memory_paths(project_path, "main")
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+
+    assert payload["accepted"] is True
+    assert progress["plannedSteps"] == ["step-01-authentication"]
+    assert progress["coversFunctions"]["step-01-authentication"] == {
+        "p1": ["Authentication"],
+        "p2": ["Profile"],
+        "p3": [],
+    }
+    assert progress["planningMetadata"]["progressMetrics"]["overallProgress"] == 55
+    assert (project_path / ".madspec" / "main" / "project-context.md").exists()
+    assert (project_path / ".madspec" / "main" / "planning-context-cache.md").exists()
