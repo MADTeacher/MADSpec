@@ -1,5 +1,7 @@
 # Контекст планирования: шаг [NN] - [Название]
 
+> Generated view from structured memory records for this step. Rebuild with `madspec memory consolidate`.
+
 **Шаг**: step-[NN]-[name]
 **Дата планирования**: [YYYY-MM-DD]
 

@@ -1,5 +1,7 @@
 # Контекст реализации: Шаг [NN] - [Название]
 
+> Generated view from structured memory records for this step. Do not use this file as canonical state.
+
 **Шаг**: step-[NN]-[name]  
 **Дата начала реализации**: [YYYY-MM-DD]  
 **Дата завершения реализации**: [YYYY-MM-DD]  
@@ -107,4 +109,3 @@
 
 **Статус реализации**: Завершен  
 **Шаг полностью завершен и протестирован**: [Да / Нет]
-

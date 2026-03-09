@@ -21,6 +21,12 @@ $ARGUMENTS
 - **Дожидайся ответа** и только затем задавай следующий вопрос.
 - Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
 
+## Structured Memory First (обязательно)
+
+- Feature workflow также использует `.madspec/<BRANCH>/memory/` как source of truth.
+- `project-context.md` и другие markdown-файлы контекста считаются generated views.
+- После инициализации feature-ветки запускай `madspec memory consolidate` и `madspec memory validate`.
+
 ## Описание
 
 Эта команда инициализирует работу над новой функциональностью в существующем проекте. Она:
@@ -320,4 +326,3 @@ $ARGUMENTS
 ## Следующий этап
 
 После завершения запустите `/madspec.feature.plan` для планирования шагов реализации.
-

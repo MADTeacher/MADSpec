@@ -1,0 +1,11 @@
+{
+  "branch": "<BRANCH>",
+  "active_goal": "",
+  "stage": "idle",
+  "current_step": null,
+  "pending_actions": [],
+  "open_questions": [],
+  "current_hypotheses": [],
+  "last_checkpoint_at": null,
+  "updated_at": "2026-03-10T00:00:00+00:00"
+}

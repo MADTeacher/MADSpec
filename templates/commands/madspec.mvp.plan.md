@@ -25,6 +25,13 @@ $ARGUMENTS
 - **Дожидайся ответа** и только затем задавай следующий вопрос.
 - Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
 
+## Structured Memory First (обязательно)
+
+- `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
+- `planning-context-cache.md`, `planning-context.md` и `project-context.md` являются generated views.
+- После обновления structured memory обязательно запускай `madspec memory consolidate` и `madspec memory validate`.
+- Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage mvp.plan --candidate-step <step-id> --depends-on <dependency>...`.
+
 ## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
 
 **НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ НЕ ИЗМЕНЯЙ `currentImplementStep` в файле `progress.json`.**
@@ -271,6 +278,12 @@ $ARGUMENTS
      - Планируй шаги интеграции, оптимизации, рефакторинга
      - Учитывай зависимости от уже запланированных шагов
 
+   - **Детерминированная проверка кандидата шага**:
+     - После того как шаг-кандидат выбран reasoning-частью агента, выполни:
+       - `madspec memory next-step --stage mvp.plan --candidate-step step-[NN]-[name] --depends-on <dep1> --depends-on <dep2>`
+     - Если команда завершилась с ошибкой, пересмотри имя шага и зависимости
+     - Не добавляй шаг в `progress.json`, пока проверка не прошла успешно
+
 4. **Создание структуры шага**:
    
    - Создай директорию `.madspec/<BRANCH>/steps/step-[NN]-[name]/`
@@ -495,4 +508,3 @@ $ARGUMENTS
 - Если планирование не завершено:
   - Запусти команду `/madspec.plan` снова для планирования следующего шага
   - Система автоматически определит следующий шаг на основе зависимостей и приоритетов
-

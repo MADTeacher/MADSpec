@@ -21,6 +21,13 @@ $ARGUMENTS
 - **Дожидайся ответа** и только затем задавай следующий вопрос.
 - Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
 
+## Structured Memory First (обязательно)
+
+- `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
+- `implementation-context.md` и `project-context.md` являются generated views.
+- После успешного checkpoint обновляй structured memory, затем выполняй `madspec memory consolidate` и `madspec memory validate`.
+- Для выбора следующего шага реализации сначала используй `madspec memory next-step --stage mvp.implement`.
+
 ## Описание
 
 Этот этап **MADSpec (MADSpec Framework)** выполняет пошаговую реализацию **MVP (Minimum Viable Product)** проекта согласно плану. Каждый шаг:
@@ -389,4 +396,3 @@ $ARGUMENTS
 - Финальную проверку всех функций
 - Демонстрацию проекта
 - Рефлексию над процессом разработки
-

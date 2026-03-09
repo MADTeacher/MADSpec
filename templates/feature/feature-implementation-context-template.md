@@ -1,5 +1,7 @@
 # Контекст реализации: шаг [NN] - [Название]
 
+> Generated view from structured memory records for this step. Do not use this file as canonical state.
+
 **Шаг**: step-[NN]-[name]
 **Дата начала**: [YYYY-MM-DD]
 **Дата завершения**: [YYYY-MM-DD]

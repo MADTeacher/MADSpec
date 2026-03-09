@@ -284,6 +284,31 @@ madspec branch set feature/new-ui
 madspec branch list
 ```
 
+### memory
+
+Управление structured memory и generated views.
+
+```bash
+madspec memory init [--branch <name>]
+madspec memory status [--branch <name>] [--json-output]
+madspec memory consolidate [--branch <name>]
+madspec memory validate [--branch <name>] [--json-output]
+madspec memory retrieve --stage <stage> [--step-id <id>] [--json-output]
+madspec memory next-step --stage <stage> [--candidate-step <id>] [--depends-on <id>] [--json-output]
+madspec memory promote [--branch <name>] [--json-output]
+madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-output]
+```
+
+**Назначение команд:**
+- `memory init` - создает canonical memory layout и procedural rules
+- `memory status` - показывает состояние structured memory
+- `memory consolidate` - пересобирает markdown views из memory
+- `memory validate` - проверяет schema, state transitions и согласованность views
+- `memory retrieve` - возвращает минимальный контекст для stage/step
+- `memory next-step` - детерминированно выбирает следующий исполнимый шаг или валидирует нового кандидата для planning
+- `memory promote` - переносит validated records в semantic memory
+- `memory learn` - превращает test/review outcomes в learning records
+
 ### check
 
 Проверка установленных инструментов.
@@ -338,7 +363,7 @@ madspec version
 **Выходные артефакты:**
 - `.gitignore` - файл исключений для GIT репозитория
 - `.madspec/<BRANCH>/concept.md` - полная концепция проекта
-- `.madspec/<BRANCH>/project-context.md` - контекст проекта со ссылками на решения
+- `.madspec/<BRANCH>/project-context.md` - generated view контекста проекта
 
 ### Этап 1: Дизайн UI (`madspec.mvp.design`)
 
@@ -358,7 +383,7 @@ madspec version
   - `README.md` - инструкция по запуску локального сервера
   - Локальный сервер (если создан)
 - `.madspec/<BRANCH>/ui-design.md` - описание дизайна с ссылками на прототипы
-- `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта
+- `.madspec/<BRANCH>/project-context.md` - regenerated view контекста проекта
 
 ### Этап 2: Выбор технологий (`madspec.mvp.tech`)
 
@@ -374,7 +399,7 @@ madspec version
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/tech-stack.md` - выбранный стек
-- `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта
+- `.madspec/<BRANCH>/project-context.md` - regenerated view контекста проекта
 
 ### Этап 3: Архитектура (`madspec.mvp.architecture`)
 
@@ -401,17 +426,18 @@ madspec version
 **Особенности:**
 - **Инкрементальный подход**: каждый запуск команды создает только один новый шаг (работа в пределах контекстного окна)
 - Автоматическое определение следующего шага на основе зависимостей и приоритетов (P1 → P2 → P3)
-- Кэширование контекста планирования (`.madspec/<BRANCH>/planning-context-cache.md`) для оптимизации инкрементального режима
+- Кэширование контекста планирования (`.madspec/<BRANCH>/planning-context-cache.md`) как generated view поверх semantic memory
 - Визуализация прогресса планирования после каждого шага (покрытие функций P1, P2, P3)
 - Автоматическое отслеживание метрик покрытия функций по приоритетам
 - Запись ключевых решений о подходе к разбивке
+- Structured memory first: сначала обновляются canonical memory files, затем выполняются `madspec memory consolidate` и `madspec memory validate`
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/implementation-plan.md` - план реализации (обновляется инкрементально)
 - `.madspec/<BRANCH>/steps/step-[NN]-[name]/` - директория с описаниями шагов (создается по одному за запуск)
 - `.madspec/<BRANCH>/memory/progress.json` - файл отслеживания прогресса с метриками планирования
-- `.madspec/<BRANCH>/planning-context-cache.md` - кэш контекста планирования (создается в initial mode)
-- `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта
+- `.madspec/<BRANCH>/planning-context-cache.md` - generated view кэша контекста планирования
+- `.madspec/<BRANCH>/project-context.md` - generated view контекста проекта
 
 ### Этап 5: Реализация (`madspec.mvp.implement`)
 
@@ -422,7 +448,7 @@ madspec version
 - Использование HTML прототипов из `.madspec/<BRANCH>/ui-prototype/` как визуального гайда при реализации интерфейса
 - Автоматическая валидация каждого шага перед переходом к следующему (чек-лист из 7 пунктов)
 - **Обязательные коммиты в GIT после каждого успешно завершенного шага** (только после валидации)
-- Ручное обновление `.madspec/<BRANCH>/memory/progress.json` после каждого успешно завершенного шага
+- Обновление canonical memory files и последующая консолидация generated views
 - Возможность возобновления с любого шага (определение начального шага из `.madspec/<BRANCH>/memory/progress.json`)
 
 **Выходные артефакты:**
@@ -437,8 +463,8 @@ madspec version
 Анализ созданных артефактов, выявление сильных и слабых сторон, сравнение с лучшими практиками и проведение рефлексии над процессом разработки.
 
 **Выходные артефакты:**
-- `.madspec/<BRANCH>/review.md` - детальный отчет с анализом и рекомендациями
-- `.madspec/<BRANCH>/improvements.md` - приоритизированный список улучшений
+- `.madspec/<BRANCH>/review.md` - generated view отчета review
+- `.madspec/<BRANCH>/improvements.md` - generated view списка улучшений
 
 **Особенность**: Этот этап помогает закрепить полученные знания, выявить области для улучшения и провести рефлексию над процессом разработки.
 
@@ -481,6 +507,11 @@ madspec version
 ```
 .madspec/
 ├── config.json           # Конфигурация проекта (текущая ветка)
+├── procedures/           # Процедурные правила поведения и guardrails
+│   ├── next-step-selection.md
+│   ├── validation-checks.md
+│   ├── promotion-guardrails.md
+│   └── learning-rules.md
 ├── templates/            # Шаблоны для артефактов (общие для всех веток)
 │   ├── concept-template.md
 │   ├── ui-design-template.md
@@ -496,6 +527,8 @@ madspec version
 │   ├── review-template.md
 │   ├── security-audit-template.md
 │   ├── planning-state-template.json
+│   ├── active-session-template.json
+│   ├── memory-record-example.json
 │   ├── planning-context-cache-template.md
 │   └── project-context-template.md
 ├── <branch-name>/        # Артефакты для конкретной ветки (MVP или Feature)
@@ -510,12 +543,21 @@ madspec version
 │   │       ├── tasks.md              # Задачи шага
 │   │       ├── tests.md              # Тесты шага
 │   │       ├── validation.md         # Критерии валидации
-│   │       ├── planning-context.md   # Контекст планирования с решениями
-│   │       └── implementation-context.md # Контекст реализации с решениями
+│   │       ├── planning-context.md   # Generated view контекста планирования
+│   │       └── implementation-context.md # Generated view контекста реализации
 │   ├── contracts/        # API контракты (создаются на этапе architecture)
 │   ├── memory/
-│   │   └── progress.json # Файл отслеживания прогресса
-│   ├── planning-context-cache.md # Кэш контекста планирования (создается на этапе plan)
+│   │   ├── progress.json             # Canonical workflow state
+│   │   ├── working/
+│   │   │   ├── active-session.json   # Активная рабочая память
+│   │   │   └── decision-log.jsonl    # Micro-decisions и checkpoints
+│   │   ├── episodes/
+│   │   │   └── events.jsonl          # История действий и результатов
+│   │   └── semantic/
+│   │       ├── facts.jsonl           # Подтвержденные факты
+│   │       ├── decisions.jsonl       # Подтвержденные решения
+│   │       └── contracts.jsonl       # Подтвержденные контракты
+│   ├── planning-context-cache.md # Generated view кэша контекста планирования
 │   ├── concept.md        # Концепция проекта (с ключевыми решениями)
 │   ├── ui-design.md      # Описание дизайна (с ключевыми решениями)
 │   ├── tech-stack.md     # Выбранный стек технологий (с ключевыми решениями)
@@ -523,10 +565,10 @@ madspec version
 │   ├── data-model.md     # Модель данных
 │   ├── deployment.md     # План деплоя и эксплуатации (создается командой madspec.deploy)
 │   ├── implementation-plan.md # План реализации
-│   ├── project-context.md # Навигационный файл (ссылки на решения)
+│   ├── project-context.md # Generated view навигации по памяти проекта
 │   ├── security-audit.md # Отчет по безопасности (с ключевыми решениями)
-│   ├── review.md         # Отчет review (с ключевыми решениями)
-│   ├── improvements.md   # Список улучшений
+│   ├── review.md         # Generated view review
+│   ├── improvements.md   # Generated view списка улучшений
 │   └── feature-context.md # Контекст feature работы (только для Feature режима)
 └── main/                 # Пример: артефакты основной ветки (для Feature режима)
     └── [те же артефакты, что и в <branch-name>/]
@@ -537,6 +579,30 @@ madspec version
 - Ветка определяется автоматически через скрипты в командах (из git или config.json)
 - Шаблоны хранятся в корне `.madspec/templates/` и общие для всех веток
 - Конфигурация проекта хранится в `.madspec/config.json`
+
+### Structured Memory First
+
+В новом workflow MADSpec каноническое состояние хранится в `.madspec/<branch-name>/memory/`, а markdown-файлы контекста являются generated views.
+
+**Canonical memory:**
+- `memory/progress.json` - состояние workflow
+- `memory/working/active-session.json` - текущая рабочая память
+- `memory/working/decision-log.jsonl` - micro-decisions и checkpoints
+- `memory/episodes/events.jsonl` - опыт выполнения
+- `memory/semantic/*.jsonl` - validated knowledge
+
+**Generated views:**
+- `project-context.md`
+- `planning-context-cache.md`
+- `steps/*/planning-context.md`
+- `steps/*/implementation-context.md`
+- `review.md`
+- `improvements.md`
+
+Базовый цикл:
+1. Обновить structured memory
+2. Выполнить `madspec memory consolidate`
+3. Выполнить `madspec memory validate`
 
 ### Новая система контекстов
 
@@ -553,9 +619,9 @@ MADSpec использует модульную систему контекст�
 - Контексты шагов позволяют отслеживать эволюцию проекта пошагово
 
 **Навигационный файл** `project-context.md`:
-- Упрощенный файл-навигатор
-- Содержит ссылки на все артефакты с решениями
-- Показывает текущий статус проекта
+- Generated view
+- Содержит ссылки на все артефакты и summary текущего memory state
+- Не является source of truth
 
 ---
 

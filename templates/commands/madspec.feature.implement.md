@@ -21,6 +21,13 @@ $ARGUMENTS
 - **Дожидайся ответа** и только затем задавай следующий вопрос.
 - Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
 
+## Structured Memory First (обязательно)
+
+- `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
+- `implementation-context.md` и `project-context.md` являются generated views.
+- После validation checkpoint обновляй structured memory, затем выполняй `madspec memory consolidate` и `madspec memory validate`.
+- Для выбора следующего шага реализации сначала используй `madspec memory next-step --stage feature.implement`.
+
 ## Описание
 
 Этап **MADSpec (MADSpec Framework)** для пошаговой реализации новой функциональности. Каждый шаг:
@@ -273,4 +280,3 @@ $ARGUMENTS
 - Финальная проверка функций
 - Демонстрация
 - Рефлексия
-

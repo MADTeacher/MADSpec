@@ -1,0 +1,16 @@
+{
+  "id": "<UUID>",
+  "ts": "2026-03-10T00:00:00+00:00",
+  "branch": "<BRANCH>",
+  "stage": "mvp.plan",
+  "step_id": null,
+  "status": "proposed",
+  "source": "agent",
+  "summary": "Short record summary",
+  "evidence": [
+    ".madspec/<BRANCH>/concept.md"
+  ],
+  "scope": "branch",
+  "record_type": "event",
+  "semantic_kind": "fact"
+}

@@ -33,6 +33,15 @@ rewrite_paths() {
     -e '/\.madspec\/templates\//!s@(^|[[:space:]]|`)(/?)templates/@\1.madspec/templates/@g'
 }
 
+copy_tree_preserving_paths() {
+  local source_root=$1 target_root=$2
+  while IFS= read -r -d '' file; do
+    local relative_path=${file#"$source_root"/}
+    mkdir -p "$target_root/$(dirname "$relative_path")"
+    cp "$file" "$target_root/$relative_path"
+  done < <(find "$source_root" -type f -print0)
+}
+
 generate_copilot_prompts() {
   local agents_dir=$1 prompts_dir=$2
   mkdir -p "$prompts_dir"
@@ -126,7 +135,16 @@ build_variant() {
     esac
   fi
   
-  [[ -d templates ]] && { mkdir -p "$MADSPEC_DIR/templates"; find templates -type f -not -path "templates/commands/*" -exec cp --parents {} "$MADSPEC_DIR"/ \; ; echo "Copied templates -> .madspec/templates"; }
+  [[ -d templates ]] && {
+    mkdir -p "$MADSPEC_DIR/templates"
+    while IFS= read -r -d '' template_file; do
+      relative_path=${template_file#"templates/"}
+      mkdir -p "$MADSPEC_DIR/templates/$(dirname "$relative_path")"
+      cp "$template_file" "$MADSPEC_DIR/templates/$relative_path"
+    done < <(find templates -type f ! -path "templates/commands/*" -print0)
+    echo "Copied templates -> .madspec/templates"
+  }
+  [[ -d procedures ]] && { mkdir -p "$MADSPEC_DIR/procedures"; cp -rp procedures/* "$MADSPEC_DIR/procedures/"; echo "Copied procedures -> .madspec/procedures"; }
 
   case $agent in
     cursor-agent)
@@ -224,4 +242,3 @@ done
 
 echo "Archives in $GENRELEASES_DIR:"
 ls -1 "$GENRELEASES_DIR"/madspec-template-*-"${NEW_VERSION}".zip
-

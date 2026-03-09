@@ -25,6 +25,12 @@ $ARGUMENTS
 - **Дожидайся ответа** и только затем задавай следующий вопрос.
 - Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
 
+## Structured Memory First (обязательно)
+
+- Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
+- Архитектурные решения сначала записывай как semantic records, а markdown-контексты считай generated views.
+- После checkpoint выполняй `madspec memory consolidate` и `madspec memory validate`.
+
 ## Описание
 
 На этом этапе **MADSpec (MADSpec Framework)** создается детальная архитектура **MVP (Minimum Viable Product)** проекта на основе:

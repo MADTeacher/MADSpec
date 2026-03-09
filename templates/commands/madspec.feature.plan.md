@@ -25,6 +25,13 @@ $ARGUMENTS
 - **Дожидайся ответа** и только затем задавай следующий вопрос.
 - Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
 
+## Structured Memory First (обязательно)
+
+- `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
+- `planning-context.md` и `project-context.md` являются generated views.
+- После изменения памяти запускай `madspec memory consolidate` и `madspec memory validate`.
+- Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage feature.plan --candidate-step <step-id> --depends-on <dependency>...`.
+
 ## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
 
 **НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ НЕ ИЗМЕНЯЙ `currentImplementStep` в файле `progress.json`.**
@@ -117,6 +124,8 @@ $ARGUMENTS
    - Сгруппируй функции по связанным файлам (из project-analysis.md)
    - Выбери шаг с наивысшим приоритетом (P1 → P2 → P3)
    - Проверь зависимости (все ли нужные шаги уже запланированы)
+   - После выбора кандидата выполни `madspec memory next-step --stage feature.plan --candidate-step step-[NN]-[name] --depends-on <dep1> ...`
+   - Если команда вернула ошибку, исправь формат шага или зависимости до записи в память
 
 4. **Создание шага на основе анализа:**
 
@@ -317,4 +326,3 @@ $ARGUMENTS
 
 - Планирование завершено (все функции покрыты): `/madspec.feature.implement`
 - Планирование не завершено: запустить `/madspec.feature.plan` снова
-

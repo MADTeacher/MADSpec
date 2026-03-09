@@ -25,6 +25,12 @@ $ARGUMENTS
 - **Дожидайся ответа** и только затем задавай следующий вопрос.
 - Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
 
+## Structured Memory First (обязательно)
+
+- Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
+- Файлы `project-context.md`, `planning-context-cache.md`, `planning-context.md`, `implementation-context.md`, `review.md`, `improvements.md` считаются **generated views**, а не source of truth.
+- Когда нужно обновить контекст, сначала обнови structured memory (`progress.json`, `active-session.json`, JSONL memory logs и semantic records), затем выполни `madspec memory consolidate`, затем `madspec memory validate`.
+
 ## Описание
 
 Этот этап является отправной точкой для **MVP (Minimum Viable Product)** проекта в рамках **MADSpec (MADSpec Framework)**. Здесь определяется **ЧТО** необходимо создать и **ПОЧЕМУ**, без погружения в технические детали.

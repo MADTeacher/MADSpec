@@ -1,5 +1,7 @@
 # Контекст проекта: [НАЗВАНИЕ_ПРОЕКТА]
 
+> Generated view. Canonical state lives in `.madspec/<BRANCH>/memory/` and is rebuilt via `madspec memory consolidate`.
+
 **Последнее обновление**: [ДАТА]
 
 ## Обзор проекта

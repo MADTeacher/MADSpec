@@ -1,5 +1,7 @@
 # Кэш контекста планирования
 
+> Generated view from structured semantic memory and workflow state. Rebuild with `madspec memory consolidate`.
+
 **Дата создания**: [ДАТА]  
 **Дата последнего обновления**: [ДАТА]
 
@@ -22,4 +24,3 @@
 ## Основные зависимости между компонентами
 
 [Описание зависимостей, которые важны для планирования шагов]
-
