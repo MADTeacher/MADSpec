@@ -26,7 +26,14 @@ $ARGUMENTS
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - Архитектурные решения сначала записывай как semantic records, а markdown-контексты считай generated views.
-- После checkpoint выполняй `madspec memory consolidate` и `madspec memory validate`.
+- Для этапа architecture **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.architecture ...`.
+- Минимальный payload checkpoint:
+  - `--summary` — итог архитектурного решения
+  - `--fact` — ключевые сущности, интеграции и ограничения
+  - `--decision` — структура проекта и архитектурные паттерны
+  - `--contract` — inventory API/contracts и важные интерфейсные ограничения
+  - `--evidence` — ссылки на `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/data-model.md`, `.madspec/<BRANCH>/contracts/openapi.yaml`
+- `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 
 ## Описание
 
@@ -178,16 +185,23 @@ $ARGUMENTS
    **Если валидация пройдена:**
    - Подтвердите успешную валидацию
 
-8. **Обновление project-context.md**:
-   - Обнови `.madspec/<BRANCH>/project-context.md`:
-     - Установи текущий этап: "architecture"
-     - Обнови статус этапа архитектуры: "Завершен"
+8. **Checkpoint в structured memory**:
+   - После успешной валидации архитектуры **обязательно** выполни `madspec memory checkpoint --stage mvp.architecture`
+   - Передай минимум:
+     - `--summary` с итогом архитектуры
+     - `--fact` с ключевыми сущностями, интеграциями и ограничениями
+     - `--decision` о структуре проекта и архитектурных паттернах
+     - `--contract` с перечнем API/контрактов и интерфейсных ограничений
+     - `--evidence .madspec/<BRANCH>/architecture.md`
+     - `--evidence .madspec/<BRANCH>/data-model.md`
+     - `--evidence .madspec/<BRANCH>/contracts/openapi.yaml`
+   - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 9. **Сохранение артефактов**:
    - Сохрани `.madspec/<BRANCH>/architecture.md`
    - Сохрани `.madspec/<BRANCH>/data-model.md`
    - Сохрани контракты в `.madspec/<BRANCH>/contracts/`
-   - Обнови `.madspec/<BRANCH>/project-context.md` (только навигацию)
+   - Убедись, что `.madspec/<BRANCH>/project-context.md` был пересобран командой `madspec memory checkpoint`
 
 10. **Отчет**:
    - Выведи пути к созданным файлам
@@ -206,7 +220,8 @@ $ARGUMENTS
 - `.madspec/<BRANCH>/data-model.md` - модель данных
 - `.madspec/<BRANCH>/contracts/` - директория с API контрактами
 - `.madspec/<BRANCH>/contracts/openapi.yaml` - объединенный файл API контрактов
-- `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта
+- `.madspec/<BRANCH>/memory/` - canonical memory с checkpoint этапа architecture
+- `.madspec/<BRANCH>/project-context.md` - generated view контекста проекта
 
 ## Подсказки и помощь
 

@@ -26,7 +26,14 @@ $ARGUMENTS
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - `project-context.md` и другие markdown-контексты обновляются только как generated views.
-- Сначала фиксируй semantic/episodic records, затем запускай `madspec memory consolidate` и `madspec memory validate`.
+- Для этапа tech **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.tech ...`.
+- Минимальный payload checkpoint:
+  - `--summary` — итог выбранного стека
+  - `--fact` — ограничения и требования проекта, повлиявшие на выбор
+  - `--decision` — утвержденные технологии и способ организации кода
+  - `--contract` — важные compatibility constraints или обязательные версии
+  - `--evidence` — ссылки на `.madspec/<BRANCH>/tech-stack.md`
+- `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 
 ## Описание
 
@@ -167,9 +174,16 @@ $ARGUMENTS
    - Подтверди успешную валидацию
    - Переходи к обновлению контекста
 
-7. **Обновление контекста**:
-   - Обнови `.madspec/<BRANCH>/project-context.md` с информацией о стеке
-   - Добавь ссылки на документацию выбранных технологий
+7. **Checkpoint в structured memory**:
+   - После утверждения стека **обязательно** выполни `madspec memory checkpoint --stage mvp.tech`
+   - Передай минимум:
+     - `--summary` с итогом выбранного технологического стека
+     - `--fact` с ключевыми требованиями и ограничениями проекта
+     - `--decision` для каждого утвержденного компонента стека
+     - `--decision` с выбранным подходом организации кода
+     - `--contract` для обязательных compatibility constraints или фиксированных версий
+     - `--evidence .madspec/<BRANCH>/tech-stack.md`
+   - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 8. **Отчет**:
    - Выведи путь к созданным файлам
@@ -195,7 +209,8 @@ $ARGUMENTS
 ## Выходные артефакты
 
 - `.madspec/<BRANCH>/tech-stack.md` - выбранный технологический стек (где `<BRANCH>` - имя текущей ветки)
-- `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта
+- `.madspec/<BRANCH>/memory/` - canonical memory с checkpoint этапа tech
+- `.madspec/<BRANCH>/project-context.md` - generated view контекста проекта
 
 ## Следующий этап
 

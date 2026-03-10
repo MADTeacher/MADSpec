@@ -268,6 +268,110 @@ def test_memory_register_step_updates_progress_and_views(tmp_path: Path, monkeyp
     assert (project_path / ".madspec" / "main" / "planning-context-cache.md").exists()
 
 
+def test_memory_checkpoint_updates_memory_and_retrieve_context(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.concept",
+            "--summary",
+            "Concept validated for MVP scheduling assistant",
+            "--fact",
+            "Primary audience: freelancers scheduling appointments",
+            "--decision",
+            "P1 focuses on appointment booking and reminders",
+            "--contract",
+            "Booking workflow must keep reminder settings editable",
+            "--evidence",
+            ".madspec/main/concept.md",
+            "--question",
+            "Should team bookings be part of MVP?",
+            "--pending-action",
+            "Proceed to mvp.design",
+            "--json-output",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True
+    paths = get_memory_paths(project_path, "main")
+
+    active_session = json.loads(paths["active_session"].read_text(encoding="utf-8"))
+    assert active_session["stage"] == "mvp.concept"
+    assert active_session["active_goal"] == "Concept validated for MVP scheduling assistant"
+    assert active_session["open_questions"] == ["Should team bookings be part of MVP?"]
+    assert active_session["pending_actions"] == ["Proceed to mvp.design"]
+
+    retrieve_result = runner.invoke(
+        cli.app,
+        ["memory", "retrieve", "--branch", "main", "--stage", "mvp.concept", "--json-output"],
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["active_session"]["stage"] == "mvp.concept"
+    assert retrieve_payload["semantic"]["facts"][0]["summary"] == "Primary audience: freelancers scheduling appointments"
+    assert retrieve_payload["semantic"]["decisions"][0]["summary"] == "P1 focuses on appointment booking and reminders"
+    assert retrieve_payload["semantic"]["contracts"][0]["summary"] == "Booking workflow must keep reminder settings editable"
+
+    project_context = (project_path / ".madspec" / "main" / "project-context.md").read_text(encoding="utf-8")
+    assert "Current stage: `mvp.concept`" in project_context
+    assert "Active goal: `Concept validated for MVP scheduling assistant`" in project_context
+
+
+def test_memory_checkpoint_rejects_invalid_stage_and_empty_summary(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".madspec").mkdir()
+    (tmp_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    invalid_stage = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--summary",
+            "bad",
+            "--json-output",
+        ],
+    )
+    assert invalid_stage.exit_code == 1, invalid_stage.stdout
+
+    empty_summary = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.concept",
+            "--summary",
+            "",
+            "--json-output",
+        ],
+    )
+    assert empty_summary.exit_code == 1, empty_summary.stdout
+
+
 def test_memory_register_step_requires_waiver_reason_for_waived_policy(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".madspec").mkdir()
@@ -350,8 +454,6 @@ def test_memory_register_step_accepts_non_code_not_applicable_policy(tmp_path: P
             "non-code",
             "--tdd-policy",
             "not-applicable",
-            "--covers",
-            "Authentication",
             "--json-output",
         ],
     )
@@ -363,6 +465,49 @@ def test_memory_register_step_accepts_non_code_not_applicable_policy(tmp_path: P
         "tddPolicy": "not-applicable",
         "waiverReason": None,
     }
+    assert payload["covers"] == {"p1": [], "p2": [], "p3": []}
+
+
+def test_memory_register_step_requires_covers_for_code_steps(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".madspec").mkdir()
+    (tmp_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = tmp_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- Authentication: sign in users
+""",
+        encoding="utf-8",
+    )
+
+    init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-authentication",
+            "--step-kind",
+            "code",
+            "--json-output",
+        ],
+    )
+
+    assert result.exit_code == 1, result.stdout
+    assert "code steps must declare at least one covered function" in result.stdout
 
 
 def test_memory_register_step_rejects_invalid_step_kind_and_tdd_policy(tmp_path: Path, monkeypatch) -> None:

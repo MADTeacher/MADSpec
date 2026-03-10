@@ -26,7 +26,13 @@ $ARGUMENTS
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - Все markdown-контексты считаются generated views.
-- Любое обновление контекста выполняй через structured memory -> `madspec memory consolidate` -> `madspec memory validate`.
+- Для этапа design **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.design ...`.
+- Минимальный payload checkpoint:
+  - `--summary` — итоговое решение по UI/UX
+  - `--fact` — покрытие экранов и пользовательских потоков
+  - `--decision` — выбранные UI-паттерны и ограничения платформ
+  - `--evidence` — ссылки на `.madspec/<BRANCH>/ui-design.md` и `.madspec/<BRANCH>/ui-prototype/index.html`
+- `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 
 ## Описание
 
@@ -174,10 +180,15 @@ $ARGUMENTS
    - Подтверди успешную валидацию
    - Переходи к шагу 4
 
-4. **Обновление project-context.md**:
-   - Обнови `.madspec/<BRANCH>/project-context.md`:
-     - Установи текущий этап: "design"
-     - Обнови статус этапа дизайна: "Завершен"
+4. **Checkpoint в structured memory**:
+   - После утверждения дизайна **обязательно** выполни `madspec memory checkpoint --stage mvp.design`
+   - Передай минимум:
+     - `--summary` с итогом UI/UX решения
+     - `--fact` о покрытии всех функций экранами и пользовательскими потоками
+     - `--decision` о выбранных паттернах навигации и платформенных ограничениях
+     - `--evidence .madspec/<BRANCH>/ui-design.md`
+     - `--evidence .madspec/<BRANCH>/ui-prototype/index.html`
+   - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 5. **Создание файлов дизайна**:
    - Создай директорию `.madspec/<BRANCH>/ui-prototype/` для HTML/CSS прототипов
@@ -185,7 +196,7 @@ $ARGUMENTS
    - Для каждого экрана создай отдельный HTML файл с встроенным CSS на основе `html-prototype-template.html`
    - Создай главный файл `index.html` на основе `index-prototype-template.html`, который служит точкой входа и содержит навигацию между экранами
    - Сохрани описание дизайна в `.madspec/<BRANCH>/ui-design.md`
-   - Обнови `.madspec/<BRANCH>/project-context.md` (только навигацию)
+   - Убедись, что `.madspec/<BRANCH>/project-context.md` был пересобран командой `madspec memory checkpoint`
 
 6. **Требование для утверждения дизайна**:
    - **КРИТИЧНО**: Попроси просмотреть и утвердить дизайн
@@ -229,7 +240,8 @@ $ARGUMENTS
   - `styles.css` или встроенные стили в каждом HTML файле
   - `[local_server_host]` - директория с локальным сервером или пару файлов
 - `.madspec/<BRANCH>/ui-design.md` - описание дизайна интерфейса (ссылки на прототипы, описание потоков)
-- `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта
+- `.madspec/<BRANCH>/memory/` - canonical memory с checkpoint этапа design
+- `.madspec/<BRANCH>/project-context.md` - generated view контекста проекта
 
 ## Следующий этап
 

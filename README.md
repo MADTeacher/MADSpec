@@ -291,9 +291,10 @@ madspec memory init [--branch <name>]
 madspec memory status [--branch <name>] [--json-output]
 madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
+madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--json-output]
 madspec memory next-step --stage <stage> [--candidate-step <id>] [--depends-on <id>] [--json-output]
-madspec memory register-step --stage <stage> --step-id <id> --step-kind <code|non-code> --covers <function> [--tdd-policy <required|waived|not-applicable>] [--waiver-reason <text>] [--depends-on <id>] [--json-output]
+madspec memory register-step --stage <stage> --step-id <id> --step-kind <code|non-code> [--covers <function>] [--tdd-policy <required|waived|not-applicable>] [--waiver-reason <text>] [--depends-on <id>] [--json-output]
 madspec memory promote [--branch <name>] [--json-output]
 madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-output]
 ```
@@ -303,9 +304,10 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory status` - показывает состояние structured memory
 - `memory consolidate` - пересобирает markdown views из memory
 - `memory validate` - проверяет schema, state transitions и согласованность views
+- `memory checkpoint` - канонически фиксирует checkpoint неитеративного этапа MVP, обновляет active session и semantic records, затем пересобирает generated views
 - `memory retrieve` - возвращает минимальный контекст для stage/step
 - `memory next-step` - детерминированно выбирает следующий исполнимый шаг или валидирует нового кандидата для planning
-- `memory register-step` - канонически регистрирует новый planned step, его TDD metadata и автоматически обновляет coverage metadata в `progress.json`
+- `memory register-step` - канонически регистрирует новый planned step, его TDD metadata и автоматически обновляет coverage metadata в `progress.json`; `--covers` обязателен для `code` шагов и опционален для `non-code`
 - `memory promote` - переносит validated records в semantic memory
 - `memory learn` - превращает test/review outcomes в learning records
 
@@ -357,7 +359,7 @@ madspec version
 **Особенности:**
 - Автоматическая инициализация GIT репозитория с детальным `.gitignore` (исключает секреты, зависимости, временные файлы)
 - Автоматическая валидация концепции перед переходом к следующему этапу
-- Запись ключевых решений (1-3 критичных на этап)
+- Обязательный checkpoint через `madspec memory checkpoint --stage mvp.concept`
 - Первый коммит в GIT после создания концепции
 
 **Выходные артефакты:**
@@ -374,7 +376,7 @@ madspec version
 - Прототипы создаются с учетом платформ из концепции - мобильные паттерны для Mobile, десктопные для Desktop, адаптивные для Web
 - Создание локального сервера для просмотра прототипов (Go, Python или Node.js)
 - Автоматическая валидация дизайна (покрытие функций, логика потоков, соответствие платформам)
-- Запись ключевых решений о паттернах UI и структуре навигации
+- Обязательный checkpoint через `madspec memory checkpoint --stage mvp.design`
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/ui-prototype/` - директория с HTML/CSS прототипами
@@ -394,8 +396,7 @@ madspec version
 - Обсуждение каждого выбора
 - Консультация по структуре проекта
 - Автоматическая валидация выбора технологий
-- Запись ключевых технологических решений
-- Автоматическое обновление прогресса через structured memory
+- Обязательный checkpoint через `madspec memory checkpoint --stage mvp.tech`
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/tech-stack.md` - выбранный стек
@@ -404,6 +405,10 @@ madspec version
 ### Этап 3: Архитектура (`madspec.mvp.architecture`)
 
 Проектирование архитектуры, структуры проекта, модели данных и API контрактов на основе HTML прототипов.
+
+**Особенности:**
+- Обязательный checkpoint через `madspec memory checkpoint --stage mvp.architecture`
+- Архитектурные решения и inventory контрактов фиксируются в semantic memory до регенерации `project-context.md`
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/architecture.md` - архитектура проекта
@@ -608,6 +613,8 @@ madspec version
 2. Выполнить `madspec memory consolidate`
 3. Выполнить `madspec memory validate`
 
+Для ранних MVP-этапов canonical update выполняется командой `madspec memory checkpoint`, которая делает все три шага автоматически.
+
 ### Новая система контекстов
 
 MADSpec использует модульную систему контекстов:
@@ -615,6 +622,7 @@ MADSpec использует модульную систему контекст�
 **Неитеративные этапы** (concept, design, tech, architecture, security, review):
 - Ключевые решения встроены в артефакт этапа (в конце файла)
 - Записываются 1-3 самых критичных решения с кратким обоснованием
+- Для MVP этапов `concept`, `design`, `tech`, `architecture` дополнительно обязателен `madspec memory checkpoint`, который пишет canonical checkpoint в `.madspec/<branch-name>/memory/`
 
 **Итеративные этапы** (plan, implement):
 - Каждый шаг имеет собственные контексты:

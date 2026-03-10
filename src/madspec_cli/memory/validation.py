@@ -218,7 +218,11 @@ def validate_branch_memory(project_path: Path, branch_name: str) -> list[str]:
         if catalog:
             known_functions = {item for values in catalog.values() for item in values}
             for step_id, coverage in progress.get("coversFunctions", {}).items():
+                if not isinstance(coverage, dict):
+                    continue
                 for priority, values in coverage.items():
+                    if not isinstance(values, list):
+                        continue
                     for value in values:
                         if value not in known_functions:
                             errors.append(

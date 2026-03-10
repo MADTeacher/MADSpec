@@ -1,3 +1,4 @@
+from .checkpoint import CHECKPOINT_STAGES, checkpoint_stage_memory
 from .learning import learn_from_outcomes, promote_validated_records
 from .planning import (
     NextStepDecision,
@@ -45,6 +46,8 @@ __all__ = [
     "_default_active_session",
     "_default_progress_state",
     "append_jsonl",
+    "CHECKPOINT_STAGES",
+    "checkpoint_stage_memory",
     "consolidate_branch_memory",
     "detect_branch",
     "determine_next_step",

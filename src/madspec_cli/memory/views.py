@@ -56,6 +56,7 @@ def _render_project_context(
         f"- Last generated: `{generated_at}`",
         f"- Current stage: `{current_stage}`",
         f"- Current step: `{current_step}`",
+        f"- Active goal: `{active_session.get('active_goal', '') or 'N/A'}`",
         f"- Progress: `{len(completed_steps)}/{len(planned_steps)}` completed",
         "",
         "## Planned Steps",

@@ -5,6 +5,8 @@ from pathlib import Path
 import typer
 
 from ..memory import (
+    CHECKPOINT_STAGES,
+    checkpoint_stage_memory,
     consolidate_branch_memory,
     ensure_memory_layout,
     get_memory_paths,
@@ -18,6 +20,64 @@ from ..memory import (
 )
 from ..project_state import create_madspec_config, emit_json, resolve_branch_name
 from ..ui import console, show_banner
+
+
+def memory_checkpoint(
+    stage: str = typer.Option(..., "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, or mvp.architecture"),
+    summary: str = typer.Option(..., "--summary", help="Stage checkpoint summary"),
+    fact: list[str] = typer.Option(None, "--fact", help="Validated fact; repeat for multiple values"),
+    decision: list[str] = typer.Option(None, "--decision", help="Validated decision; repeat for multiple values"),
+    contract: list[str] = typer.Option(None, "--contract", help="Validated contract/constraint; repeat for multiple values"),
+    evidence: list[str] = typer.Option(None, "--evidence", help="Supporting evidence path or note; repeat for multiple values"),
+    question: list[str] = typer.Option(None, "--question", help="Open question to store in active session; repeat for multiple values"),
+    pending_action: list[str] = typer.Option(None, "--pending-action", help="Pending action to store in active session; repeat for multiple values"),
+    branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
+    json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+) -> None:
+    """Persist a non-iterative stage checkpoint into structured memory."""
+    project_path = Path.cwd()
+    target_branch = resolve_branch_name(project_path, branch_name)
+    payload = checkpoint_stage_memory(
+        project_path,
+        target_branch,
+        stage,
+        summary,
+        facts=fact or [],
+        decisions=decision or [],
+        contracts=contract or [],
+        evidence=evidence or [],
+        questions=question or [],
+        pending_actions=pending_action or [],
+    )
+
+    if json_output:
+        emit_json(payload)
+        if not payload.get("accepted"):
+            raise typer.Exit(1)
+        return
+
+    show_banner()
+    console.print(f"[cyan]Branch:[/cyan] {target_branch}")
+    console.print(f"[cyan]Stage:[/cyan] {stage}")
+    if payload.get("accepted"):
+        written = payload["written"]
+        console.print(f"[green]Checkpoint saved for stage:[/green] {stage}")
+        console.print(
+            "[cyan]Records:[/cyan] "
+            f"decision_log={written['decision_log']} "
+            f"facts={written['facts']} "
+            f"decisions={written['decisions']} "
+            f"contracts={written['contracts']}"
+        )
+        return
+
+    console.print(
+        "[red]Checkpoint rejected.[/red] "
+        f"Allowed stages: {', '.join(sorted(CHECKPOINT_STAGES))}"
+    )
+    for error in payload.get("errors", []):
+        console.print(f"[red]- {error}[/red]")
+    raise typer.Exit(1)
 
 
 def memory_init(
@@ -202,7 +262,11 @@ def memory_next_step(
 def memory_register_step(
     stage: str = typer.Option(..., "--stage", help="Planning stage, e.g. mvp.plan or feature.plan"),
     step_id: str = typer.Option(..., "--step-id", help="New step identifier"),
-    covers: list[str] = typer.Option(..., "--covers", help="Covered function ids/labels; repeat the option for multiple values"),
+    covers: list[str] = typer.Option(
+        None,
+        "--covers",
+        help="Covered function ids/labels; repeat for multiple values. Required for code steps, optional for non-code.",
+    ),
     step_kind: str = typer.Option(..., "--step-kind", help="Step kind: code or non-code"),
     tdd_policy: str = typer.Option(None, "--tdd-policy", help="TDD policy: required, waived, or not-applicable"),
     waiver_reason: str = typer.Option(None, "--waiver-reason", help="Reason for waiving TDD on non-code steps"),
@@ -220,7 +284,7 @@ def memory_register_step(
         target_branch,
         stage,
         step_id=step_id,
-        covers=covers,
+        covers=covers or [],
         step_kind=step_kind,
         tdd_policy=tdd_policy,
         waiver_reason=waiver_reason,
@@ -316,6 +380,7 @@ def register(memory_app: typer.Typer) -> None:
     memory_app.command("status")(memory_status)
     memory_app.command("consolidate")(memory_consolidate)
     memory_app.command("validate")(memory_validate)
+    memory_app.command("checkpoint")(memory_checkpoint)
     memory_app.command("retrieve")(memory_retrieve)
     memory_app.command("next-step")(memory_next_step)
     memory_app.command("register-step")(memory_register_step)

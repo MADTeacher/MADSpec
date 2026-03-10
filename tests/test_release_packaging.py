@@ -37,3 +37,17 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "get-branch" not in command_body
         assert "--step-kind" in command_body
         assert "red -> green -> refactor" in command_body
+
+        for stage_name in (
+            "madspec.mvp.concept",
+            "madspec.mvp.design",
+            "madspec.mvp.tech",
+            "madspec.mvp.architecture",
+        ):
+            stage_command = next(
+                name
+                for name in names
+                if name.endswith(f"{stage_name}.md") or name.endswith(f"{stage_name}.agent.md")
+            )
+            stage_body = zf.read(stage_command).decode("utf-8")
+            assert "madspec memory checkpoint" in stage_body

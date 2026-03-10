@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from madspec_cli.memory import (
+    checkpoint_stage_memory,
     append_jsonl,
     consolidate_branch_memory,
     determine_next_step,
@@ -449,6 +450,77 @@ def test_register_planned_step_supports_non_code_waiver(tmp_path: Path) -> None:
     assert progress["stepStatus"]["step-01-design-polish"]["tddPhase"] == "waived"
 
 
+def test_register_planned_step_supports_non_code_without_coverage(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+
+    payload = register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-01-project-setup",
+        covers=[],
+        step_kind="non-code",
+        tdd_policy="not-applicable",
+        summary="Bootstrap project structure before functional slices.",
+    )
+
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+
+    assert payload["accepted"] is True
+    assert payload["covers"] == {"p1": [], "p2": [], "p3": []}
+    assert progress["coversFunctions"]["step-01-project-setup"] == {"p1": [], "p2": [], "p3": []}
+    assert progress["stepStatus"]["step-01-project-setup"]["tddPhase"] == "waived"
+
+
+def test_register_planned_step_normalizes_markdown_catalog_labels(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    (paths["branch_dir"] / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- **Создание поста в CRM**
+""",
+        encoding="utf-8",
+    )
+
+    payload = register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-01-posting-foundation",
+        covers=["Создание поста в CRM"],
+        step_kind="code",
+    )
+
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+
+    assert payload["accepted"] is True
+    assert progress["coversFunctions"]["step-01-posting-foundation"] == {
+        "p1": ["Создание поста в CRM"],
+        "p2": [],
+        "p3": [],
+    }
+
+
+def test_register_planned_step_reports_known_labels_for_unknown_cover(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+
+    payload = register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-01-authentication",
+        covers=["Unknown capability"],
+        step_kind="code",
+    )
+
+    assert payload["accepted"] is False
+    assert "concept.md" in payload["errors"][0]
+    assert "User authentication" in payload["errors"][0]
+
+
 def test_ensure_memory_layout_normalizes_legacy_tdd_fields(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _write_mvp_concept(paths["branch_dir"])
@@ -496,6 +568,53 @@ def test_ensure_memory_layout_normalizes_legacy_tdd_fields(tmp_path: Path) -> No
     }
     assert progress["stepStatus"]["step-01-bootstrap"]["tddPhase"] == "waived"
     assert progress["stepStatus"]["step-02-auth"]["tddPhase"] == "not_started"
+
+
+def test_ensure_memory_layout_normalizes_legacy_coverage_shape(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+    write_json(
+        paths["progress"],
+        {
+            "currentImplementStep": None,
+            "completedSteps": [],
+            "plannedSteps": ["step-01-bootstrap"],
+            "stepStatus": {
+                "step-01-bootstrap": {"status": "planned", "tddPhase": "not_started"}
+            },
+            "stepMetadata": {
+                "step-01-bootstrap": _step_metadata("non-code", "not-applicable")
+            },
+            "coversFunctions": {
+                "step-01-bootstrap": []
+            },
+            "planningMetadata": {
+                "lastPlannedStep": "step-01-bootstrap",
+                "planningPhase": "initial",
+                "totalStepsEstimated": 1,
+                "stepDependencies": {},
+                "progressMetrics": {
+                    "p1Coverage": {"covered": 99, "total": 0, "percentage": 99},
+                    "p2Coverage": {"covered": 99, "total": 0, "percentage": 99},
+                    "p3Coverage": {"covered": 99, "total": 0, "percentage": 99},
+                    "overallProgress": 99,
+                },
+            },
+        },
+    )
+
+    ensure_memory_layout(paths["branch_dir"].parents[1], "main")
+    consolidate_branch_memory(paths["branch_dir"].parents[1], "main")
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+
+    assert progress["coversFunctions"]["step-01-bootstrap"] == {"p1": [], "p2": [], "p3": []}
+    assert progress["planningMetadata"]["progressMetrics"] == {
+        "p1Coverage": {"covered": 0, "total": 2, "percentage": 0},
+        "p2Coverage": {"covered": 0, "total": 1, "percentage": 0},
+        "p3Coverage": {"covered": 0, "total": 1, "percentage": 0},
+        "overallProgress": 0,
+    }
+    assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
 
 
 def test_validate_requires_completed_code_step_to_finish_tdd_cycle(tmp_path: Path) -> None:
@@ -582,3 +701,52 @@ def test_validate_requires_waiver_reason_for_waived_step(tmp_path: Path) -> None
     errors = validate_branch_memory(paths["branch_dir"].parents[1], "main")
 
     assert any("waiverReason is required" in error for error in errors)
+
+
+def test_checkpoint_stage_memory_updates_active_session_and_project_context(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    payload = checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.tech",
+        "Tech stack approved for MVP",
+        facts=["Need web delivery and fast iteration"],
+        decisions=["Use FastAPI for backend and HTMX for frontend"],
+        contracts=["Python version must remain 3.13"],
+        evidence=[".madspec/main/tech-stack.md"],
+        questions=["Do we need offline mode?"],
+        pending_actions=["Proceed to mvp.architecture"],
+    )
+
+    assert payload["accepted"] is True
+    active_session = json.loads(paths["active_session"].read_text(encoding="utf-8"))
+    assert active_session["stage"] == "mvp.tech"
+    assert active_session["active_goal"] == "Tech stack approved for MVP"
+    assert active_session["current_hypotheses"] == ["Use FastAPI for backend and HTMX for frontend"]
+
+    project_context = (paths["branch_dir"] / "project-context.md").read_text(encoding="utf-8")
+    assert "Current stage: `mvp.tech`" in project_context
+    assert "Active goal: `Tech stack approved for MVP`" in project_context
+
+    retrieved = retrieve_memory_context(paths["branch_dir"].parents[1], "main", "mvp.tech")
+    assert retrieved["semantic"]["facts"][0]["summary"] == "Need web delivery and fast iteration"
+    assert retrieved["semantic"]["decisions"][0]["summary"] == "Use FastAPI for backend and HTMX for frontend"
+    assert retrieved["semantic"]["contracts"][0]["summary"] == "Python version must remain 3.13"
+
+
+def test_checkpoint_stage_memory_is_atomic_on_invalid_payload(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    original_active_session = paths["active_session"].read_text(encoding="utf-8")
+    original_decision_log = paths["decision_log"].read_text(encoding="utf-8")
+
+    payload = checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        "",
+    )
+
+    assert payload["accepted"] is False
+    assert paths["active_session"].read_text(encoding="utf-8") == original_active_session
+    assert paths["decision_log"].read_text(encoding="utf-8") == original_decision_log

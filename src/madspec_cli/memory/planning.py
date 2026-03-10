@@ -9,6 +9,7 @@ from .records import STEP_ID_PATTERN, make_record
 from .storage import (
     _default_active_session,
     _default_progress_state,
+    _default_step_coverage,
     _default_step_metadata,
     _default_step_status,
     append_jsonl,
@@ -99,7 +100,9 @@ def _extract_mvp_functions(concept_path: Path) -> dict[str, list[str]]:
         value = line[2:].strip()
         if ":" in value:
             value = value.split(":", 1)[0].strip()
-        priorities[current_priority].append(value)
+        value = _normalize_function_label(value)
+        if value:
+            priorities[current_priority].append(value)
     return priorities
 
 
@@ -122,10 +125,32 @@ def _extract_feature_functions(analysis_path: Path) -> dict[str, list[str]]:
             continue
         if not current_priority or not line.startswith("- **"):
             continue
-        match = re.match(r"- \*\*([^*]+)\*\*:", line)
+        match = re.match(r"- \*\*([^*]+)\*\*(?::|$)", line)
         if match:
-            priorities[current_priority].append(match.group(1).strip())
+            priorities[current_priority].append(_normalize_function_label(match.group(1)))
     return priorities
+
+
+def _normalize_function_label(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", value).strip()
+    while normalized.startswith("**") and normalized.endswith("**") and len(normalized) >= 4:
+        normalized = normalized[2:-2].strip()
+    return normalized
+
+
+def _catalog_source_name(stage: str) -> str:
+    return "project-analysis.md" if "feature." in stage.lower() else "concept.md"
+
+
+def _known_function_samples(catalog: dict[str, list[str]], limit: int = 5) -> str:
+    values: list[str] = []
+    for priority in ("p1", "p2", "p3"):
+        for item in catalog.get(priority, []):
+            if item not in values:
+                values.append(item)
+            if len(values) >= limit:
+                return ", ".join(values)
+    return ", ".join(values)
 
 
 def extract_function_catalog(project_path: Path, branch_name: str, stage: str) -> dict[str, list[str]]:
@@ -147,7 +172,11 @@ def _compute_progress_metrics(
         total = len(catalog.get(priority, []))
         covered_names: set[str] = set()
         for step_coverage in covers_functions.values():
-            covered_names.update(step_coverage.get(priority, []))
+            if not isinstance(step_coverage, dict):
+                continue
+            values = step_coverage.get(priority, [])
+            if isinstance(values, list):
+                covered_names.update(item for item in values if isinstance(item, str))
         covered = len(covered_names.intersection(set(catalog.get(priority, []))))
         percentage = int(round((covered / total) * 100)) if total else 0
         metrics[f"{priority}Coverage"] = {
@@ -325,29 +354,38 @@ def register_planned_step(
             errors=["waiver reason is only allowed when TDD policy is waived"],
         ).to_payload()
 
+    normalized_covers = [_normalize_function_label(item) for item in covers]
+    normalized_covers = [item for item in normalized_covers if item]
+
+    if step_kind == "code" and not normalized_covers:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["code steps must declare at least one covered function"],
+        ).to_payload()
+
     catalog = extract_function_catalog(project_path, branch_name, stage)
+    catalog_source = _catalog_source_name(stage)
     known_functions = {
         item: priority for priority, items in catalog.items() for item in items
     }
-    if not known_functions:
+    if not known_functions and normalized_covers:
         return RegisterStepResult(
             accepted=False,
             step_id=step_id,
-            errors=["no functions catalog found for the target stage"],
+            errors=[f"no functions catalog found in {catalog_source} for the target stage"],
         ).to_payload()
 
-    unknown = [item for item in covers if item not in known_functions]
+    unknown = [item for item in normalized_covers if item not in known_functions]
     if unknown:
+        choices = _known_function_samples(catalog)
+        suggestion = f" Known labels from {catalog_source}: {choices}" if choices else ""
         return RegisterStepResult(
             accepted=False,
             step_id=step_id,
-            errors=[f"unknown covered functions: {', '.join(unknown)}"],
-        ).to_payload()
-    if not covers:
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=["at least one covered function must be provided"],
+            errors=[
+                f"unknown covered functions in {catalog_source}: {', '.join(unknown)}.{suggestion}"
+            ],
         ).to_payload()
 
     planned_steps = progress.setdefault("plannedSteps", [])
@@ -372,8 +410,8 @@ def register_planned_step(
     )
 
     covers_functions = progress.setdefault("coversFunctions", {})
-    covers_functions[step_id] = {"p1": [], "p2": [], "p3": []}
-    for item in covers:
+    covers_functions[step_id] = _default_step_coverage()
+    for item in normalized_covers:
         covers_functions[step_id][known_functions[item]].append(item)
 
     progress["planningMetadata"]["progressMetrics"] = _compute_progress_metrics(
@@ -404,7 +442,7 @@ def register_planned_step(
                 record_type="planned_step",
                 metadata={
                     "depends_on": list(depends_on or []),
-                    "covers": list(covers),
+                    "covers": list(normalized_covers),
                     "step_kind": step_kind,
                     "tdd_policy": effective_tdd_policy,
                     "waiver_reason": waiver_reason,

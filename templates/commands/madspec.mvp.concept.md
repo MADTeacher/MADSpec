@@ -26,7 +26,13 @@ $ARGUMENTS
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - Файлы `project-context.md`, `planning-context-cache.md`, `planning-context.md`, `implementation-context.md`, `review.md`, `improvements.md` считаются **generated views**, а не source of truth.
-- Когда нужно обновить контекст, сначала обнови structured memory (`progress.json`, `active-session.json`, JSONL memory logs и semantic records), затем выполни `madspec memory consolidate`, затем `madspec memory validate`.
+- Для этапа concept **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.concept ...`.
+- Минимальный payload checkpoint:
+  - `--summary` — краткий итог концепции
+  - `--fact` — проблема проекта, целевая аудитория, ограничения
+  - `--decision` — приоритизация функций P1/P2/P3
+  - `--evidence` — ссылки на `.madspec/<BRANCH>/concept.md` и другие опорные артефакты
+- `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 
 ## Описание
 
@@ -153,17 +159,20 @@ $ARGUMENTS
    - Подтверди успешную валидацию
    - Переходи к следующему этапу
 
-7. **Обновление project-context.md**:
-   - Создай/обнови `.madspec/<BRANCH>/project-context.md` из шаблона `.madspec/templates/project-context-template.md`
-   - Заполни:
-     - Название проекта
-     - Краткое описание проекта
-     - Текущий этап: "concept"
-     - Статус этапа концепции: "Завершен"
+7. **Checkpoint в structured memory**:
+   - После финальной валидации **обязательно** выполни `madspec memory checkpoint --stage mvp.concept`
+   - Передай минимум:
+     - `--summary` с итогом концепции
+     - `--fact` с формулировкой проблемы проекта
+     - `--fact` с описанием целевой аудитории
+     - `--fact` с ключевыми ограничениями или предположениями
+     - `--decision` с итоговой приоритизацией функций P1/P2/P3
+     - `--evidence .madspec/<BRANCH>/concept.md`
+   - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 8. **Сохранение файлов**:
    - Сохрани `.madspec/<BRANCH>/concept.md` (где `<BRANCH>` - имя ветки, определенное в шаге 0)
-   - Сохрани `.madspec/<BRANCH>/project-context.md` (только навигация)
+   - Убедись, что `.madspec/<BRANCH>/project-context.md` был пересобран командой `madspec memory checkpoint`
 
 ## Правила
 
@@ -176,7 +185,8 @@ $ARGUMENTS
 
 - `.gitignore` - файл исключений для GIT репозитория
 - `.madspec/<BRANCH>/concept.md` - полная концепция проекта (где `<BRANCH>` - имя текущей ветки)
-- `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта
+- `.madspec/<BRANCH>/memory/` - canonical memory с checkpoint этапа concept
+- `.madspec/<BRANCH>/project-context.md` - generated view контекста проекта
 
 ## Следующий этап
 

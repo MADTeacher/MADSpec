@@ -12,6 +12,7 @@ from .records import PROCEDURE_FILES
 STEP_KINDS = {"code", "non-code"}
 TDD_POLICIES = {"required", "waived", "not-applicable"}
 TDD_PHASES = {"not_started", "red", "green", "refactor", "completed", "waived"}
+PRIORITIES = ("p1", "p2", "p3")
 LEGACY_TDD_WAIVER_REASON = "Legacy step migrated without recorded TDD evidence."
 
 
@@ -108,6 +109,22 @@ def _default_step_metadata(
     }
 
 
+def _default_step_coverage() -> dict[str, list[str]]:
+    return {priority: [] for priority in PRIORITIES}
+
+
+def _normalize_step_coverage(coverage: Any) -> dict[str, list[str]]:
+    normalized = _default_step_coverage()
+    if not isinstance(coverage, dict):
+        return normalized
+
+    for priority in PRIORITIES:
+        values = coverage.get(priority, [])
+        if isinstance(values, list):
+            normalized[priority] = [item for item in values if isinstance(item, str)]
+    return normalized
+
+
 def normalize_progress_state(progress: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     changed = False
     normalized = dict(progress)
@@ -122,6 +139,18 @@ def normalize_progress_state(progress: dict[str, Any]) -> tuple[dict[str, Any], 
     planned_steps = normalized.get("plannedSteps", [])
     step_status = normalized.setdefault("stepStatus", {})
     step_metadata = normalized.setdefault("stepMetadata", {})
+    covers_functions = normalized.setdefault("coversFunctions", {})
+
+    if not isinstance(covers_functions, dict):
+        covers_functions = {}
+        normalized["coversFunctions"] = covers_functions
+        changed = True
+
+    for step_id, coverage in list(covers_functions.items()):
+        normalized_coverage = _normalize_step_coverage(coverage)
+        if coverage != normalized_coverage:
+            covers_functions[step_id] = normalized_coverage
+            changed = True
 
     for step_id in planned_steps:
         status_info = step_status.get(step_id)
@@ -184,6 +213,9 @@ def normalize_progress_state(progress: dict[str, Any]) -> tuple[dict[str, Any], 
         if status_info.get("tddPhase") not in TDD_PHASES:
             status_info["tddPhase"] = default_tdd_phase
             changed = True
+        elif tdd_policy in {"waived", "not-applicable"} and status_info.get("tddPhase") != "waived":
+            status_info["tddPhase"] = "waived"
+            changed = True
         if "redEvidence" not in status_info or not isinstance(status_info.get("redEvidence"), list):
             status_info["redEvidence"] = []
             changed = True
@@ -192,6 +224,12 @@ def normalize_progress_state(progress: dict[str, Any]) -> tuple[dict[str, Any], 
             changed = True
         if "refactorNote" not in status_info:
             status_info["refactorNote"] = None
+            changed = True
+
+        coverage = covers_functions.get(step_id)
+        normalized_coverage = _normalize_step_coverage(coverage)
+        if coverage != normalized_coverage:
+            covers_functions[step_id] = normalized_coverage
             changed = True
 
     return normalized, changed
