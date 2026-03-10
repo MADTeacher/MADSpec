@@ -12,6 +12,8 @@
 ### 2. Определение покрываемых функций
 - [ ] Определено, какие функции из концепции покрывает этот шаг (P1, P2, P3)
 - [ ] Функции явно указаны в `coversFunctions` в `.madspec/<BRANCH>/memory/progress.json`
+- [ ] Выбран `step-kind`: `code` или `non-code`
+- [ ] Для `code` шага TDD policy = `required`; для `non-code` шага указан `waiver` или `not-applicable`
 
 ## Создание файлов шага
 
@@ -33,7 +35,8 @@
 - [ ] Задачи понятны и выполнимы
 
 ### 6. Создание tests.md
-- [ ] Файл содержит описание автоматических тестов (Backend и Frontend)
+- [ ] Для `code` шага заполнены секции `Red`, `Green`, `Relevant Suite`
+- [ ] Для `non-code` шага заполнена секция `Waiver`
 - [ ] Файл содержит описание ручных тестов
 - [ ] Указаны команды для запуска тестов
 - [ ] Описаны ожидаемые результаты
@@ -60,6 +63,8 @@
 - [ ] Шаг добавлен в `plannedSteps`
 - [ ] Статус шага добавлен в `stepStatus` со значением `"planned"`
 - [ ] Шаг зарегистрирован через `madspec memory register-step`
+- [ ] В `stepMetadata` заполнены `kind`, `tddPolicy`, `waiverReason`
+- [ ] В `stepStatus` созданы `tddPhase`, `redEvidence`, `greenEvidence`, `refactorNote`
 - [ ] Зависимости добавлены в `planningMetadata.stepDependencies`
 - [ ] Обновлен `planningMetadata.lastPlannedStep`
 - [ ] `coversFunctions` обновлен автоматически

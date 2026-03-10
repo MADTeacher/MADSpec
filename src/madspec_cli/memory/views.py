@@ -44,6 +44,8 @@ def _render_project_context(
 ) -> str:
     planned_steps = progress.get("plannedSteps", [])
     completed_steps = progress.get("completedSteps", [])
+    step_metadata = progress.get("stepMetadata", {})
+    step_status = progress.get("stepStatus", {})
     current_stage = active_session.get("stage", "idle") or "idle"
     current_step = active_session.get("current_step") or progress.get("currentImplementStep") or "N/A"
     lines = [
@@ -59,7 +61,14 @@ def _render_project_context(
         "## Planned Steps",
     ]
     lines.extend(
-        f"- `{step}`" + (" [completed]" if step in completed_steps else "")
+        f"- `{step}`"
+        + (
+            " "
+            f"[{step_metadata.get(step, {}).get('kind', 'unknown')}/"
+            f"{step_metadata.get(step, {}).get('tddPolicy', 'unknown')}/"
+            f"{step_status.get(step, {}).get('tddPhase', 'unknown')}]"
+        )
+        + (" [completed]" if step in completed_steps else "")
         for step in planned_steps
     )
     if not planned_steps:
@@ -111,13 +120,24 @@ def _render_planning_cache(
     return "\n".join(lines) + "\n"
 
 
-def _render_step_context(step_id: str, title: str, records: list[dict[str, Any]], generated_at: str) -> str:
+def _render_step_context(
+    step_id: str,
+    title: str,
+    records: list[dict[str, Any]],
+    generated_at: str,
+    *,
+    step_metadata: dict[str, Any] | None = None,
+    status_info: dict[str, Any] | None = None,
+) -> str:
     lines = [
         f"# {title}: {step_id}",
         "",
         "> Generated from structured memory records.",
         "",
         f"- Last generated: `{generated_at}`",
+        f"- Step kind: `{(step_metadata or {}).get('kind', 'unknown')}`",
+        f"- TDD policy: `{(step_metadata or {}).get('tddPolicy', 'unknown')}`",
+        f"- TDD phase: `{(status_info or {}).get('tddPhase', 'unknown')}`",
         "",
         "## Records",
     ]
@@ -183,6 +203,8 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
 
     all_records = decision_log + events + facts + decisions + contracts
     grouped_records = _group_records_by_step(all_records)
+    step_metadata = progress.get("stepMetadata", {})
+    step_status = progress.get("stepStatus", {})
     for step_id, step_records in sorted(grouped_records.items()):
         step_dir = paths.branch_dir / "steps" / step_id
         if not step_dir.exists():
@@ -193,12 +215,26 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
         ]
         planning_path = step_dir / "planning-context.md"
         planning_path.write_text(
-            _render_step_context(step_id, "Planning Context", planning_records, generated_at),
+            _render_step_context(
+                step_id,
+                "Planning Context",
+                planning_records,
+                generated_at,
+                step_metadata=step_metadata.get(step_id),
+                status_info=step_status.get(step_id),
+            ),
             encoding="utf-8",
         )
         implementation_path = step_dir / "implementation-context.md"
         implementation_path.write_text(
-            _render_step_context(step_id, "Implementation Context", implementation_records, generated_at),
+            _render_step_context(
+                step_id,
+                "Implementation Context",
+                implementation_records,
+                generated_at,
+                step_metadata=step_metadata.get(step_id),
+                status_info=step_status.get(step_id),
+            ),
             encoding="utf-8",
         )
         generated.extend([planning_path, implementation_path])

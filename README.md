@@ -297,7 +297,7 @@ madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--json-output]
 madspec memory next-step --stage <stage> [--candidate-step <id>] [--depends-on <id>] [--json-output]
-madspec memory register-step --stage <stage> --step-id <id> --covers <function> [--depends-on <id>] [--json-output]
+madspec memory register-step --stage <stage> --step-id <id> --step-kind <code|non-code> --covers <function> [--tdd-policy <required|waived|not-applicable>] [--waiver-reason <text>] [--depends-on <id>] [--json-output]
 madspec memory promote [--branch <name>] [--json-output]
 madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-output]
 ```
@@ -309,7 +309,7 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory validate` - проверяет schema, state transitions и согласованность views
 - `memory retrieve` - возвращает минимальный контекст для stage/step
 - `memory next-step` - детерминированно выбирает следующий исполнимый шаг или валидирует нового кандидата для planning
-- `memory register-step` - канонически регистрирует новый planned step и автоматически обновляет coverage metadata в `progress.json`
+- `memory register-step` - канонически регистрирует новый planned step, его TDD metadata и автоматически обновляет coverage metadata в `progress.json`
 - `memory promote` - переносит validated records в semantic memory
 - `memory learn` - превращает test/review outcomes в learning records
 
@@ -430,6 +430,8 @@ madspec version
 **Особенности:**
 - **Инкрементальный подход**: каждый запуск команды создает только один новый шаг (работа в пределах контекстного окна)
 - Автоматическое определение следующего шага на основе зависимостей и приоритетов (P1 → P2 → P3)
+- Каждый шаг классифицируется как `code` или `non-code`
+- Для `code` шагов обязателен TDD-план `red -> green -> refactor`; для `non-code` шагов обязателен `waiver` или `not-applicable`
 - Кэширование контекста планирования (`.madspec/<BRANCH>/planning-context-cache.md`) как generated view поверх semantic memory
 - Визуализация прогресса планирования после каждого шага (покрытие функций P1, P2, P3)
 - Автоматическое отслеживание метрик покрытия функций по приоритетам
@@ -449,6 +451,8 @@ madspec version
 
 **Особенности:**
 - Последовательное выполнение шагов с учетом зависимостей
+- Для `code` шагов обязателен цикл `red -> green -> refactor` до обновления статуса и коммита
+- Для `non-code` шагов обход TDD допускается только через явный `waiver` в canonical state
 - Использование HTML прототипов из `.madspec/<BRANCH>/ui-prototype/` как визуального гайда при реализации интерфейса
 - Автоматическая валидация каждого шага перед переходом к следующему (чек-лист из 7 пунктов)
 - **Обязательные коммиты в GIT после каждого успешно завершенного шага** (только после валидации)
@@ -551,7 +555,7 @@ madspec version
 │   │       └── implementation-context.md # Generated view контекста реализации
 │   ├── contracts/        # API контракты (создаются на этапе architecture)
 │   ├── memory/
-│   │   ├── progress.json             # Canonical workflow state
+│   │   ├── progress.json             # Canonical workflow state + stepMetadata + TDD status
 │   │   ├── working/
 │   │   │   ├── active-session.json   # Активная рабочая память
 │   │   │   └── decision-log.jsonl    # Micro-decisions и checkpoints
@@ -654,6 +658,8 @@ MADSpec использует модульную систему контекст�
 
 Файл `.madspec/<branch-name>/memory/progress.json` отслеживает:
 - Завершенные шаги реализации
+- Метаданные шага: `stepMetadata.kind`, `stepMetadata.tddPolicy`, `stepMetadata.waiverReason`
+- TDD состояние шага: `stepStatus.tddPhase`, `redEvidence`, `greenEvidence`, `refactorNote`
 - Метрики покрытия функций по приоритетам
 - Текущий этап проекта
 - История изменений

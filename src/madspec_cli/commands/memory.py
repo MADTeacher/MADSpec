@@ -203,6 +203,9 @@ def memory_register_step(
     stage: str = typer.Option(..., "--stage", help="Planning stage, e.g. mvp.plan or feature.plan"),
     step_id: str = typer.Option(..., "--step-id", help="New step identifier"),
     covers: list[str] = typer.Option(..., "--covers", help="Covered function ids/labels; repeat the option for multiple values"),
+    step_kind: str = typer.Option(..., "--step-kind", help="Step kind: code or non-code"),
+    tdd_policy: str = typer.Option(None, "--tdd-policy", help="TDD policy: required, waived, or not-applicable"),
+    waiver_reason: str = typer.Option(None, "--waiver-reason", help="Reason for waiving TDD on non-code steps"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     depends_on: list[str] = typer.Option(None, "--depends-on", help="Dependency step ids"),
     summary: str = typer.Option(None, "--summary", help="Optional summary for the decision log"),
@@ -218,6 +221,9 @@ def memory_register_step(
         stage,
         step_id=step_id,
         covers=covers,
+        step_kind=step_kind,
+        tdd_policy=tdd_policy,
+        waiver_reason=waiver_reason,
         depends_on=depends_on or [],
         summary=summary,
     )
@@ -246,6 +252,12 @@ def memory_register_step(
             f"P2={metrics['p2Coverage']['covered']}/{metrics['p2Coverage']['total']} "
             f"P3={metrics['p3Coverage']['covered']}/{metrics['p3Coverage']['total']} "
             f"overall={metrics['overallProgress']}%"
+        )
+        metadata = payload.get("stepMetadata", {})
+        console.print(
+            "[cyan]TDD:[/cyan] "
+            f"kind={metadata.get('kind')} "
+            f"policy={metadata.get('tddPolicy')}"
         )
         return
 

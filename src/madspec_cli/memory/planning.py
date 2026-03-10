@@ -9,8 +9,11 @@ from .records import STEP_ID_PATTERN, make_record
 from .storage import (
     _default_active_session,
     _default_progress_state,
+    _default_step_metadata,
+    _default_step_status,
     append_jsonl,
     get_memory_paths,
+    normalize_progress_state,
     read_json,
     now_iso,
     write_json,
@@ -53,6 +56,7 @@ class RegisterStepResult:
     errors: list[str]
     depends_on: list[str] | None = None
     covers: dict[str, list[str]] | None = None
+    step_metadata: dict[str, Any] | None = None
     progress_metrics: dict[str, Any] | None = None
 
     def to_payload(self) -> dict[str, Any]:
@@ -66,6 +70,8 @@ class RegisterStepResult:
             payload["depends_on"] = self.depends_on
         if self.covers is not None:
             payload["covers"] = self.covers
+        if self.step_metadata is not None:
+            payload["stepMetadata"] = self.step_metadata
         if self.progress_metrics is not None:
             payload["progressMetrics"] = self.progress_metrics
         return payload
@@ -244,11 +250,16 @@ def register_planned_step(
     *,
     step_id: str,
     covers: list[str],
+    step_kind: str,
+    tdd_policy: str | None = None,
+    waiver_reason: str | None = None,
     depends_on: list[str] | None = None,
     summary: str | None = None,
 ) -> dict[str, Any]:
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
+    if isinstance(progress, dict):
+        progress, _ = normalize_progress_state(progress)
     decision = determine_next_step(
         project_path,
         branch_name,
@@ -261,6 +272,57 @@ def register_planned_step(
             accepted=False,
             step_id=step_id,
             errors=decision["errors"],
+        ).to_payload()
+
+    if step_kind not in {"code", "non-code"}:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["step kind must be one of: code, non-code"],
+        ).to_payload()
+
+    effective_tdd_policy = tdd_policy
+    if effective_tdd_policy is None:
+        if step_kind == "code":
+            effective_tdd_policy = "required"
+        elif waiver_reason:
+            effective_tdd_policy = "waived"
+        else:
+            effective_tdd_policy = "not-applicable"
+
+    if effective_tdd_policy not in {"required", "waived", "not-applicable"}:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["tdd policy must be one of: required, waived, not-applicable"],
+        ).to_payload()
+
+    if step_kind == "code" and effective_tdd_policy != "required":
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["code steps must use the required TDD policy"],
+        ).to_payload()
+
+    if step_kind == "non-code" and effective_tdd_policy == "required":
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["non-code steps cannot use the required TDD policy"],
+        ).to_payload()
+
+    if effective_tdd_policy == "waived" and not waiver_reason:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["waiver reason is required when TDD policy is waived"],
+        ).to_payload()
+
+    if effective_tdd_policy != "waived" and waiver_reason is not None:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=["waiver reason is only allowed when TDD policy is waived"],
         ).to_payload()
 
     catalog = extract_function_catalog(project_path, branch_name, stage)
@@ -292,10 +354,13 @@ def register_planned_step(
     if step_id not in planned_steps:
         planned_steps.append(step_id)
 
-    progress.setdefault("stepStatus", {})[step_id] = {
-        "status": "planned",
-        "completedAt": None,
-    }
+    tdd_phase = "waived" if effective_tdd_policy in {"waived", "not-applicable"} else "not_started"
+    progress.setdefault("stepStatus", {})[step_id] = _default_step_status(tdd_phase=tdd_phase)
+    progress.setdefault("stepMetadata", {})[step_id] = _default_step_metadata(
+        kind=step_kind,
+        tdd_policy=effective_tdd_policy,
+        waiver_reason=waiver_reason,
+    )
 
     step_dependencies = progress.setdefault("planningMetadata", {}).setdefault(
         "stepDependencies", {}
@@ -340,6 +405,9 @@ def register_planned_step(
                 metadata={
                     "depends_on": list(depends_on or []),
                     "covers": list(covers),
+                    "step_kind": step_kind,
+                    "tdd_policy": effective_tdd_policy,
+                    "waiver_reason": waiver_reason,
                 },
             )
         ],
@@ -351,5 +419,6 @@ def register_planned_step(
         errors=[],
         depends_on=list(depends_on or []),
         covers=covers_functions[step_id],
+        step_metadata=progress["stepMetadata"][step_id],
         progress_metrics=progress["planningMetadata"]["progressMetrics"],
     ).to_payload()

@@ -101,6 +101,10 @@ $ARGUMENTS
    - Прочитай `.madspec/<BRANCH>/steps/step-[NN]-[name]/tasks.md`
    - Прочитай `.madspec/<BRANCH>/steps/step-[NN]-[name]/tests.md`
    - Прочитай `.madspec/<BRANCH>/steps/step-[NN]-[name]/validation.md`
+   - Прочитай `.madspec/<BRANCH>/memory/progress.json` и найди `stepMetadata["step-[NN]-[name]"]`
+   - Определи `step kind` и `tddPolicy`:
+     - `code + required` -> шаг выполняется строго по циклу `red -> green -> refactor`
+     - `non-code + waived|not-applicable` -> кодовые TDD gates не применяются, но причина waiver должна быть сохранена в артефактах и `progress.json`
    - **Примечание**: `[NN]` и `[name]` определяются из текущего шага (см. раздел 2.5)
 
 5. **Выполнение шага**:
@@ -108,6 +112,15 @@ $ARGUMENTS
    - Следуй описанию из `description.md`
    - Создавай/модифицируй файлы согласно задачам
    - Отмечай выполненные задачи в `tasks.md` (чекбоксы `[x]`)
+   - **Для `code` шага TDD обязателен и порядок нельзя менять:**
+     1. Подготовь или создай focused test из секции `Red`
+     2. Запусти его и зафиксируй `red` в `stepStatus.tddPhase=red` и `stepStatus.redEvidence`
+     3. Сделай минимальную реализацию только для перехода в green
+     4. Повтори прогон и зафиксируй `green` в `stepStatus.tddPhase=green` и `stepStatus.greenEvidence`
+     5. Выполни refactor без изменения поведения и запиши результат в `stepStatus.refactorNote`
+     6. Повтори focused test и `Relevant Suite`
+     7. Только после этого переводи `tddPhase` в `completed`
+   - **Для `non-code` шага** зафиксируй `stepStatus.tddPhase=waived`, сохрани причину из `stepMetadata.waiverReason` и выполняй обычный checklist шага.
    - **Примечание**: Файл `tasks.md` находится в `.madspec/<BRANCH>/steps/` и может быть частью репозитория. Если файл недоступен для редактирования, веди учет выполненных задач в отдельном файле или комментариях.
 
 5.1. **⚠️ КРИТИЧЕСКИ ВАЖНО: Использование официальных команд создания проектов**:
@@ -182,7 +195,18 @@ $ARGUMENTS
      - Все тесты должны проходить успешно
      - **Если тесты нет, но они требуются в рамках текущего шага**: исправь проблемы и повтори проверки
      - **Если тестов нет и они не требуются на текущем шаге проекта**: пропусти этот пункт
-   
+
+   - [ ] **TDD-артефакты заполнены для code-step**
+     - Проверь `stepMetadata["step-[NN]-[name]"]` в `.madspec/<BRANCH>/memory/progress.json`
+     - Для `code + required` убедись, что:
+       - `stepStatus.tddPhase = completed`
+       - `stepStatus.redEvidence` заполнен
+       - `stepStatus.greenEvidence` заполнен
+       - `stepStatus.refactorNote` заполнен или содержит `No refactor needed`
+     - Для `non-code` шага убедись, что:
+       - `stepStatus.tddPhase = waived`
+       - `stepMetadata.waiverReason` заполнен при `tddPolicy=waived`
+
    - [ ] **Ручные тесты описаны**
      - Проверь файл `.madspec/<BRANCH>/steps/step-[NN]-[name]/tests.md` на наличие ручных тестов/чек-листов
      - **Если ручных тестов нет, но они требуются на данном шаге**: исправь проблемы и повтори проверки
@@ -233,7 +257,10 @@ $ARGUMENTS
         - Установи `stepStatus["step-[NN]-[name]"]` как объект с полями:
           - `status`: `"completed"`
           - `completedAt`: `"YYYY-MM-DD"` (дата завершения в формате ISO)
-        - Пример: `stepStatus["step-01-setup"] = {"status": "completed", "completedAt": "2024-01-15"}`
+          - `tddPhase`: `"completed"` для `code` шага или `"waived"` для `non-code`
+          - `redEvidence`: список прогонов / артефактов red
+          - `greenEvidence`: список прогонов / артефактов green
+          - `refactorNote`: что было отрефакторено или `No refactor needed`
      
      c. **Определи следующий шаг**:
         - Найди следующий незавершенный шаг из `plannedSteps` в `.madspec/<BRANCH>/memory/progress.json` (если поле существует)
@@ -256,9 +283,16 @@ $ARGUMENTS
      "completedSteps": [],
      "plannedSteps": ["step-01-setup", "step-02-user-model", "step-03-auth"],
      "stepStatus": {},
-     "planningMetadata": {
-       "stepDependencies": {
-         "step-02-user-model": ["step-01-setup"],
+     "stepMetadata": {
+       "step-01-setup": {
+         "kind": "code",
+         "tddPolicy": "required",
+         "waiverReason": null
+       }
+     },
+      "planningMetadata": {
+        "stepDependencies": {
+          "step-02-user-model": ["step-01-setup"],
          "step-03-auth": ["step-02-user-model"]
        }
      }
@@ -274,19 +308,30 @@ $ARGUMENTS
      "stepStatus": {
        "step-01-setup": {
          "status": "completed",
-         "completedAt": "2024-01-15"
+         "completedAt": "2024-01-15",
+         "tddPhase": "completed",
+         "redEvidence": ["uv run pytest tests/test_setup.py -q"],
+         "greenEvidence": ["uv run pytest tests/test_setup.py -q"],
+         "refactorNote": "No refactor needed"
        }
      },
-     "planningMetadata": {
-       "stepDependencies": {
-         "step-02-user-model": ["step-01-setup"],
+     "stepMetadata": {
+       "step-01-setup": {
+         "kind": "code",
+         "tddPolicy": "required",
+         "waiverReason": null
+       }
+     },
+      "planningMetadata": {
+        "stepDependencies": {
+          "step-02-user-model": ["step-01-setup"],
          "step-03-auth": ["step-02-user-model"]
        }
      }
    }
    ```
    
-   **Примечание**: Поле `plannedSteps` и `planningMetadata` обычно не изменяются на этапе реализации, они создаются на этапе планирования. Обновляй только `currentImplementStep`, `completedSteps` и `stepStatus`.
+   **Примечание**: Поле `plannedSteps`, `stepMetadata` и `planningMetadata` обычно не изменяются на этапе реализации, они создаются на этапе планирования. Обновляй `currentImplementStep`, `completedSteps` и `stepStatus`, не разрушая TDD metadata.
    
    **ВАЖНО**: 
    - Обновляй `.madspec/<BRANCH>/memory/progress.json` только после успешной валидации шага

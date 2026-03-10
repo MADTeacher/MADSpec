@@ -28,7 +28,7 @@ $ARGUMENTS
 - `planning-context.md` и `project-context.md` являются generated views.
 - После изменения памяти запускай `madspec memory consolidate` и `madspec memory validate`.
 - Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage feature.plan --candidate-step <step-id> --depends-on <dependency>...`.
-- Для записи нового planned step в canonical state используй `madspec memory register-step --stage feature.plan --step-id <step-id> --covers <function-id> ...`, а не ручное редактирование `progress.json`.
+- Для записи нового planned step в canonical state используй `madspec memory register-step --stage feature.plan --step-id <step-id> --step-kind <code|non-code> --covers <function-id> ...`, а не ручное редактирование `progress.json`.
 
 ## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
 
@@ -55,6 +55,13 @@ $ARGUMENTS
 - Содержащим описание что нужно сделать
 - Включающим тесты для валидации
 - Покрывающим хотя бы одну функцию из добавляемой функциональности
+- Явно классифицированным как `code` или `non-code`
+
+## TDD policy (обязательно)
+
+- Для `code` шага TDD обязателен: в плане нужно явно описать `red -> green -> refactor`.
+- В `tests.md` для `code` шага должны быть секции `Red`, `Green`, `Relevant Suite`, `Manual Checks`.
+- Для `non-code` шага TDD не обходится молча: в плане должен быть `Waiver` с причиной, а шаг регистрируется через `--step-kind non-code` и `--tdd-policy waived|not-applicable`.
 
 ## Предварительные условия
 
@@ -166,13 +173,21 @@ $ARGUMENTS
    ```
    # Тесты шага [NN]
    
-   ## Автоматические тесты
-   - [ ] Unit-тесты для новых компонентов/функций
-   - [ ] Интеграционные тесты для связей с существующим кодом
+   ## Red
+   - [ ] Focused test / assertion, который сначала падает
+
+   ## Green
+   - [ ] Минимальная реализация, после которой focused test становится green
+
+   ## Relevant Suite
+   - [ ] Unit/Integration/Regression suite после refactor
    
-   ## Ручные проверки
+   ## Manual Checks
    - [ ] Проверить что файлы из tasks.md созданы/модифицированы
    - [ ] Проверить интеграцию (согласно project-analysis.md)
+
+   ## Waiver
+   - [ ] Если шаг non-code: причина, почему TDD waived или not-applicable
    ```
 
    **4.4. `validation.md`:**
@@ -184,6 +199,10 @@ $ARGUMENTS
    - [ ] Файлы созданы согласно описанию
    - [ ] Интеграция с существующим кодом работает
    - [ ] Автоматические тесты проходят
+   - [ ] Для code-step red зафиксирован до реализации
+   - [ ] Для code-step focused test стал green
+   - [ ] Для code-step relevant suite green после refactor
+   - [ ] Для non-code шага заполнен waiver
    
    ## Из project-analysis.md
    - [ ] Модификации из "Файлы для модификации" выполнены
@@ -210,15 +229,19 @@ $ARGUMENTS
     madspec memory register-step \
       --stage feature.plan \
       --step-id step-[NN]-[name] \
+      --step-kind <code|non-code> \
       --covers F01 \
       --covers F02 \
       --depends-on step-01-...
     ```
 
+    Для `non-code` шага обязательно добавь `--tdd-policy waived --waiver-reason "<причина>"` или `--tdd-policy not-applicable`.
+
     Команда должна автоматически:
     - сохранить `currentImplementStep` без изменений
     - добавить шаг в `plannedSteps`
     - обновить `stepStatus`
+    - обновить `stepMetadata`
     - записать `coversFunctions`
     - обновить `planningMetadata.stepDependencies`
     - обновить `planningMetadata.lastPlannedStep`
@@ -265,11 +288,11 @@ $ARGUMENTS
 
 9. **Валидация шага:**
 
-   - [ ] Описание понятно и связано с project-analysis.md
-   - [ ] Задачи конкретные и выполнимые
-   - [ ] Тесты определены
-   - [ ] Критерии завершения проверяемы
-   - [ ] Зависимости учтены
+- [ ] Описание понятно и связано с project-analysis.md
+- [ ] Задачи конкретные и выполнимые
+- [ ] Тесты определены, включая `Red` / `Green` / `Relevant Suite` или `Waiver`
+- [ ] Критерии завершения проверяемы
+- [ ] Зависимости учтены
    - [ ] Шаг покрывает функцию из concept.md
    - [ ] Файлы для модификации/создания из analysis учтены
    - [ ] Размер шага адекватный

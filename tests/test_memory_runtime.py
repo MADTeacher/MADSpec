@@ -19,6 +19,33 @@ from madspec_cli.memory import (
 )
 
 
+def _step_status(
+    *,
+    status: str,
+    completed_at: str | None = None,
+    tdd_phase: str = "not_started",
+    red: list[str] | None = None,
+    green: list[str] | None = None,
+    refactor_note: str | None = None,
+) -> dict[str, object]:
+    return {
+        "status": status,
+        "completedAt": completed_at,
+        "tddPhase": tdd_phase,
+        "redEvidence": red or [],
+        "greenEvidence": green or [],
+        "refactorNote": refactor_note,
+    }
+
+
+def _step_metadata(kind: str, policy: str, waiver_reason: str | None = None) -> dict[str, object]:
+    return {
+        "kind": kind,
+        "tddPolicy": policy,
+        "waiverReason": waiver_reason,
+    }
+
+
 def _bootstrap_project(tmp_path: Path, branch: str = "main") -> dict[str, Path]:
     project_path = tmp_path / "project"
     project_path.mkdir()
@@ -76,7 +103,10 @@ def test_consolidate_is_deterministic_for_same_memory_state(tmp_path: Path) -> N
             "completedSteps": [],
             "plannedSteps": ["step-01-bootstrap"],
             "stepStatus": {
-                "step-01-bootstrap": {"status": "planned", "completedAt": None}
+                "step-01-bootstrap": _step_status(status="planned")
+            },
+            "stepMetadata": {
+                "step-01-bootstrap": _step_metadata("code", "required")
             },
             "coversFunctions": {
                 "step-01-bootstrap": {"p1": ["User authentication"], "p2": [], "p3": []}
@@ -153,7 +183,19 @@ def test_validate_reports_invalid_status_and_broken_step_reference(tmp_path: Pat
             "currentImplementStep": "step-99-missing",
             "completedSteps": ["step-01-bootstrap"],
             "plannedSteps": ["step-01-bootstrap"],
-            "stepStatus": {"step-ghost": {"status": "completed", "completedAt": "2026-03-10"}},
+            "stepStatus": {
+                "step-ghost": _step_status(
+                    status="completed",
+                    completed_at="2026-03-10",
+                    tdd_phase="completed",
+                    red=["uv run pytest tests/test_auth.py -q"],
+                    green=["uv run pytest tests/test_auth.py -q"],
+                    refactor_note="No refactor needed.",
+                )
+            },
+            "stepMetadata": {
+                "step-01-bootstrap": _step_metadata("code", "required")
+            },
             "coversFunctions": {},
             "planningMetadata": {
                 "lastPlannedStep": "step-01-bootstrap",
@@ -269,9 +311,21 @@ def test_determine_next_step_validates_candidate_and_selects_ready_step(tmp_path
             "completedSteps": ["step-01-bootstrap"],
             "plannedSteps": ["step-01-bootstrap", "step-02-api", "step-03-ui"],
             "stepStatus": {
-                "step-01-bootstrap": {"status": "completed", "completedAt": "2026-03-10"},
-                "step-02-api": {"status": "planned", "completedAt": None},
-                "step-03-ui": {"status": "planned", "completedAt": None},
+                "step-01-bootstrap": _step_status(
+                    status="completed",
+                    completed_at="2026-03-10",
+                    tdd_phase="completed",
+                    red=["uv run pytest tests/test_bootstrap.py -q"],
+                    green=["uv run pytest tests/test_bootstrap.py -q"],
+                    refactor_note="No refactor needed.",
+                ),
+                "step-02-api": _step_status(status="planned"),
+                "step-03-ui": _step_status(status="planned", tdd_phase="waived"),
+            },
+            "stepMetadata": {
+                "step-01-bootstrap": _step_metadata("code", "required"),
+                "step-02-api": _step_metadata("code", "required"),
+                "step-03-ui": _step_metadata("non-code", "waived", "UI polish step."),
             },
             "coversFunctions": {
                 "step-01-bootstrap": {"p1": ["User authentication"], "p2": [], "p3": []},
@@ -329,6 +383,7 @@ def test_register_planned_step_updates_coverage_metrics(tmp_path: Path) -> None:
         "mvp.plan",
         step_id="step-01-authentication",
         covers=["User authentication"],
+        step_kind="code",
         summary="Plan authentication bootstrap",
     )
     second = register_planned_step(
@@ -337,6 +392,7 @@ def test_register_planned_step_updates_coverage_metrics(tmp_path: Path) -> None:
         "mvp.plan",
         step_id="step-02-session-persistence",
         covers=["Session persistence", "Profile customization"],
+        step_kind="code",
         depends_on=["step-01-authentication"],
     )
 
@@ -344,6 +400,11 @@ def test_register_planned_step_updates_coverage_metrics(tmp_path: Path) -> None:
 
     assert first["accepted"] is True
     assert second["accepted"] is True
+    assert first["stepMetadata"] == {
+        "kind": "code",
+        "tddPolicy": "required",
+        "waiverReason": None,
+    }
     assert progress["planningMetadata"]["lastPlannedStep"] == "step-02-session-persistence"
     assert progress["planningMetadata"]["progressMetrics"]["p1Coverage"] == {
         "covered": 2,
@@ -356,5 +417,168 @@ def test_register_planned_step_updates_coverage_metrics(tmp_path: Path) -> None:
         "percentage": 100,
     }
     assert progress["planningMetadata"]["progressMetrics"]["overallProgress"] == 80
+    assert progress["stepStatus"]["step-02-session-persistence"]["tddPhase"] == "not_started"
+    assert progress["stepMetadata"]["step-02-session-persistence"]["tddPolicy"] == "required"
     assert progress["coversFunctions"]["step-02-session-persistence"]["p2"] == ["Profile customization"]
     assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
+
+
+def test_register_planned_step_supports_non_code_waiver(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+
+    payload = register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-01-design-polish",
+        covers=["User authentication"],
+        step_kind="non-code",
+        tdd_policy="waived",
+        waiver_reason="UI polish does not add executable product logic.",
+    )
+
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+
+    assert payload["accepted"] is True
+    assert progress["stepMetadata"]["step-01-design-polish"] == {
+        "kind": "non-code",
+        "tddPolicy": "waived",
+        "waiverReason": "UI polish does not add executable product logic.",
+    }
+    assert progress["stepStatus"]["step-01-design-polish"]["tddPhase"] == "waived"
+
+
+def test_ensure_memory_layout_normalizes_legacy_tdd_fields(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+    write_json(
+        paths["progress"],
+        {
+            "currentImplementStep": None,
+            "completedSteps": ["step-01-bootstrap"],
+            "plannedSteps": ["step-01-bootstrap", "step-02-auth"],
+            "stepStatus": {
+                "step-01-bootstrap": {"status": "completed", "completedAt": "2026-03-10"},
+                "step-02-auth": {"status": "planned", "completedAt": None},
+            },
+            "coversFunctions": {
+                "step-01-bootstrap": {"p1": ["User authentication"], "p2": [], "p3": []},
+                "step-02-auth": {"p1": ["Session persistence"], "p2": [], "p3": []},
+            },
+            "planningMetadata": {
+                "lastPlannedStep": "step-02-auth",
+                "planningPhase": "incremental",
+                "totalStepsEstimated": 2,
+                "stepDependencies": {"step-02-auth": ["step-01-bootstrap"]},
+                "progressMetrics": {
+                    "p1Coverage": {"covered": 1, "total": 2, "percentage": 50},
+                    "p2Coverage": {"covered": 0, "total": 1, "percentage": 0},
+                    "p3Coverage": {"covered": 0, "total": 1, "percentage": 0},
+                    "overallProgress": 25,
+                },
+            },
+        },
+    )
+
+    ensure_memory_layout(paths["branch_dir"].parents[1], "main")
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+
+    assert progress["stepMetadata"]["step-01-bootstrap"] == {
+        "kind": "non-code",
+        "tddPolicy": "waived",
+        "waiverReason": "Legacy step migrated without recorded TDD evidence.",
+    }
+    assert progress["stepMetadata"]["step-02-auth"] == {
+        "kind": "code",
+        "tddPolicy": "required",
+        "waiverReason": None,
+    }
+    assert progress["stepStatus"]["step-01-bootstrap"]["tddPhase"] == "waived"
+    assert progress["stepStatus"]["step-02-auth"]["tddPhase"] == "not_started"
+
+
+def test_validate_requires_completed_code_step_to_finish_tdd_cycle(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+    write_json(
+        paths["progress"],
+        {
+            "currentImplementStep": None,
+            "completedSteps": ["step-01-authentication"],
+            "plannedSteps": ["step-01-authentication"],
+            "stepStatus": {
+                "step-01-authentication": _step_status(
+                    status="completed",
+                    completed_at="2026-03-10",
+                    tdd_phase="green",
+                    red=["uv run pytest tests/test_auth.py -q"],
+                    green=["uv run pytest tests/test_auth.py -q"],
+                    refactor_note="No refactor needed.",
+                )
+            },
+            "stepMetadata": {
+                "step-01-authentication": _step_metadata("code", "required")
+            },
+            "coversFunctions": {
+                "step-01-authentication": {"p1": ["User authentication"], "p2": [], "p3": []}
+            },
+            "planningMetadata": {
+                "lastPlannedStep": "step-01-authentication",
+                "planningPhase": "incremental",
+                "totalStepsEstimated": 1,
+                "stepDependencies": {"step-01-authentication": []},
+                "progressMetrics": {
+                    "p1Coverage": {"covered": 1, "total": 2, "percentage": 50},
+                    "p2Coverage": {"covered": 0, "total": 1, "percentage": 0},
+                    "p3Coverage": {"covered": 0, "total": 1, "percentage": 0},
+                    "overallProgress": 25,
+                },
+            },
+        },
+    )
+
+    errors = validate_branch_memory(paths["branch_dir"].parents[1], "main")
+
+    assert any("must have tddPhase='completed'" in error for error in errors)
+
+
+def test_validate_requires_waiver_reason_for_waived_step(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+    write_json(
+        paths["progress"],
+        {
+            "currentImplementStep": None,
+            "completedSteps": [],
+            "plannedSteps": ["step-01-ui-polish"],
+            "stepStatus": {
+                "step-01-ui-polish": _step_status(
+                    status="planned",
+                    tdd_phase="waived",
+                )
+            },
+            "stepMetadata": {
+                "step-01-ui-polish": _step_metadata("non-code", "waived")
+            },
+            "coversFunctions": {
+                "step-01-ui-polish": {"p1": ["User authentication"], "p2": [], "p3": []}
+            },
+            "planningMetadata": {
+                "lastPlannedStep": "step-01-ui-polish",
+                "planningPhase": "incremental",
+                "totalStepsEstimated": 1,
+                "stepDependencies": {"step-01-ui-polish": []},
+                "progressMetrics": {
+                    "p1Coverage": {"covered": 1, "total": 2, "percentage": 50},
+                    "p2Coverage": {"covered": 0, "total": 1, "percentage": 0},
+                    "p3Coverage": {"covered": 0, "total": 1, "percentage": 0},
+                    "overallProgress": 25,
+                },
+            },
+        },
+    )
+
+    errors = validate_branch_memory(paths["branch_dir"].parents[1], "main")
+
+    assert any("waiverReason is required" in error for error in errors)

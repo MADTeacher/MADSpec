@@ -139,6 +139,7 @@ def test_validate_branch_memory_is_read_only(tmp_path: Path) -> None:
             "completedSteps": [],
             "plannedSteps": [],
             "stepStatus": {},
+            "stepMetadata": {},
             "coversFunctions": {},
             "planningMetadata": {
                 "lastPlannedStep": None,

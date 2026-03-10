@@ -35,3 +35,5 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         command_body = zf.read(command_name).decode("utf-8")
         assert "scripts:" not in command_body
         assert "get-branch" not in command_body
+        assert "--step-kind" in command_body
+        assert "red -> green -> refactor" in command_body

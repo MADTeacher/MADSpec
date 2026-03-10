@@ -89,6 +89,9 @@ $ARGUMENTS
      - `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/tests.md`
      - `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/validation.md`
      - `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/planning-context.md`
+   - Из `progress.json` прочитай `stepMetadata["step-[NN]-[name]"]` и определи:
+     - `code + required` -> шаг выполняется строго по циклу `red -> green -> refactor`
+     - `non-code + waived|not-applicable` -> TDD оформлен waiver-ом, а не молчаливым обходом
 
 2. **Определение начального шага:**
 
@@ -126,6 +129,19 @@ $ARGUMENTS
    - [ ] Задача не выполнена
    ```
 
+   **3.5. TDD цикл для code-step:**
+   - Сначала подготовь focused test из секции `Red`
+   - Зафиксируй failing run в `stepStatus.tddPhase=red` и `stepStatus.redEvidence`
+   - Сделай минимальную реализацию для green
+   - Зафиксируй passing run в `stepStatus.tddPhase=green` и `stepStatus.greenEvidence`
+   - Выполни refactor и запиши итог в `stepStatus.refactorNote`
+   - Повтори focused test и `Relevant Suite`
+   - Только после этого переводи `tddPhase` в `completed`
+
+   **3.6. Non-code waiver path:**
+   - Для `non-code` шага сохрани `stepStatus.tddPhase=waived`
+   - Проверь, что `stepMetadata.waiverReason` заполнен при `tddPolicy=waived`
+
 4. **Валидация шага:**
 
    **Обязательная валидация перед коммитом:**
@@ -144,14 +160,18 @@ $ARGUMENTS
    
    - [ ] **Критерии из validation.md выполнены**
      - Проверь каждый критерий
-   
+
    - [ ] **Соответствует architecture.md**
      - Структура файлов
      - Паттерны и подходы
-   
+
    - [ ] **Тесты описаны (из tests.md)**
      - Если тесты требуются — они должны быть
      - Автоматические тесты проходят
+
+   - [ ] **TDD состояние зафиксировано в progress.json**
+     - Для `code + required`: `tddPhase=completed`, заполнены `redEvidence`, `greenEvidence`, `refactorNote`
+     - Для `non-code`: `tddPhase=waived`, а при `tddPolicy=waived` есть причина
 
    **Если валидация не пройдена:**
    - Укажи что не выполнено
@@ -170,7 +190,18 @@ $ARGUMENTS
      "stepStatus": {
        "step-[NN]-[name]": {
          "status": "completed",
-         "completedAt": "YYYY-MM-DD"
+         "completedAt": "YYYY-MM-DD",
+         "tddPhase": "completed",
+         "redEvidence": ["<command or evidence>"],
+         "greenEvidence": ["<command or evidence>"],
+         "refactorNote": "No refactor needed"
+       }
+     },
+     "stepMetadata": {
+       "step-[NN]-[name]": {
+         "kind": "code",
+         "tddPolicy": "required",
+         "waiverReason": null
        }
      },
      "planningMetadata": {...}
@@ -252,6 +283,7 @@ $ARGUMENTS
 - **ВЫПОЛНЯЙ** задачи из tasks.md
 - **ВАЛИДИРУЙ** каждый шаг перед коммитом
 - **ОБНОВЛЯЙ** progress.json после валидации
+- **ДЛЯ CODE-STEP** не коммить до полного цикла `red -> green -> refactor`
 - **КОММИТЬ** после успешной валидации
 - **ИСПОЛЬЗУЙ** project-analysis.md для понимания функций и интеграции
 - **СЛЕДУЙ** паттернам из существующего кода

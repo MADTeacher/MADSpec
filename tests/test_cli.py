@@ -14,6 +14,33 @@ from madspec_cli.memory import append_jsonl, get_memory_paths, make_record
 runner = CliRunner()
 
 
+def _step_status(
+    *,
+    status: str,
+    completed_at: str | None = None,
+    tdd_phase: str = "not_started",
+    red: list[str] | None = None,
+    green: list[str] | None = None,
+    refactor_note: str | None = None,
+) -> dict[str, object]:
+    return {
+        "status": status,
+        "completedAt": completed_at,
+        "tddPhase": tdd_phase,
+        "redEvidence": red or [],
+        "greenEvidence": green or [],
+        "refactorNote": refactor_note,
+    }
+
+
+def _step_metadata(kind: str, policy: str, waiver_reason: str | None = None) -> dict[str, object]:
+    return {
+        "kind": kind,
+        "tddPolicy": policy,
+        "waiverReason": waiver_reason,
+    }
+
+
 def _fake_download(
     project_path: Path,
     ai_assistant: str,
@@ -143,8 +170,19 @@ def test_memory_commands_support_validation_and_retrieve_json(tmp_path: Path, mo
     progress["plannedSteps"] = ["step-01-bootstrap", "step-02-auth-flow"]
     progress["completedSteps"] = ["step-01-bootstrap"]
     progress["stepStatus"] = {
-        "step-01-bootstrap": {"status": "completed", "completedAt": "2026-03-10"},
-        "step-02-auth-flow": {"status": "planned", "completedAt": None},
+        "step-01-bootstrap": _step_status(
+            status="completed",
+            completed_at="2026-03-10",
+            tdd_phase="completed",
+            red=["uv run pytest tests/test_bootstrap.py -q"],
+            green=["uv run pytest tests/test_bootstrap.py -q"],
+            refactor_note="No refactor needed.",
+        ),
+        "step-02-auth-flow": _step_status(status="planned"),
+    }
+    progress["stepMetadata"] = {
+        "step-01-bootstrap": _step_metadata("code", "required"),
+        "step-02-auth-flow": _step_metadata("code", "required"),
     }
     progress["planningMetadata"]["stepDependencies"] = {"step-02-auth-flow": ["step-01-bootstrap"]}
     paths["progress"].write_text(json.dumps(progress, indent=2) + "\n", encoding="utf-8")
@@ -198,6 +236,8 @@ def test_memory_register_step_updates_progress_and_views(tmp_path: Path, monkeyp
             "mvp.plan",
             "--step-id",
             "step-01-authentication",
+            "--step-kind",
+            "code",
             "--covers",
             "Authentication",
             "--covers",
@@ -217,9 +257,178 @@ def test_memory_register_step_updates_progress_and_views(tmp_path: Path, monkeyp
         "p2": ["Profile"],
         "p3": [],
     }
+    assert progress["stepMetadata"]["step-01-authentication"] == {
+        "kind": "code",
+        "tddPolicy": "required",
+        "waiverReason": None,
+    }
+    assert progress["stepStatus"]["step-01-authentication"]["tddPhase"] == "not_started"
     assert progress["planningMetadata"]["progressMetrics"]["overallProgress"] == 55
     assert (project_path / ".madspec" / "main" / "project-context.md").exists()
     assert (project_path / ".madspec" / "main" / "planning-context-cache.md").exists()
+
+
+def test_memory_register_step_requires_waiver_reason_for_waived_policy(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".madspec").mkdir()
+    (tmp_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = tmp_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- Authentication: sign in users
+""",
+        encoding="utf-8",
+    )
+
+    init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-ui-polish",
+            "--step-kind",
+            "non-code",
+            "--tdd-policy",
+            "waived",
+            "--covers",
+            "Authentication",
+            "--json-output",
+        ],
+    )
+
+    assert result.exit_code == 1, result.stdout
+    assert "waiver reason is required" in result.stdout
+
+
+def test_memory_register_step_accepts_non_code_not_applicable_policy(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".madspec").mkdir()
+    (tmp_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = tmp_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- Authentication: sign in users
+""",
+        encoding="utf-8",
+    )
+
+    init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-doc-refresh",
+            "--step-kind",
+            "non-code",
+            "--tdd-policy",
+            "not-applicable",
+            "--covers",
+            "Authentication",
+            "--json-output",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["stepMetadata"] == {
+        "kind": "non-code",
+        "tddPolicy": "not-applicable",
+        "waiverReason": None,
+    }
+
+
+def test_memory_register_step_rejects_invalid_step_kind_and_tdd_policy(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".madspec").mkdir()
+    (tmp_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = tmp_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- Authentication: sign in users
+""",
+        encoding="utf-8",
+    )
+
+    init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    invalid_kind = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-auth",
+            "--step-kind",
+            "unknown",
+            "--covers",
+            "Authentication",
+            "--json-output",
+        ],
+    )
+    invalid_policy = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-auth",
+            "--step-kind",
+            "non-code",
+            "--tdd-policy",
+            "sometimes",
+            "--covers",
+            "Authentication",
+            "--json-output",
+        ],
+    )
+
+    assert invalid_kind.exit_code == 1, invalid_kind.stdout
+    assert "step kind must be one of" in invalid_kind.stdout
+    assert invalid_policy.exit_code == 1, invalid_policy.stdout
+    assert "tdd policy must be one of" in invalid_policy.stdout
 
 
 def test_git_current_branch_uses_config_fallback_json(tmp_path: Path, monkeypatch) -> None:

@@ -28,7 +28,7 @@ $ARGUMENTS
 - `planning-context-cache.md`, `planning-context.md` и `project-context.md` являются generated views.
 - После обновления structured memory обязательно запускай `madspec memory consolidate` и `madspec memory validate`.
 - Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage mvp.plan --candidate-step <step-id> --depends-on <dependency>...`.
-- Для записи нового planned step в canonical state используй `madspec memory register-step --stage mvp.plan --step-id <step-id> --covers <function> ...`, а не ручное редактирование `progress.json`.
+- Для записи нового planned step в canonical state используй `madspec memory register-step --stage mvp.plan --step-id <step-id> --step-kind <code|non-code> --covers <function> ...`, а не ручное редактирование `progress.json`.
 
 ## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
 
@@ -53,6 +53,18 @@ $ARGUMENTS
 - Содержащим описание того, что нужно сделать
 - Включающим тесты для валидации
 - Покрывающим хотя бы одну функцию из концепции проекта
+- Явно классифицированным как `code` или `non-code`
+
+## TDD policy (обязательно)
+
+- Для `code` шага TDD обязателен: план должен описывать `red -> green -> refactor`.
+- Для `code` шага в `tests.md` должны быть явно указаны:
+  - failing test / assertion, который должен сначала падать;
+  - минимальная реализация для перехода в green;
+  - relevant suite / regression suite после green;
+  - refactor intent или явное `no refactor needed`.
+- Для `non-code` шага должен быть заполнен TDD waiver с причиной и шаг должен регистрироваться через `--step-kind non-code` и `--tdd-policy waived|not-applicable`.
+- По умолчанию новый `code` шаг регистрируется с `tddPolicy=required` и `tddPhase=not_started`.
 
 ## Предварительные условия
 
@@ -174,6 +186,9 @@ $ARGUMENTS
    - Создай структуру первого шага:
      - Создай директорию `.madspec/<BRANCH>/steps/step-01-[name]/`
      - Создай файлы: `description.md`, `tasks.md`, `tests.md`, `validation.md`
+     - В `description.md` явно укажи `step kind` и `TDD policy`
+     - В `tests.md` для `code` шага обязательно создай секции `Red`, `Green`, `Relevant Suite`, `Manual Checks`; для `non-code` шага — `Manual Checks` и `Waiver`
+     - В `validation.md` для `code` шага обязательно добавь критерии: red зафиксирован, focused test green, relevant suite green после refactor, regression сохранена
      - **ОБЯЗАТЕЛЬНО**: Создай `planning-context.md` из шаблона `.madspec/templates/planning-context-template.md`:
        - Заполни все поля шаблона:
          - Почему этот шаг создан
@@ -182,8 +197,9 @@ $ARGUMENTS
          - Связанные артефакты (UI прототипы, API контракты, модели данных)
          - Размер и сложность шага
        - Сохрани в `.madspec/<BRANCH>/steps/step-01-[name]/planning-context.md`
-     - Зарегистрируй шаг через `madspec memory register-step --stage mvp.plan --step-id step-01-[name] --covers <function> ...`
-     - Команда должна автоматически обновить `plannedSteps`, `stepStatus`, `coversFunctions`, `planningMetadata.stepDependencies`, `planningMetadata.lastPlannedStep` и `planningMetadata.progressMetrics`
+     - Зарегистрируй шаг через `madspec memory register-step --stage mvp.plan --step-id step-01-[name] --step-kind <code|non-code> --covers <function> ...`
+     - Для `non-code` шага обязательно передай `--tdd-policy waived --waiver-reason "<причина>"` или `--tdd-policy not-applicable`
+     - Команда должна автоматически обновить `plannedSteps`, `stepStatus`, `stepMetadata`, `coversFunctions`, `planningMetadata.stepDependencies`, `planningMetadata.lastPlannedStep` и `planningMetadata.progressMetrics`
    
    - Отобрази визуализацию прогресса планирования (см. раздел 6)
 
@@ -220,6 +236,9 @@ $ARGUMENTS
    - **Создай только ОДИН новый шаг**:
      - Создай директорию `.madspec/<BRANCH>/steps/step-[NN]-[name]/`
      - Создай файлы: `description.md`, `tasks.md`, `tests.md`, `validation.md`
+     - В `description.md` явно укажи `step kind` и `TDD policy`
+     - В `tests.md` для `code` шага обязательно создай секции `Red`, `Green`, `Relevant Suite`, `Manual Checks`; для `non-code` шага — `Manual Checks` и `Waiver`
+     - В `validation.md` для `code` шага обязательно добавь критерии: red зафиксирован, focused test green, relevant suite green после refactor, regression сохранена
      - **ОБЯЗАТЕЛЬНО**: Если для функции существуют связанные артефакты, включи ссылки на них в `description.md` и `tasks.md`:
        - Файлы UI-дизайна (`.madspec/<BRANCH>/ui-design.md`, `.madspec/<BRANCH>/ui-prototype/*.html`)
        - Контракты API (`.madspec/<BRANCH>/contracts/openapi.yaml`, `.madspec/<BRANCH>/contracts/*.graphql`, `.madspec/<BRANCH>/contracts/*.proto`, и т.д.)
@@ -233,9 +252,10 @@ $ARGUMENTS
          - Связанные артефакты (UI прототипы, API контракты, модели данных) - с конкретными ссылками
          - Размер и сложность шага (низкая/средняя/высокая) с обоснованием
        - Сохрани в `.madspec/<BRANCH>/steps/step-[NN]-[name]/planning-context.md`
-     - Зарегистрируй шаг через `madspec memory register-step --stage mvp.plan --step-id step-[NN]-[name] --covers <function> ... --depends-on <dep>`
+     - Зарегистрируй шаг через `madspec memory register-step --stage mvp.plan --step-id step-[NN]-[name] --step-kind <code|non-code> --covers <function> ... --depends-on <dep>`
+       - Для `non-code` шага обязательно передай `--tdd-policy waived --waiver-reason "<причина>"` или `--tdd-policy not-applicable`
        - Команда **обязана** сохранить `currentImplementStep` без изменений
-       - Команда **обязана** автоматически обновить `plannedSteps`, `stepStatus`, `coversFunctions`, `planningMetadata.stepDependencies`, `planningMetadata.lastPlannedStep` и `planningMetadata.progressMetrics`
+       - Команда **обязана** автоматически обновить `plannedSteps`, `stepStatus`, `stepMetadata`, `coversFunctions`, `planningMetadata.stepDependencies`, `planningMetadata.lastPlannedStep` и `planningMetadata.progressMetrics`
    
    - Обнови `.madspec/<BRANCH>/implementation-plan.md`, добавив новый шаг в список
    
@@ -284,8 +304,8 @@ $ARGUMENTS
    - Создай файлы на основе шаблона `.madspec/templates/step-template.md`:
      - `description.md` - описание шага, что нужно сделать, почему этот шаг важен
      - `tasks.md` - список конкретных задач (чек-лист)
-     - `tests.md` - описание тестов для этого шага (автоматические и ручные)
-     - `validation.md` - критерии успешного завершения
+- `tests.md` - TDD артефакты (`Red`, `Green`, `Relevant Suite`, `Manual Checks`, `Waiver`)
+- `validation.md` - критерии успешного завершения, включая TDD gates
    
    - В каждом файле укажи:
      - Номер и название шага
