@@ -194,7 +194,7 @@ MADSpec uses `$ARGUMENTS` placeholder for all Markdown-based commands.
 2. **CLI test**: Test `madspecinit --ai <agent>` command
 3. **File generation**: Verify correct directory structure and files
 4. **Command validation**: Ensure generated commands work with the agent
-5. **Educational workflow test**: Test full MADSpec workflow with new agent
+5. **Workflow test**: Test full MADSpec workflow with new agent
 
 ## Common Pitfalls
 
@@ -209,7 +209,7 @@ MADSpec uses `$ARGUMENTS` placeholder for all Markdown-based commands.
 When adding new agents:
 
 - Consider the agent's native command/workflow patterns
-- Ensure compatibility with the MADSpec educational process
+- Ensure compatibility with the MADSpec workflow and command structure
 - Document any special requirements or limitations
 - Update this guide with lessons learned
 - Verify the actual CLI tool name before adding to AGENT_CONFIG

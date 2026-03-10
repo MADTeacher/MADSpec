@@ -276,12 +276,12 @@ def init(
         Panel(
             "\n".join(
                 [
-                    "Optional commands for enhanced learning [bright_black](educational features)[/bright_black]",
+                    "Optional commands for review and improvement [bright_black](recommended)[/bright_black]",
                     "",
-                    "○ [cyan]/madspec.review[/] [bright_black](optional)[/bright_black] - Review and reflect on your implementation",
+                    "○ [cyan]/madspec.review[/] [bright_black](optional)[/bright_black] - Review implementation quality and capture improvements",
                 ]
             ),
-            title="Learning Enhancement Commands",
+            title="Review Commands",
             border_style="cyan",
             padding=(1, 2),
         )
