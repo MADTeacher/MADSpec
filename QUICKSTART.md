@@ -85,7 +85,6 @@ madspec.feature.implement
 При инициализации MADSpec копирует навыки в вашу среду (например, `.cursor/skills/`):
 
 - **generate-agents-md** — генерация AGENTS.md по лучшим практикам
-- **subagents_orchestrator** — распределение задач между субагентами
 
 ## Что вы получаете
 
