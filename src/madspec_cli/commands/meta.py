@@ -27,7 +27,7 @@ def migrate() -> None:
         return
 
     target_branch = get_current_branch(project_path)
-    exclude_dirs = {"templates", "scripts", target_branch}
+    exclude_dirs = {"templates", target_branch}
     artifacts_in_root = [
         item
         for item in madspec_dir.iterdir()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import tempfile
 import zipfile
@@ -30,7 +29,6 @@ from .ui import StepTracker, console
 class InitResult:
     project_path: Path
     selected_ai: str
-    selected_script: str
     branch_name: str | None
     git_error_message: str | None
     config_error_message: str | None
@@ -91,7 +89,6 @@ def download_template_from_github(
     ai_assistant: str,
     download_dir: Path,
     *,
-    script_type: str = "sh",
     verbose: bool = True,
     show_progress: bool = True,
     client: httpx.Client | None = None,
@@ -101,7 +98,7 @@ def download_template_from_github(
     repo_owner = "MADTeacher"
     repo_name = "MADSpec"
     http_client = client or create_http_client()
-    pattern = f"madspec-template-{ai_assistant}-{script_type}"
+    pattern = f"madspec-template-{ai_assistant}"
 
     if verbose:
         console.print("[cyan]Fetching latest release information...[/cyan]")
@@ -190,7 +187,6 @@ def download_template_from_github(
 def download_and_extract_template(
     project_path: Path,
     ai_assistant: str,
-    script_type: str,
     is_current_dir: bool = False,
     *,
     verbose: bool = True,
@@ -208,7 +204,6 @@ def download_and_extract_template(
         zip_path, asset = download_template_from_github(
             ai_assistant,
             current_dir,
-            script_type=script_type,
             verbose=verbose and tracker is None,
             show_progress=tracker is None,
             client=client,
@@ -331,60 +326,10 @@ def download_and_extract_template(
     return project_path
 
 
-def ensure_executable_scripts(
-    project_path: Path,
-    tracker: StepTracker | None = None,
-) -> None:
-    if os.name == "nt":
-        return
-
-    failures: list[str] = []
-    updated = 0
-    for root in (project_path / "scripts", project_path / ".madspec" / "scripts"):
-        if not root.is_dir():
-            continue
-        for script in root.rglob("*.sh"):
-            try:
-                if script.is_symlink() or not script.is_file():
-                    continue
-                if script.read_bytes()[:2] != b"#!":
-                    continue
-                mode = script.stat().st_mode
-                if mode & 0o111:
-                    continue
-                new_mode = mode
-                if mode & 0o400:
-                    new_mode |= 0o100
-                if mode & 0o040:
-                    new_mode |= 0o010
-                if mode & 0o004:
-                    new_mode |= 0o001
-                if not (new_mode & 0o100):
-                    new_mode |= 0o100
-                os.chmod(script, new_mode)
-                updated += 1
-            except Exception as exc:
-                failures.append(f"{script.relative_to(root)}: {exc}")
-
-    if tracker:
-        detail = f"{updated} updated" + (f", {len(failures)} failed" if failures else "")
-        tracker.add("chmod", "Set script permissions recursively")
-        (tracker.error if failures else tracker.complete)("chmod", detail)
-        return
-
-    if updated:
-        console.print(f"[cyan]Updated execute permissions on {updated} script(s) recursively[/cyan]")
-    if failures:
-        console.print("[yellow]Some scripts could not be updated:[/yellow]")
-        for failure in failures:
-            console.print(f"  - {failure}")
-
-
 def initialize_project(
     project_path: Path,
     *,
     selected_ai: str,
-    selected_script: str,
     here: bool,
     no_git: bool,
     should_init_git: bool,
@@ -402,7 +347,6 @@ def initialize_project(
     download_and_extract_template(
         project_path,
         selected_ai,
-        selected_script,
         here,
         verbose=False,
         tracker=tracker,
@@ -410,7 +354,6 @@ def initialize_project(
         debug=debug,
         github_token=github_token,
     )
-    ensure_executable_scripts(project_path, tracker=tracker)
 
     if tracker:
         tracker.add("madspec-config", "Create MADSpec config")
@@ -454,7 +397,6 @@ def initialize_project(
     return InitResult(
         project_path=project_path,
         selected_ai=selected_ai,
-        selected_script=selected_script,
         branch_name=branch_name,
         git_error_message=git_error_message,
         config_error_message=config_error_message,

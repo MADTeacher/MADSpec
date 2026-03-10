@@ -1,8 +1,5 @@
 ---
 description: Feature - Инициализация работы над новой функциональностью - анализ проекта, автогенерация MADSpec артефактов, определение точек интеграции
-scripts:
-  sh: scripts/bash/get-branch.sh
-  ps: scripts/powershell/get-branch.ps1
 ---
 
 ## Пользовательский ввод
@@ -56,14 +53,14 @@ $ARGUMENTS
 
 0. **Определение текущей ветки и создание feature ветки:**
 
-   - Выполни скрипт `{SCRIPT}` для определения текущей ветки
+   - Выполни `madspec git current-branch` для определения текущей ветки
    - Определи основную ветку:
      1. Проверь наличие `.madspec/main/` → если есть, `main` — основная
      2. Иначе проверь `git branch -r` для удаленных веток
      3. Если найдена `origin/main` или `origin/master` → используй ее
      4. Если git недоступен, используй `main` по умолчанию
    - Спроси у пользователя: "Какое короткое название для feature ветки?" (например: `user-auth`, `payment`, `notifications`)
-   - Создай ветку: `git checkout -b feature/<short-name>`
+   - Создай ветку: `madspec git create-branch feature/<short-name>`
    - Создай директорию: `.madspec/feature/<short-name>/`
 
 1. **Анализ существующего проекта:**
@@ -258,7 +255,7 @@ $ARGUMENTS
    **Обязательные пункты:**
 
    - [ ] **Feature ветка создана**
-     - Выполнен `git checkout -b feature/<short-name>`
+     - Выполнен `madspec git create-branch feature/<short-name>`
      - Создана директория `.madspec/feature/<short-name>/`
    
    - [ ] **Технологический стек определен**

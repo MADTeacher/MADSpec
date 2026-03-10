@@ -111,7 +111,7 @@ case $agent in
   # ... existing cases ...
   new-agent)
     mkdir -p "$base_dir/.newagent/commands"
-    generate_commands new-agent md "\$ARGUMENTS" "$base_dir/.newagent/commands" "$script" ;;
+    generate_commands new-agent md "\$ARGUMENTS" "$base_dir/.newagent/commands" ;;
 esac
 ```
 
@@ -123,7 +123,7 @@ esac
 - **Feature commands**: `madspec.feature.init`, `madspec.feature.plan`, `madspec.feature.implement`
 - **General commands**: `madspec.deploy`, `madspec.security`, `madspec.review`
 
-All commands must include branch detection scripts in the `scripts` section (sh and ps).
+All commands should rely on `madspec git current-branch` for branch detection instead of shipping shell/PowerShell helper scripts.
 
 #### 5. Update GitHub Release Script
 
@@ -132,8 +132,7 @@ Modify `.github/workflows/scripts/create-github-release.sh` to include the new a
 ```bash
 gh release create "$VERSION" \
   # ... existing packages ...
-  .genreleases/pldf-template-new-agent-sh-"$VERSION".zip \
-  .genreleases/pldf-template-new-agent-ps-"$VERSION".zip \
+  .genreleases/pldf-template-new-agent-"$VERSION".zip \
   # Add new agent packages here
 ```
 
@@ -169,15 +168,12 @@ Used by: Cursor, opencode, Kilo Code, Roo Code, SourceCraft
 ```markdown
 ---
 description: "Command description"
-scripts:
-  sh: scripts/bash/get-branch.sh
-  ps: scripts/powershell/get-branch.ps1
 ---
 
 Command content with $ARGUMENTS placeholder.
 ```
 
-**Important:** Commands reference scripts from the `scripts/` directory, rather than containing inline code. Scripts are executed from the project root and return values via stdout.
+**Important:** Commands call MADSpec CLI directly for branch and git operations, for example `madspec git current-branch`, `madspec git init`, and `madspec git commit`.
 
 ## Directory Conventions
 
@@ -221,4 +217,3 @@ When adding new agents:
 ---
 
 *This documentation should be updated whenever new agents are added to maintain accuracy and completeness.*
-

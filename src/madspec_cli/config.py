@@ -50,8 +50,6 @@ AGENT_CONFIG: dict[str, AgentConfig] = {
     ),
 }
 
-SCRIPT_TYPE_CHOICES = {"sh": "POSIX Shell (bash/zsh)", "ps": "PowerShell"}
-
 
 def allowed_ai_values() -> str:
     return ", ".join(AGENT_CONFIG.keys())

@@ -2,12 +2,11 @@
 set -euo pipefail
 
 # create-release-packages.sh (workflow-local)
-# Build MADSpec template release archives for each supported AI assistant and script type.
+# Build MADSpec template release archives for each supported AI assistant.
 # Usage: .github/workflows/scripts/create-release-packages.sh <version>
 #   Version argument should include leading 'v'.
-#   Optionally set AGENTS and/or SCRIPTS env vars to limit what gets built.
-#     AGENTS  : space or comma separated subset of: cursor-agent opencode kilocode roo sourcecraft (default: all)
-#     SCRIPTS : space or comma separated subset of: sh ps (default: both)
+#   Optionally set AGENTS env var to limit what gets built.
+#     AGENTS  : space or comma separated subset of: cursor-agent opencode kilocode roo sourcecraft copilot (default: all)
 
 if [[ $# -ne 1 ]]; then
   echo "Usage: $0 <version-with-v-prefix>" >&2
@@ -27,9 +26,7 @@ mkdir -p "$GENRELEASES_DIR"
 rm -rf "$GENRELEASES_DIR"/* || true
 
 rewrite_paths() {
-  # Skip lines that already have .madspec/ before the target directory to prevent duplication
   sed -E \
-    -e '/\.madspec\/scripts\//!s@(^|[[:space:]]|`)(/?)scripts/@\1.madspec/scripts/@g' \
     -e '/\.madspec\/templates\//!s@(^|[[:space:]]|`)(/?)templates/@\1.madspec/templates/@g'
 }
 
@@ -63,39 +60,18 @@ EOF
 }
 
 generate_commands() {
-  local agent=$1 ext=$2 arg_format=$3 output_dir=$4 script_variant=$5
+  local agent=$1 ext=$2 arg_format=$3 output_dir=$4
   mkdir -p "$output_dir"
   for template in templates/commands/*.md; do
     [[ -f "$template" ]] || continue
-    local name description script_command body
+    local name body
     name=$(basename "$template" .md)
-    
+
     # Normalize line endings
     file_content=$(tr -d '\r' < "$template")
-    
-    # Extract description and script command from YAML frontmatter
-    # Use grep + sed instead of awk with pipe to avoid broken pipe errors
-    description=$(grep -m1 '^description:' <<< "$file_content" | sed 's/^description:[[:space:]]*//' || true)
-    script_command=$(grep -m1 "^[[:space:]]*${script_variant}:" <<< "$file_content" | sed "s/^[[:space:]]*${script_variant}:[[:space:]]*//" || true)
-    
-    if [[ -z $script_command ]]; then
-      # Empty script command is OK for MADSpec (most commands don't use external scripts)
-      script_command=""
-    fi
-    
-    # Replace {SCRIPT} placeholder with the script command
-    body=$(sed "s|{SCRIPT}|${script_command}|g" <<< "$file_content")
-    
-    # Remove the scripts: section from frontmatter while preserving YAML structure
-    # Use here-string instead of pipe to avoid broken pipe errors
-    body=$(awk '
-      /^---$/ { print; if (++dash_count == 1) in_frontmatter=1; else in_frontmatter=0; next }
-      in_frontmatter && /^scripts:$/ { skip_scripts=1; next }
-      in_frontmatter && /^[a-zA-Z].*:/ && skip_scripts { skip_scripts=0 }
-      in_frontmatter && skip_scripts && /^[[:space:]]/ { next }
-      { print }
-    ' <<< "$body")
-    
+
+    body="$file_content"
+
     # Apply other substitutions
     body=$(sed "s/{ARGS}/$arg_format/g; s/__AGENT__/$agent/g" <<< "$body" | rewrite_paths)
 
@@ -109,31 +85,13 @@ generate_commands() {
 }
 
 build_variant() {
-  local agent=$1 script=$2
-  local base_dir="$GENRELEASES_DIR/madspec-${agent}-package-${script}"
-  echo "Building $agent ($script) package..."
+  local agent=$1
+  local base_dir="$GENRELEASES_DIR/madspec-${agent}-package"
+  echo "Building $agent package..."
   mkdir -p "$base_dir"
   
-  # Copy base structure but filter scripts by variant
   MADSPEC_DIR="$base_dir/.madspec"
   mkdir -p "$MADSPEC_DIR"
-  
-  # Only copy the relevant script variant directory
-  if [[ -d scripts ]]; then
-    mkdir -p "$MADSPEC_DIR/scripts"
-    case $script in
-      sh)
-        [[ -d scripts/bash ]] && { cp -rp scripts/bash "$MADSPEC_DIR/scripts/"; echo "Copied scripts/bash -> .madspec/scripts"; }
-        # Copy any script files that aren't in variant-specific directories
-        find scripts -maxdepth 1 -type f -exec cp -p {} "$MADSPEC_DIR/scripts/" \; 2>/dev/null || true
-        ;;
-      ps)
-        [[ -d scripts/powershell ]] && { cp -rp scripts/powershell "$MADSPEC_DIR/scripts/"; echo "Copied scripts/powershell -> .madspec/scripts"; }
-        # Copy any script files that aren't in variant-specific directories
-        find scripts -maxdepth 1 -type f -exec cp -p {} "$MADSPEC_DIR/scripts/" \; 2>/dev/null || true
-        ;;
-    esac
-  fi
   
   [[ -d templates ]] && {
     mkdir -p "$MADSPEC_DIR/templates"
@@ -149,32 +107,32 @@ build_variant() {
   case $agent in
     cursor-agent)
       mkdir -p "$base_dir/.cursor/commands"
-      generate_commands cursor-agent md "\$ARGUMENTS" "$base_dir/.cursor/commands" "$script"
+      generate_commands cursor-agent md "\$ARGUMENTS" "$base_dir/.cursor/commands"
       [[ -d skills ]] && { mkdir -p "$base_dir/.cursor/skills"; cp -r skills/* "$base_dir/.cursor/skills/"; echo "Copied skills -> .cursor/skills"; }
       ;;
     opencode)
       mkdir -p "$base_dir/.opencode/command"
-      generate_commands opencode md "\$ARGUMENTS" "$base_dir/.opencode/command" "$script"
+      generate_commands opencode md "\$ARGUMENTS" "$base_dir/.opencode/command"
       [[ -d skills ]] && { mkdir -p "$base_dir/.opencode/skills"; cp -r skills/* "$base_dir/.opencode/skills/"; echo "Copied skills -> .opencode/skills"; }
       ;;
     kilocode)
       mkdir -p "$base_dir/.kilocode/rules"
-      generate_commands kilocode md "\$ARGUMENTS" "$base_dir/.kilocode/rules" "$script"
+      generate_commands kilocode md "\$ARGUMENTS" "$base_dir/.kilocode/rules"
       [[ -d skills ]] && { mkdir -p "$base_dir/.kilocode/skills"; cp -r skills/* "$base_dir/.kilocode/skills/"; echo "Copied skills -> .kilocode/skills"; }
       ;;
     roo)
       mkdir -p "$base_dir/.roo/rules"
-      generate_commands roo md "\$ARGUMENTS" "$base_dir/.roo/rules" "$script"
+      generate_commands roo md "\$ARGUMENTS" "$base_dir/.roo/rules"
       [[ -d skills ]] && { mkdir -p "$base_dir/.roo/skills"; cp -r skills/* "$base_dir/.roo/skills/"; echo "Copied skills -> .roo/skills"; }
       ;;
     sourcecraft)
       mkdir -p "$base_dir/.codeassistant/commands"
-      generate_commands sourcecraft md "\$ARGUMENTS" "$base_dir/.codeassistant/commands" "$script"
+      generate_commands sourcecraft md "\$ARGUMENTS" "$base_dir/.codeassistant/commands"
       [[ -d skills ]] && { mkdir -p "$base_dir/.codeassistant/skills"; cp -r skills/* "$base_dir/.codeassistant/skills/"; echo "Copied skills -> .codeassistant/skills"; }
       ;;
     copilot)
       mkdir -p "$base_dir/.github/agents"
-      generate_commands copilot agent.md "\$ARGUMENTS" "$base_dir/.github/agents" "$script"
+      generate_commands copilot agent.md "\$ARGUMENTS" "$base_dir/.github/agents"
       # Generate companion prompt files
       generate_copilot_prompts "$base_dir/.github/agents" "$base_dir/.github/prompts"
       # Create VS Code workspace settings
@@ -183,20 +141,13 @@ build_variant() {
       [[ -d skills ]] && { mkdir -p "$base_dir/.github/skills"; cp -r skills/* "$base_dir/.github/skills/"; echo "Copied skills -> .github/skills"; }
       ;;
   esac
-  
-  # Ensure all .sh scripts have execute permissions before packaging
-  if [[ -d "$MADSPEC_DIR/scripts" ]]; then
-    find "$MADSPEC_DIR/scripts" -type f -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
-    echo "Set execute permissions on .sh scripts"
-  fi
-  
-  ( cd "$base_dir" && zip -r "../madspec-template-${agent}-${script}-${NEW_VERSION}.zip" . )
-  echo "Created $GENRELEASES_DIR/madspec-template-${agent}-${script}-${NEW_VERSION}.zip"
+
+  ( cd "$base_dir" && zip -r "../madspec-template-${agent}-${NEW_VERSION}.zip" . )
+  echo "Created $GENRELEASES_DIR/madspec-template-${agent}-${NEW_VERSION}.zip"
 }
 
 # Determine agent list
 ALL_AGENTS=(cursor-agent opencode kilocode roo sourcecraft copilot)
-ALL_SCRIPTS=(sh ps)
 
 norm_list() {
   # convert comma+space separated -> line separated unique while preserving order of first occurrence
@@ -224,20 +175,10 @@ else
   AGENT_LIST=("${ALL_AGENTS[@]}")
 fi
 
-if [[ -n ${SCRIPTS:-} ]]; then
-  mapfile -t SCRIPT_LIST < <(printf '%s' "$SCRIPTS" | norm_list)
-  validate_subset script ALL_SCRIPTS "${SCRIPT_LIST[@]}" || exit 1
-else
-  SCRIPT_LIST=("${ALL_SCRIPTS[@]}")
-fi
-
 echo "Agents: ${AGENT_LIST[*]}"
-echo "Scripts: ${SCRIPT_LIST[*]}"
 
 for agent in "${AGENT_LIST[@]}"; do
-  for script in "${SCRIPT_LIST[@]}"; do
-    build_variant "$agent" "$script"
-  done
+  build_variant "$agent"
 done
 
 echo "Archives in $GENRELEASES_DIR:"

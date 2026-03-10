@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-import os
 import shutil
-import sys
 from pathlib import Path
 
 import typer
 from rich.live import Live
 from rich.panel import Panel
 
-from ..config import AGENT_CONFIG, SCRIPT_TYPE_CHOICES, allowed_ai_values
+from ..config import AGENT_CONFIG, allowed_ai_values
 from ..git_ops import check_tool
 from ..initializer import initialize_project
 from ..ui import StepTracker, console, select_with_arrows, show_banner
@@ -24,11 +22,6 @@ def init(
         None,
         "--ai",
         help=f"AI assistant to use: {allowed_ai_values()}",
-    ),
-    script_type: str = typer.Option(
-        None,
-        "--script",
-        help="Script type to use: sh or ps",
     ),
     ignore_agent_tools: bool = typer.Option(
         False,
@@ -162,32 +155,12 @@ def init(
             )
             raise typer.Exit(1)
 
-    if script_type:
-        if script_type not in SCRIPT_TYPE_CHOICES:
-            console.print(
-                f"[red]Error:[/red] Invalid script type '{script_type}'. Choose from: {', '.join(SCRIPT_TYPE_CHOICES.keys())}"
-            )
-            raise typer.Exit(1)
-        selected_script = script_type
-    else:
-        default_script = "ps" if os.name == "nt" else "sh"
-        if sys.stdin.isatty():
-            selected_script = select_with_arrows(
-                SCRIPT_TYPE_CHOICES,
-                "Choose script type (or press Enter)",
-                default_script,
-            )
-        else:
-            selected_script = default_script
-
     console.print(f"[cyan]Selected AI assistant:[/cyan] {selected_ai}")
-    console.print(f"[cyan]Selected script type:[/cyan] {selected_script}")
 
     tracker = StepTracker("Initialize MADSpec Project")
     for key, label, detail in (
         ("precheck", "Check required tools", "ok"),
         ("ai-select", "Select AI assistant", selected_ai),
-        ("script-select", "Select script type", selected_script),
     ):
         tracker.add(key, label)
         tracker.complete(key, detail)
@@ -198,7 +171,6 @@ def init(
         ("zip-list", "Archive contents"),
         ("extracted-summary", "Extraction summary"),
         ("flatten", "Flatten nested directory"),
-        ("chmod", "Ensure scripts executable"),
         ("cleanup", "Cleanup"),
         ("git", "Initialize git repository"),
         ("final", "Finalize"),
@@ -212,7 +184,6 @@ def init(
             result = initialize_project(
                 project_path,
                 selected_ai=selected_ai,
-                selected_script=selected_script,
                 here=here,
                 no_git=no_git,
                 should_init_git=should_init_git,
@@ -253,9 +224,7 @@ def init(
                 f"{result.git_error_message}\n\n"
                 f"[dim]You can initialize git manually later with:[/dim]\n"
                 f"[cyan]cd {project_path if not here else '.'}[/cyan]\n"
-                f"[cyan]git init[/cyan]\n"
-                f"[cyan]git add .[/cyan]\n"
-                f'[cyan]git commit -m "Initial commit"[/cyan]',
+                f"[cyan]madspec git init[/cyan]",
                 title="[red]Git Initialization Failed[/red]",
                 border_style="red",
                 padding=(1, 2),

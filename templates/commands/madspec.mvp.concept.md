@@ -4,9 +4,6 @@ handoffs:
   - label: UI/UX-дизайн
     agent: madspec.mvp.design.md
     prompt: Проработай графический пользовательский интерфейс на основе концепции реализуемой системы
-scripts:
-  sh: scripts/bash/get-branch.sh
-  ps: scripts/powershell/get-branch.ps1
 ---
 
 ## Пользовательский ввод
@@ -48,101 +45,30 @@ $ARGUMENTS
 
 
 0. **Определение текущей ветки**:
-   - **ВАЖНО**: Перед началом работы определи текущую ветку, выполнив `{SCRIPT}` из корня проекта
-   - Скрипт возвращает имя ветки через stdout
-   - Используй результат выполнения скрипта (имя ветки) для формирования путей к артефактам
-   - Все пути к артефактам должны быть в формате `.madspec/<BRANCH>/...`, где `<BRANCH>` - это имя ветки, полученное из скрипта
-   - Если ни скрипт, ни файл недоступны, используй значение по умолчанию `main`
+   - **ВАЖНО**: Перед началом работы определи текущую ветку, выполнив `madspec git current-branch` из корня проекта
+   - Команда возвращает имя ветки через stdout
+   - Используй результат выполнения команды (имя ветки) для формирования путей к артефактам
+   - Все пути к артефактам должны быть в формате `.madspec/<BRANCH>/...`, где `<BRANCH>` - это имя ветки, полученное из команды
+   - Если ни команда, ни файл недоступны, используй значение по умолчанию `main`
    - Сохрани имя ветки для использования в дальнейших шагах
 
 1. **Инициализация GIT репозитория и создание ветки для разработки**:
    - Проверь, инициализирован ли GIT репозиторий (выполни `git status` или проверь наличие `.git/`)
    - Если репозиторий не инициализирован:
-     - Выполни `git init`
-     - Создай максимально полный `.gitignore` (если его нет), обязательно исключив следующие категории файлов:
-       
-       **Конфигурационные файлы с секретами** (критически важно!):
-       - `.env`, `.env.local`, `.env.production`, `.env.development`, `.env.test`, `.env.*.local`
-       - `*.env`, `*.secret`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, `*.cer`, `*.crt`
-       - `config/secrets.json`, `secrets.yaml`, `secrets.yml`, `credentials.json`, `credentials.yaml`
-       - `*.token`, `*.password`, `*.passwd`, `*.auth`
-       - Любые файлы с API ключами, токенами, паролями
-       
-       **Зависимости Node.js**:
-       - `node_modules/`, `npm-debug.log*`, `yarn-error.log*`, `.pnpm-debug.log*`
-       - `.yarn/`, `.pnp.*`, `.yarn-integrity`, `yarn.lock` (опционально)
-       - `.npm/`, `.node_repl_history`, `package-lock.json` (опционально)
-       
-       **Зависимости Python**:
-       - `venv/`, `.venv/`, `env/`, `ENV/`, `env.bak/`, `venv.bak/`
-       - `__pycache__/`, `*.py[cod]`, `*$py.class`, `*.so`, `.Python`
-       - `pip-log.txt`, `pip-delete-this-directory.txt`, `.pytest_cache/`
-       - `*.egg-info/`, `dist/`, `build/`, `eggs/`, `wheels/`
-       
-       **Зависимости Java**:
-       - `target/`, `*.class`, `*.jar`, `*.war`, `*.ear`, `*.nar`
-       - `.gradle/`, `.mvn/`, `mvnw`, `mvnw.cmd`, `.settings/`
-       - `*.iml`, `*.ipr`, `*.iws`, `*.classpath`, `.project`
-       
-       **Зависимости Go**:
-       - `vendor/`, `*.exe`, `*.exe~`, `*.dll`, `*.test`, `*.out`
-       - `go.work`, `go.work.sum`
-       
-       **Зависимости Rust**:
-       - `target/`, `Cargo.lock` (опционально)
-       
-       **Зависимости Dart/Flutter**:
-       - `.dart_tool/`, `.flutter-plugins`, `.flutter-plugins-dependencies`
-       - `.packages`, `pubspec.lock` (опционально), `.pub-cache/`
-       - `build/`, `.flutter-plugins-dependencies`
-       
-       **Зависимости PHP**:
-       - `vendor/`, `composer.lock` (опционально)
-       
-       **Зависимости C#/.NET**:
-       - `bin/`, `obj/`, `*.user`, `*.suo`, `*.cache`, `*.dll`
-       - `.vs/`, `.vscode/`, `*.sln.docstates`
-       
-       **Временные и системные файлы**:
-       - `.DS_Store`, `Thumbs.db`, `ehthumbs.db`, `Desktop.ini`
-       - `*.log`, `*.tmp`, `*.temp`, `*.swp`, `*.swo`, `*~`, `*.bak`
-       - `.DS_Store?`, `._*`, `.Spotlight-V100`, `.Trashes`
-       
-       **IDE и редакторы**:
-       - `.idea/`, `.vscode/` (кроме настроек проекта), `.vs/`
-       - `*.sublime-*`, `.fleet/`, `.cursor/`, `.history/`
-       - `*.code-workspace`, `.vscode-test/`
-       
-       **Артефакты сборки**:
-       - `dist/`, `build/`, `out/`, `.next/`, `.nuxt/`, `.output/`
-       - `*.o`, `*.a`, `*.lib`, `*.so`, `*.dylib`, `*.dll`
-       
-       **Базы данных**:
-       - `*.db`, `*.sqlite`, `*.sqlite3`, `*.db-shm`, `*.db-wal`
-       
-       **Кэш и временные данные**:
-       - `.cache/`, `.temp/`, `.tmp/`, `.parcel-cache/`
-       - `.turbo/`, `.next/`, `.nuxt/`, `.vuepress/dist/`
-       
-       **Операционные системы**:
-       - `.DS_Store`, `Thumbs.db`, `desktop.ini`, `$RECYCLE.BIN/`
-       - `.fseventsd/`, `.Spotlight-V100/`, `.TemporaryItems/`
-       
+     - Выполни `madspec git init --commit-message "feat: добавлена концепция проекта"`
+     - Команда сама инициализирует репозиторий, создаст или дополнит `.gitignore`, добавит все файлы и создаст первый коммит
      - **ВАЖНО**: `.gitignore` должен быть создан ДО первого коммита, чтобы секреты не попали в репозиторий
-     - Добавь все файлы: `git add .`
      - Убедись, что `.gitignore` работает: проверь `git status` и убедись, что конфигурационные файлы с секретами не отображаются
-     - Создай первый коммит: `git commit -m "feat: добавлена концепция проекта"`
    - **Создание ветки для разработки MVP**:
      - Создай новую ветку для разработки MVP (например, `mvp-initial` или `develop`)
-     - Переключись на эту ветку: `git checkout -b <branch-name>`
+     - Переключись на эту ветку: `madspec git create-branch <branch-name>`
      - **ВАЖНО**: Все артефакты MVP будут сохраняться в `.madspec/<branch-name>/`
-     - **ОБЯЗАТЕЛЬНО**: Обнови `.madspec/config.json`, установив `"currentBranch": "<branch-name>"`
+     - **ОБЯЗАТЕЛЬНО**: `madspec git create-branch` автоматически обновит `.madspec/config.json`, установив `"currentBranch": "<branch-name>"`
    - Если репозиторий уже инициализирован:
-     - Проверь наличие `.gitignore` и при необходимости обнови его (добавь правила для конфигурационных файлов с секретами и других категорий, если их нет)
-     - Если текущая ветка - `main` или `master`, создай новую ветку для разработки: `git checkout -b <branch-name>`
-     - **ОБЯЗАТЕЛЬНО**: Обнови `.madspec/config.json`, установив `"currentBranch": "<branch-name>"`
-     - Добавь новые файлы: `git add .`
-     - Создай коммит: `git commit -m "feat: добавлена концепция проекта"`
+     - Проверь наличие `.gitignore` и при необходимости обнови его через `madspec git ensure-gitignore`
+     - Если текущая ветка - `main` или `master`, создай новую ветку для разработки: `madspec git create-branch <branch-name>`
+     - Если новая ветка не создавалась, синхронизируй MADSpec-конфигурацию через `madspec git set-branch <branch-name>`
+     - После завершения этапа создай коммит: `madspec git commit --message "feat: добавлена концепция проекта"`
    - **КРИТИЧЕСКИ ВАЖНО**: Никогда не коммить файлы с секретами (API ключи, пароли, токены). Если секреты уже попали в репозиторий, их нужно немедленно изменить, так как история GIT сохраняет все изменения
 
 2. **Создание структуры концепции**:

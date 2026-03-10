@@ -247,7 +247,6 @@ madspec init <PROJECT_NAME> [OPTIONS]
 
 **Опции:**
 - `--ai <agent>` - AI ассистент для использования (cursor-agent, opencode, kilocode, roo, sourcecraft, copilot)
-- `--script <sh|ps>` - Тип скрипта (POSIX Shell или PowerShell)
 - `--ignore-agent-tools` - Пропустить проверку инструментов AI агента
 - `--no-git` - Пропустить инициализацию Git репозитория
 - `--here` - Инициализировать проект в текущей директории
@@ -264,24 +263,27 @@ madspec init . --ai sourcecraft
 madspec init --here --force
 ```
 
-### branch
-
-Управление конфигурацией ветки MADSpec.
+### git
 
 ```bash
-madspec branch <ACTION> [BRANCH_NAME]
+madspec git <COMMAND> [OPTIONS]
 ```
 
-**Действия:**
-- `get` - Показать текущую ветку
-- `set <branch-name>` - Установить рабочую ветку в .madspec/config.json
-- `list` - Список всех веток с артефактами
+**Команды:**
+- `current-branch` - Показать текущую ветку с fallback на `.madspec/config.json`
+- `list-branches` - Список всех веток с артефактами
+- `set-branch <branch-name>` - Установить рабочую ветку в `.madspec/config.json`
+- `ensure-gitignore` - Создать или дополнить `.gitignore`
+- `init` - Инициализировать git-репозиторий и сделать initial commit
+- `create-branch <branch-name>` - Создать git-ветку и синхронизировать `.madspec`
+- `commit --message <msg>` - Добавить все изменения и создать commit
 
 **Примеры:**
 ```bash
-madspec branch get
-madspec branch set feature/new-ui
-madspec branch list
+madspec git current-branch
+madspec git set-branch feature/new-ui
+madspec git create-branch feature/user-auth
+madspec git commit --message "feat: add auth"
 ```
 
 ### memory
@@ -397,7 +399,7 @@ madspec version
 - Консультация по структуре проекта
 - Автоматическая валидация выбора технологий
 - Запись ключевых технологических решений
-- Автоматическое обновление прогресса через скрипт
+- Автоматическое обновление прогресса через structured memory
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/tech-stack.md` - выбранный стек
@@ -578,7 +580,7 @@ madspec version
 
 **Важно:**
 - Артефакты хранятся в `.madspec/<branch-name>/`, где `<branch-name>` - имя текущей ветки
-- Ветка определяется автоматически через скрипты в командах (из git или config.json)
+- Ветка определяется автоматически через `madspec git current-branch` (из git или config.json)
 - Шаблоны хранятся в корне `.madspec/templates/` и общие для всех веток
 - Конфигурация проекта хранится в `.madspec/config.json`
 
@@ -631,9 +633,8 @@ MADSpec использует модульную систему контекст�
 
 ### Определение ветки
 
-Все команды автоматически определяют текущую ветку через скрипты в секции `scripts`:
-- Команды ссылаются на скрипты `scripts/bash/get-branch.sh` (для sh) или `scripts/powershell/get-branch.ps1` (для ps)
-- Скрипты выполняются из корня проекта и возвращают имя ветки через stdout
+Все команды автоматически определяют текущую ветку через `madspec git current-branch`:
+- Команда выполняется из корня проекта и возвращает имя ветки через stdout
 - Логика определения ветки:
   1. Сначала используется `git branch --show-current` (как наиболее актуальный источник)
   2. Затем проверяется `.madspec/config.json` (если существует и содержит `currentBranch`) как fallback

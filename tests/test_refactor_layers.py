@@ -61,7 +61,7 @@ def test_release_asset_selection_uses_pattern_match() -> None:
         "tag_name": "v1.2.3",
         "assets": [
             {
-                "name": "madspec-template-cursor-agent-sh-v1.2.3.zip",
+                "name": "madspec-template-cursor-agent-v1.2.3.zip",
                 "size": 1234,
                 "browser_download_url": "https://example.com/ok.zip",
             },
@@ -80,12 +80,12 @@ def test_release_asset_selection_uses_pattern_match() -> None:
     asset = fetch_latest_release_asset(
         "MADTeacher",
         "MADSpec",
-        "madspec-template-cursor-agent-sh",
+        "madspec-template-cursor-agent",
         client=client,
     )
 
     assert asset == ReleaseAsset(
-        filename="madspec-template-cursor-agent-sh-v1.2.3.zip",
+        filename="madspec-template-cursor-agent-v1.2.3.zip",
         size=1234,
         release="v1.2.3",
         asset_url="https://example.com/ok.zip",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 
-from .commands import branch as branch_commands
+from .commands import git as git_commands
 from .commands import init as init_commands
 from .commands import memory as memory_commands
 from .commands import meta as meta_commands
@@ -27,7 +27,7 @@ def callback(ctx: typer.Context) -> None:
 
 
 init_commands.register(app)
-branch_commands.register(app)
+git_commands.register(app)
 meta_commands.register(app)
 memory_commands.register(memory_app)
 
