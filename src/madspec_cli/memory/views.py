@@ -3,6 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .architecture_state import (
+    architecture_completeness_errors,
+    load_architecture_state,
+    render_architecture_markdown,
+    render_data_model_markdown,
+    render_openapi_yaml,
+)
 from .concept_state import concept_completeness_errors, load_concept_state, render_concept_markdown
 from .design_state import (
     design_completeness_errors,
@@ -266,6 +273,99 @@ def _build_tech_status(tech_state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _architecture_missing_required_fields(
+    architecture_state: dict[str, Any],
+    *,
+    design_state: dict[str, Any],
+) -> list[str]:
+    error_map = {
+        "architecture state must include an architecture overview before checkpoint": "architectureOverview",
+        "architecture state must include a project structure strategy before checkpoint": "projectStructure.strategy",
+        "architecture state must include a project structure rationale before checkpoint": "projectStructure.rationale",
+        "architecture state must include at least one directory before checkpoint": "projectStructure.directories",
+        "architecture state must include at least one entity before checkpoint": "dataModel.entities",
+        "architecture state must include at least one entity with fields before checkpoint": "dataModel.entities.fields",
+        "architecture state must include at least one endpoint before checkpoint": "contracts.endpoints",
+        "architecture state must include at least one endpoint linked to a screen before checkpoint": "contracts.endpoints.screenIds",
+        "architecture state must include at least one response field before checkpoint": "contracts.endpoints.fields.response",
+        "architecture state must include at least one code principle or pattern before checkpoint": "codePrinciples|patterns",
+    }
+    missing: list[str] = []
+    for error in architecture_completeness_errors(architecture_state, design_state=design_state):
+        field_name = error_map.get(error)
+        if field_name and field_name not in missing:
+            missing.append(field_name)
+    return missing
+
+
+def _architecture_filled_fields(architecture_state: dict[str, Any]) -> list[str]:
+    field_checks = (
+        ("architectureOverview", bool(architecture_state.get("architectureOverview"))),
+        ("projectStructure.strategy", bool(architecture_state.get("projectStructure", {}).get("strategy"))),
+        ("projectStructure.rationale", bool(architecture_state.get("projectStructure", {}).get("rationale"))),
+        ("projectStructure.directories", bool(architecture_state.get("projectStructure", {}).get("directories"))),
+        ("dataModel.entities", bool(architecture_state.get("dataModel", {}).get("entities"))),
+        (
+            "dataModel.entities.fields",
+            any(entity.get("fields") for entity in architecture_state.get("dataModel", {}).get("entities", [])),
+        ),
+        ("contracts.endpoints", bool(architecture_state.get("contracts", {}).get("endpoints"))),
+        ("integrations", bool(architecture_state.get("integrations"))),
+        ("codePrinciples", bool(architecture_state.get("codePrinciples"))),
+        ("patterns", bool(architecture_state.get("patterns"))),
+        ("securityNotes", bool(architecture_state.get("securityNotes"))),
+        ("performanceNotes", bool(architecture_state.get("performanceNotes"))),
+        ("nextActions", bool(architecture_state.get("nextActions"))),
+        ("checkpointSummary", bool(architecture_state.get("checkpointSummary"))),
+    )
+    return [field_name for field_name, is_filled in field_checks if is_filled]
+
+
+def _build_architecture_status(
+    architecture_state: dict[str, Any],
+    *,
+    design_state: dict[str, Any],
+) -> dict[str, Any]:
+    missing_required_fields = _architecture_missing_required_fields(
+        architecture_state,
+        design_state=design_state,
+    )
+    reference_errors = [
+        error
+        for error in architecture_completeness_errors(architecture_state, design_state=design_state)
+        if error not in {
+            "architecture state must include an architecture overview before checkpoint",
+            "architecture state must include a project structure strategy before checkpoint",
+            "architecture state must include a project structure rationale before checkpoint",
+            "architecture state must include at least one directory before checkpoint",
+            "architecture state must include at least one entity before checkpoint",
+            "architecture state must include at least one entity with fields before checkpoint",
+            "architecture state must include at least one endpoint before checkpoint",
+            "architecture state must include at least one endpoint linked to a screen before checkpoint",
+            "architecture state must include at least one response field before checkpoint",
+            "architecture state must include at least one code principle or pattern before checkpoint",
+        }
+    ]
+    return {
+        "is_complete": not missing_required_fields and not reference_errors,
+        "missing_required_fields": missing_required_fields,
+        "filled_fields": _architecture_filled_fields(architecture_state),
+        "reference_errors": reference_errors,
+        "counts": {
+            "directories": len(architecture_state.get("projectStructure", {}).get("directories", [])),
+            "entities": len(architecture_state.get("dataModel", {}).get("entities", [])),
+            "endpoints": len(architecture_state.get("contracts", {}).get("endpoints", [])),
+            "integrations": len(architecture_state.get("integrations", [])),
+            "code_principles": len(architecture_state.get("codePrinciples", [])),
+            "patterns": len(architecture_state.get("patterns", [])),
+        },
+        "last_checkpoint_summary": architecture_state.get("checkpointSummary") or None,
+        "revision": architecture_state.get("revision", 0),
+        "ratified_at": architecture_state.get("ratifiedAt"),
+        "updated_at": architecture_state.get("updatedAt"),
+    }
+
+
 def _render_project_context(
     branch_name: str,
     progress: dict[str, Any],
@@ -273,6 +373,7 @@ def _render_project_context(
     concept_state: dict[str, Any],
     design_state: dict[str, Any],
     tech_state: dict[str, Any],
+    architecture_state: dict[str, Any],
     generated_at: str,
 ) -> str:
     planned_steps = progress.get("plannedSteps", [])
@@ -315,6 +416,7 @@ def _render_project_context(
             f"- `.madspec/{branch_name}/memory/stages/mvp.concept.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.design.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.tech.json`",
+            f"- `.madspec/{branch_name}/memory/stages/mvp.architecture.json`",
             f"- `.madspec/{branch_name}/memory/working/active-session.json`",
             f"- `.madspec/{branch_name}/memory/working/decision-log.jsonl`",
             f"- `.madspec/{branch_name}/memory/episodes/events.jsonl`",
@@ -324,9 +426,13 @@ def _render_project_context(
             f"- `.madspec/{branch_name}/concept.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/ui-design.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/tech-stack.md` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/architecture.md` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/data-model.md` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/contracts/openapi.yaml` (generated from structured memory)",
             f"- Concept checkpoint summary: `{concept_state.get('checkpointSummary') or 'N/A'}`",
             f"- Design checkpoint summary: `{design_state.get('checkpointSummary') or 'N/A'}`",
             f"- Tech checkpoint summary: `{tech_state.get('checkpointSummary') or 'N/A'}`",
+            f"- Architecture checkpoint summary: `{architecture_state.get('checkpointSummary') or 'N/A'}`",
             (
                 f"- Design inventory: `{len(design_state.get('screens', []))}` screens, "
                 f"`{len(design_state.get('flows', []))}` flows, main prototype "
@@ -346,6 +452,11 @@ def _render_project_context(
                 or "N/A"
             )
             + "`",
+            (
+                f"- Architecture inventory: `{len(architecture_state.get('projectStructure', {}).get('directories', []))}` directories, "
+                f"`{len(architecture_state.get('dataModel', {}).get('entities', []))}` entities, "
+                f"`{len(architecture_state.get('contracts', {}).get('endpoints', []))}` endpoints"
+            ),
         ]
     )
     return "\n".join(lines) + "\n"
@@ -462,6 +573,7 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state)
     tech_state = load_tech_state(paths.tech_state)
+    architecture_state = load_architecture_state(paths.architecture_state)
     generated_at = active_session.get("updated_at") or active_session.get("last_checkpoint_at") or now_iso()
     decision_log = read_jsonl(paths.decision_log)
     events = read_jsonl(paths.events)
@@ -497,6 +609,37 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     )
     generated.append(tech_path)
 
+    architecture_path = paths.branch_dir / "architecture.md"
+    architecture_path.write_text(
+        render_architecture_markdown(
+            architecture_state,
+            branch_name=branch_name,
+            project_name=concept_state.get("projectName", ""),
+        ),
+        encoding="utf-8",
+    )
+    generated.append(architecture_path)
+
+    data_model_path = paths.branch_dir / "data-model.md"
+    data_model_path.write_text(
+        render_data_model_markdown(
+            architecture_state,
+            branch_name=branch_name,
+            project_name=concept_state.get("projectName", ""),
+        ),
+        encoding="utf-8",
+    )
+    generated.append(data_model_path)
+
+    contracts_dir = paths.branch_dir / "contracts"
+    contracts_dir.mkdir(parents=True, exist_ok=True)
+    openapi_path = contracts_dir / "openapi.yaml"
+    openapi_path.write_text(
+        render_openapi_yaml(architecture_state, branch_name=branch_name),
+        encoding="utf-8",
+    )
+    generated.append(openapi_path)
+
     project_context_path = paths.branch_dir / "project-context.md"
     project_context_path.write_text(
         _render_project_context(
@@ -506,6 +649,7 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
             concept_state,
             design_state,
             tech_state,
+            architecture_state,
             generated_at,
         ),
         encoding="utf-8",
@@ -675,16 +819,18 @@ def retrieve_memory_context(
     is_concept_stage = stage_lower == "mvp.concept"
     is_design_stage = stage_lower == "mvp.design"
     is_tech_stage = stage_lower == "mvp.tech"
+    is_architecture_stage = stage_lower == "mvp.architecture"
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state) if is_design_stage else None
     tech_state = load_tech_state(paths.tech_state) if is_tech_stage else None
+    architecture_state = load_architecture_state(paths.architecture_state) if is_architecture_stage else None
     if limit is None:
-        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage) else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage) else 5
     elif limit <= 0:
-        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage) else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage) else 5
     else:
         resolved_limit = limit
-    include_history_records = include_history or not (is_concept_stage or is_design_stage or is_tech_stage)
+    include_history_records = include_history or not (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage)
     decision_log = read_jsonl(paths.decision_log) if include_history_records else []
     events = read_jsonl(paths.events) if include_history_records else []
     semantic_sets = _load_semantic_record_sets(
@@ -814,11 +960,20 @@ def retrieve_memory_context(
             else None
         ),
         "tech_status": _build_tech_status(tech_state) if is_tech_stage and tech_state is not None else None,
+        "architecture_status": (
+            _build_architecture_status(
+                architecture_state,
+                design_state=load_design_state(paths.design_state),
+            )
+            if is_architecture_stage and architecture_state is not None
+            else None
+        ),
         "episodes": trimmed_events if include_history_records else [],
         "decision_log": trimmed_decisions if include_history_records else [],
         "artifact_state": {
             "concept": concept_state if (is_concept_stage and full_artifact) else None,
             "design": design_state if (is_design_stage and full_artifact) else None,
             "tech": tech_state if (is_tech_stage and full_artifact) else None,
+            "architecture": architecture_state if (is_architecture_stage and full_artifact) else None,
         },
     }

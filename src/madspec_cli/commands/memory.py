@@ -127,6 +127,22 @@ def memory_capture(
     library: list[str] = typer.Option(None, "--library", help="Tech-only: library in '<scope>::<name>::<version>::<purpose>' format; repeat for multiple values"),
     code_organization: str = typer.Option(None, "--code-organization", help="Tech-only: code organization in '<repo-strategy>::<source-layout>::<modularity>::<rationale>' format"),
     alternative: list[str] = typer.Option(None, "--alternative", help="Tech-only: rejected alternative in '<slot>::<option>::<reason-rejected>' format; repeat for multiple values"),
+    architecture_overview: str = typer.Option(None, "--architecture-overview", help="Architecture-only: short summary of the chosen architecture"),
+    project_structure: str = typer.Option(None, "--project-structure", help="Architecture-only: project structure in '<strategy>::<rationale>' format"),
+    directory: list[str] = typer.Option(None, "--directory", help="Architecture-only: directory in '<path>::<purpose>' format; repeat for multiple values"),
+    entity: list[str] = typer.Option(None, "--entity", help="Architecture-only: entity in '<name>::<description>' format; repeat for multiple values"),
+    entity_field: list[str] = typer.Option(None, "--entity-field", help="Architecture-only: entity field in '<entity>::<field>::<type>::<required|optional>::<description>' format; repeat for multiple values"),
+    entity_relationship: list[str] = typer.Option(None, "--entity-relationship", help="Architecture-only: entity relationship in '<entity>::<target>::<kind>::<description>' format; repeat for multiple values"),
+    entity_state: list[str] = typer.Option(None, "--entity-state", help="Architecture-only: entity state in '<entity>::<state>::<description>' format; repeat for multiple values"),
+    endpoint: list[str] = typer.Option(None, "--endpoint", help="Architecture-only: endpoint in '<operation-id>::<METHOD>::</path>::<summary>' format; repeat for multiple values"),
+    endpoint_screen: list[str] = typer.Option(None, "--endpoint-screen", help="Architecture-only: endpoint to screen link in '<operation-id>::<screen-id>' format; repeat for multiple values"),
+    endpoint_field: list[str] = typer.Option(None, "--endpoint-field", help="Architecture-only: endpoint field in '<operation-id>::<section>::<name>::<type>::<required|optional>::<description>' format; repeat for multiple values"),
+    endpoint_error: list[str] = typer.Option(None, "--endpoint-error", help="Architecture-only: endpoint error in '<operation-id>::<status>::<code>::<description>' format; repeat for multiple values"),
+    integration: list[str] = typer.Option(None, "--integration", help="Architecture-only: integration in '<name>::<kind>::<purpose>::<touchpoints>' format; repeat for multiple values"),
+    code_principle: list[str] = typer.Option(None, "--code-principle", help="Architecture-only: code principle; repeat for multiple values"),
+    pattern: list[str] = typer.Option(None, "--pattern", help="Architecture-only: pattern in '<name>::<rationale>' format; repeat for multiple values"),
+    security_note: list[str] = typer.Option(None, "--security-note", help="Architecture-only: security note; repeat for multiple values"),
+    performance_note: list[str] = typer.Option(None, "--performance-note", help="Architecture-only: performance note; repeat for multiple values"),
     status: str = typer.Option("validated", "--status", help="Memory record status: proposed, validated, conflicted, or obsolete"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
@@ -176,6 +192,22 @@ def memory_capture(
         libraries=library or [],
         code_organization=code_organization,
         alternatives=alternative or [],
+        architecture_overview=architecture_overview,
+        project_structure=project_structure,
+        directories=directory or [],
+        entities=entity or [],
+        entity_fields=entity_field or [],
+        entity_relationships=entity_relationship or [],
+        entity_states=entity_state or [],
+        endpoints=endpoint or [],
+        endpoint_screens=endpoint_screen or [],
+        endpoint_fields=endpoint_field or [],
+        endpoint_errors=endpoint_error or [],
+        integrations=integration or [],
+        code_principles=code_principle or [],
+        architecture_patterns=pattern or [],
+        security_notes=security_note or [],
+        performance_notes=performance_note or [],
         status=status,
     )
 
@@ -328,12 +360,12 @@ def memory_retrieve(
     full_artifact: bool = typer.Option(
         False,
         "--full-artifact",
-        help="For mvp.concept, mvp.design, or mvp.tech return the full stage artifact state instead of summary-only context",
+        help="For mvp.concept, mvp.design, mvp.tech, or mvp.architecture return the full stage artifact state instead of summary-only context",
     ),
     include_history: bool = typer.Option(
         False,
         "--include-history",
-        help="For mvp.concept, mvp.design, or mvp.tech include episodes and decision log in the response",
+        help="For mvp.concept, mvp.design, mvp.tech, or mvp.architecture include episodes and decision log in the response",
     ),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
@@ -341,7 +373,7 @@ def memory_retrieve(
     project_path = Path.cwd()
     target_branch = resolve_branch_name(project_path, branch_name)
     ensure_memory_layout(project_path, target_branch)
-    resolved_limit = limit if limit is not None else (3 if stage.strip().lower() in {"mvp.concept", "mvp.design", "mvp.tech"} else 5)
+    resolved_limit = limit if limit is not None else (3 if stage.strip().lower() in {"mvp.concept", "mvp.design", "mvp.tech", "mvp.architecture"} else 5)
     payload = retrieve_memory_context(
         project_path,
         target_branch,

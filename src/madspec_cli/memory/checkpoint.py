@@ -3,6 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .architecture_state import (
+    ARCHITECTURE_STAGE,
+    architecture_completeness_errors,
+    load_architecture_state,
+    save_architecture_state,
+    update_architecture_state,
+)
 from .concept_state import (
     CONCEPT_STAGE,
     concept_completeness_errors,
@@ -143,6 +150,7 @@ def checkpoint_stage_memory(
         paths.concept_state: _snapshot_file(paths.concept_state),
         paths.design_state: _snapshot_file(paths.design_state),
         paths.tech_state: _snapshot_file(paths.tech_state),
+        paths.architecture_state: _snapshot_file(paths.architecture_state),
     }
 
     ts = now_iso()
@@ -183,6 +191,7 @@ def checkpoint_stage_memory(
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state)
     tech_state = load_tech_state(paths.tech_state)
+    architecture_state = load_architecture_state(paths.architecture_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -220,6 +229,21 @@ def checkpoint_stage_memory(
             ratify=True,
         )
         errors.extend(tech_completeness_errors(tech_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == ARCHITECTURE_STAGE:
+        architecture_state = update_architecture_state(
+            architecture_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(
+            architecture_completeness_errors(
+                architecture_state,
+                design_state=design_state,
+            )
+        )
         if errors:
             return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
 
@@ -276,6 +300,8 @@ def checkpoint_stage_memory(
             save_design_state(paths.design_state, design_state)
         elif normalized_stage == TECH_STAGE:
             save_tech_state(paths.tech_state, tech_state)
+        elif normalized_stage == ARCHITECTURE_STAGE:
+            save_architecture_state(paths.architecture_state, architecture_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, [checkpoint_record])
         append_jsonl(paths.facts, fact_records)

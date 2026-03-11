@@ -4,6 +4,15 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .architecture_state import (
+    architecture_reference_errors,
+    architecture_schema_errors,
+    is_empty_architecture_state,
+    load_architecture_state,
+    render_architecture_markdown,
+    render_data_model_markdown,
+    render_openapi_yaml,
+)
 from .concept_state import concept_schema_errors, load_concept_state, render_concept_markdown
 from .design_state import (
     design_reference_errors,
@@ -320,6 +329,43 @@ def validate_branch_memory(project_path: Path, branch_name: str) -> list[str]:
         errors.append("tech-stack.md is missing; rebuild generated views with `madspec memory consolidate`")
     elif tech_path.read_text(encoding="utf-8") != tech_text:
         errors.append("tech-stack.md is out of sync with memory/stages/mvp.tech.json")
+
+    architecture_state_raw = read_json(paths.architecture_state, None)
+    errors.extend(
+        f"{paths.architecture_state.name}: {item}"
+        for item in architecture_schema_errors(architecture_state_raw)
+    )
+    architecture_state = load_architecture_state(paths.architecture_state)
+    architecture_text = render_architecture_markdown(
+        architecture_state,
+        branch_name=branch_name,
+        project_name=concept_state.get("projectName", ""),
+    )
+    architecture_path = paths.branch_dir / "architecture.md"
+    if not architecture_path.exists():
+        errors.append("architecture.md is missing; rebuild generated views with `madspec memory consolidate`")
+    elif architecture_path.read_text(encoding="utf-8") != architecture_text:
+        errors.append("architecture.md is out of sync with memory/stages/mvp.architecture.json")
+
+    data_model_text = render_data_model_markdown(
+        architecture_state,
+        branch_name=branch_name,
+        project_name=concept_state.get("projectName", ""),
+    )
+    data_model_path = paths.branch_dir / "data-model.md"
+    if not data_model_path.exists():
+        errors.append("data-model.md is missing; rebuild generated views with `madspec memory consolidate`")
+    elif data_model_path.read_text(encoding="utf-8") != data_model_text:
+        errors.append("data-model.md is out of sync with memory/stages/mvp.architecture.json")
+
+    openapi_text = render_openapi_yaml(architecture_state, branch_name=branch_name)
+    openapi_path = paths.branch_dir / "contracts" / "openapi.yaml"
+    if not openapi_path.exists():
+        errors.append("contracts/openapi.yaml is missing; rebuild generated views with `madspec memory consolidate`")
+    elif openapi_path.read_text(encoding="utf-8") != openapi_text:
+        errors.append("contracts/openapi.yaml is out of sync with memory/stages/mvp.architecture.json")
+    if not is_empty_architecture_state(architecture_state):
+        errors.extend(architecture_reference_errors(architecture_state, design_state=design_state))
 
     for path in (
         paths.decision_log,

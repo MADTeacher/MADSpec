@@ -3,6 +3,24 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .architecture_state import (
+    ARCHITECTURE_STAGE,
+    load_architecture_state,
+    parse_directory_value,
+    parse_endpoint_error_value,
+    parse_endpoint_field_value,
+    parse_endpoint_screen_value,
+    parse_endpoint_value,
+    parse_entity_field_value,
+    parse_entity_relationship_value,
+    parse_entity_state_value,
+    parse_entity_value,
+    parse_integration_value,
+    parse_pattern_value,
+    parse_project_structure_value,
+    save_architecture_state,
+    update_architecture_state,
+)
 from .concept_state import (
     CONCEPT_STAGE,
     load_concept_state,
@@ -97,6 +115,16 @@ def _filter_non_blocking_design_validation_errors(errors: list[str]) -> list[str
     return [error for error in errors if not error.startswith(non_blocking_prefixes)]
 
 
+def _filter_non_blocking_architecture_validation_errors(errors: list[str]) -> list[str]:
+    non_blocking_prefixes = (
+        "architecture entity '",
+        "architecture endpoint '",
+        "architecture must link at least one endpoint to design screen ",
+        "architecture screen '",
+    )
+    return [error for error in errors if not error.startswith(non_blocking_prefixes)]
+
+
 def capture_stage_memory(
     project_path: Path,
     branch_name: str,
@@ -140,6 +168,22 @@ def capture_stage_memory(
     libraries: list[str] | None = None,
     code_organization: str | None = None,
     alternatives: list[str] | None = None,
+    architecture_overview: str | None = None,
+    project_structure: str | None = None,
+    directories: list[str] | None = None,
+    entities: list[str] | None = None,
+    entity_fields: list[str] | None = None,
+    entity_relationships: list[str] | None = None,
+    entity_states: list[str] | None = None,
+    endpoints: list[str] | None = None,
+    endpoint_screens: list[str] | None = None,
+    endpoint_fields: list[str] | None = None,
+    endpoint_errors: list[str] | None = None,
+    integrations: list[str] | None = None,
+    code_principles: list[str] | None = None,
+    architecture_patterns: list[str] | None = None,
+    security_notes: list[str] | None = None,
+    performance_notes: list[str] | None = None,
     status: str = "validated",
 ) -> dict[str, Any]:
     normalized_stage = stage.strip().lower()
@@ -183,6 +227,10 @@ def capture_stage_memory(
     normalized_requirements = _normalize_text_list(requirements)
     normalized_preferences = _normalize_text_list(preferences)
     normalized_tech_constraints = _normalize_text_list(tech_constraints)
+    normalized_architecture_overview = (architecture_overview or "").strip()
+    normalized_code_principles = _normalize_text_list(code_principles)
+    normalized_security_notes = _normalize_text_list(security_notes)
+    normalized_performance_notes = _normalize_text_list(performance_notes)
     concept_feature_updates: dict[str, list[dict[str, str]]] = {"p1": [], "p2": [], "p3": []}
     concept_feature_errors: list[str] = []
     for priority, values in {
@@ -211,8 +259,21 @@ def capture_stage_memory(
     tech_library_updates: list[dict[str, str]] = []
     tech_alternative_updates: list[dict[str, str]] = []
     tech_code_organization: dict[str, str] | None = None
+    architecture_project_structure: dict[str, str] | None = None
+    architecture_directory_updates: list[dict[str, str]] = []
+    architecture_entity_updates: list[dict[str, str]] = []
+    architecture_entity_field_updates: list[dict[str, Any]] = []
+    architecture_entity_relationship_updates: list[dict[str, Any]] = []
+    architecture_entity_state_updates: list[dict[str, Any]] = []
+    architecture_endpoint_updates: list[dict[str, Any]] = []
+    architecture_endpoint_screen_updates: list[dict[str, str]] = []
+    architecture_endpoint_field_updates: list[dict[str, Any]] = []
+    architecture_endpoint_error_updates: list[dict[str, Any]] = []
+    architecture_integration_updates: list[dict[str, Any]] = []
+    architecture_pattern_updates: list[dict[str, str]] = []
     design_errors: list[str] = []
     tech_errors: list[str] = []
+    architecture_errors: list[str] = []
 
     for value in _normalize_text_list(zones):
         parsed = parse_zone_value(value)
@@ -312,6 +373,108 @@ def capture_stage_memory(
                 "code-organization must use '<repo-strategy>::<source-layout>::<modularity>::<rationale>' format"
             )
 
+    if project_structure:
+        architecture_project_structure = parse_project_structure_value(project_structure)
+        if architecture_project_structure is None:
+            architecture_errors.append(
+                "project-structure must use '<strategy>::<rationale>' format"
+            )
+
+    for value in _normalize_text_list(directories):
+        parsed = parse_directory_value(value)
+        if parsed is None:
+            architecture_errors.append(f"directory must use '<path>::<purpose>' format: {value}")
+            continue
+        architecture_directory_updates.append(parsed)
+
+    for value in _normalize_text_list(entities):
+        parsed = parse_entity_value(value)
+        if parsed is None:
+            architecture_errors.append(f"entity must use '<name>::<description>' format: {value}")
+            continue
+        architecture_entity_updates.append(parsed)
+
+    for value in _normalize_text_list(entity_fields):
+        parsed = parse_entity_field_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"entity-field must use '<entity>::<field>::<type>::<required|optional>::<description>' format: {value}"
+            )
+            continue
+        architecture_entity_field_updates.append(parsed)
+
+    for value in _normalize_text_list(entity_relationships):
+        parsed = parse_entity_relationship_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"entity-relationship must use '<entity>::<target>::<kind>::<description>' format: {value}"
+            )
+            continue
+        architecture_entity_relationship_updates.append(parsed)
+
+    for value in _normalize_text_list(entity_states):
+        parsed = parse_entity_state_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"entity-state must use '<entity>::<state>::<description>' format: {value}"
+            )
+            continue
+        architecture_entity_state_updates.append(parsed)
+
+    for value in _normalize_text_list(endpoints):
+        parsed = parse_endpoint_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"endpoint must use '<operation-id>::<METHOD>::</path>::<summary>' format: {value}"
+            )
+            continue
+        architecture_endpoint_updates.append(parsed)
+
+    for value in _normalize_text_list(endpoint_screens):
+        parsed = parse_endpoint_screen_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"endpoint-screen must use '<operation-id>::<screen-id>' format: {value}"
+            )
+            continue
+        architecture_endpoint_screen_updates.append(parsed)
+
+    for value in _normalize_text_list(endpoint_fields):
+        parsed = parse_endpoint_field_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"endpoint-field must use '<operation-id>::<section>::<name>::<type>::<required|optional>::<description>' format: {value}"
+            )
+            continue
+        architecture_endpoint_field_updates.append(parsed)
+
+    for value in _normalize_text_list(endpoint_errors):
+        parsed = parse_endpoint_error_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"endpoint-error must use '<operation-id>::<status>::<code>::<description>' format: {value}"
+            )
+            continue
+        architecture_endpoint_error_updates.append(parsed)
+
+    for value in _normalize_text_list(integrations):
+        parsed = parse_integration_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"integration must use '<name>::<kind>::<purpose>::<touchpoints>' format: {value}"
+            )
+            continue
+        architecture_integration_updates.append(parsed)
+
+    for value in _normalize_text_list(architecture_patterns):
+        parsed = parse_pattern_value(value)
+        if parsed is None:
+            architecture_errors.append(
+                f"pattern must use '<name>::<rationale>' format: {value}"
+            )
+            continue
+        architecture_pattern_updates.append(parsed)
+
     used_concept_fields = any(
         [
             normalized_project_name,
@@ -354,6 +517,26 @@ def capture_stage_memory(
             tech_alternative_updates,
         ]
     )
+    used_architecture_fields = any(
+        [
+            normalized_architecture_overview,
+            architecture_project_structure,
+            architecture_directory_updates,
+            architecture_entity_updates,
+            architecture_entity_field_updates,
+            architecture_entity_relationship_updates,
+            architecture_entity_state_updates,
+            architecture_endpoint_updates,
+            architecture_endpoint_screen_updates,
+            architecture_endpoint_field_updates,
+            architecture_endpoint_error_updates,
+            architecture_integration_updates,
+            normalized_code_principles,
+            architecture_pattern_updates,
+            normalized_security_notes,
+            normalized_performance_notes,
+        ]
+    )
     if used_concept_fields and normalized_stage != CONCEPT_STAGE:
         return {
             "accepted": False,
@@ -375,12 +558,19 @@ def capture_stage_memory(
             "stage": normalized_stage,
             "errors": ["tech-specific capture options are only supported for stage mvp.tech"],
         }
-    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE}:
+    if used_architecture_fields and normalized_stage != ARCHITECTURE_STAGE:
         return {
             "accepted": False,
             "branch": branch_name,
             "stage": normalized_stage,
-            "errors": ["--next-action is only supported for stages mvp.concept, mvp.design, and mvp.tech"],
+            "errors": ["architecture-specific capture options are only supported for stage mvp.architecture"],
+        }
+    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE, ARCHITECTURE_STAGE}:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": ["--next-action is only supported for stages mvp.concept, mvp.design, mvp.tech, and mvp.architecture"],
         }
     if concept_feature_errors:
         return {
@@ -402,6 +592,13 @@ def capture_stage_memory(
             "branch": branch_name,
             "stage": normalized_stage,
             "errors": tech_errors,
+        }
+    if architecture_errors:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": architecture_errors,
         }
     normalized_pending_actions = _append_unique(normalized_pending_actions, normalized_next_actions)
     concept_fact_summaries = (
@@ -489,6 +686,69 @@ def capture_stage_memory(
         ]
     )
     tech_contract_summaries = normalized_tech_constraints
+    architecture_fact_summaries = (
+        ([f"Architecture overview: {normalized_architecture_overview}"] if normalized_architecture_overview else [])
+        + (
+            [
+                "Project structure: "
+                f"{architecture_project_structure['strategy']} - "
+                f"{architecture_project_structure['rationale']}"
+            ]
+            if architecture_project_structure is not None
+            else []
+        )
+        + [
+            f"Directory {item['path']}: {item['purpose']}"
+            for item in architecture_directory_updates
+        ]
+        + [
+            f"Entity {item['name']}: {item['description']}"
+            for item in architecture_entity_updates
+        ]
+        + [
+            f"Entity field {item['entity']}.{item['field']['name']}: {item['field']['type']} - {item['field']['description']}"
+            for item in architecture_entity_field_updates
+        ]
+        + [
+            f"Integration {item['name']} ({item['kind']}): {item['purpose']}"
+            for item in architecture_integration_updates
+        ]
+        + normalized_code_principles
+        + normalized_security_notes
+        + normalized_performance_notes
+    )
+    architecture_decision_summaries = (
+        [
+            f"Entity relationship {item['entity']} -> {item['relationship']['target']} ({item['relationship']['kind']}): {item['relationship']['description']}"
+            for item in architecture_entity_relationship_updates
+        ]
+        + [
+            f"Entity state {item['entity']}: {item['state']['name']} - {item['state']['description']}"
+            for item in architecture_entity_state_updates
+        ]
+        + [
+            f"Endpoint {item['operationId']}: {item['method']} {item['path']} - {item['summary']}"
+            for item in architecture_endpoint_updates
+        ]
+        + [
+            f"Endpoint {item['operationId']} linked to screen {item['screenId']}"
+            for item in architecture_endpoint_screen_updates
+        ]
+        + [
+            f"Endpoint field {item['operationId']} {item['field']['section']} {item['field']['name']}: {item['field']['type']} - {item['field']['description']}"
+            for item in architecture_endpoint_field_updates
+        ]
+        + [
+            f"Pattern {item['name']}: {item['rationale']}"
+            for item in architecture_pattern_updates
+        ]
+    )
+    architecture_contract_summaries = (
+        [
+            f"Endpoint error {item['operationId']} {item['error']['status']} {item['error']['code']}: {item['error']['description']}"
+            for item in architecture_endpoint_error_updates
+        ]
+    )
     if not any(
         [
             normalized_summary,
@@ -506,6 +766,9 @@ def capture_stage_memory(
             tech_fact_summaries,
             tech_decision_summaries,
             tech_contract_summaries,
+            architecture_fact_summaries,
+            architecture_decision_summaries,
+            architecture_contract_summaries,
         ]
     ):
         return {
@@ -526,6 +789,7 @@ def capture_stage_memory(
         paths.concept_state: _snapshot_file(paths.concept_state),
         paths.design_state: _snapshot_file(paths.design_state),
         paths.tech_state: _snapshot_file(paths.tech_state),
+        paths.architecture_state: _snapshot_file(paths.architecture_state),
     }
 
     ts = now_iso()
@@ -547,10 +811,12 @@ def capture_stage_memory(
         concept_decision_summaries
         or design_decision_summaries
         or tech_decision_summaries
+        or architecture_decision_summaries
         or normalized_decisions
         or concept_fact_summaries
         or design_fact_summaries
         or tech_fact_summaries
+        or architecture_fact_summaries
         or normalized_facts,
     )[:20]
     active_session["last_checkpoint_at"] = ts
@@ -579,6 +845,7 @@ def capture_stage_memory(
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state)
     tech_state = load_tech_state(paths.tech_state)
+    architecture_state = load_architecture_state(paths.architecture_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -620,6 +887,27 @@ def capture_stage_memory(
             libraries=tech_library_updates,
             code_organization=tech_code_organization,
             alternatives=tech_alternative_updates,
+            next_actions=normalized_next_actions,
+        )
+    elif normalized_stage == ARCHITECTURE_STAGE:
+        architecture_state = update_architecture_state(
+            architecture_state,
+            architecture_overview=normalized_architecture_overview or None,
+            project_structure=architecture_project_structure,
+            directories=architecture_directory_updates,
+            entities=architecture_entity_updates,
+            entity_fields=architecture_entity_field_updates,
+            entity_relationships=architecture_entity_relationship_updates,
+            entity_states=architecture_entity_state_updates,
+            endpoints=architecture_endpoint_updates,
+            endpoint_screens=architecture_endpoint_screen_updates,
+            endpoint_fields=architecture_endpoint_field_updates,
+            endpoint_errors=architecture_endpoint_error_updates,
+            integrations=architecture_integration_updates,
+            code_principles=normalized_code_principles,
+            patterns=architecture_pattern_updates,
+            security_notes=normalized_security_notes,
+            performance_notes=normalized_performance_notes,
             next_actions=normalized_next_actions,
         )
 
@@ -851,6 +1139,185 @@ def capture_stage_memory(
                 branch_name,
                 normalized_stage,
                 "memory.capture",
+                f"Architecture overview: {normalized_architecture_overview}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "architectureOverview"},
+                ts=ts,
+            )
+        ]
+        if normalized_architecture_overview and normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                "Project structure: "
+                f"{architecture_project_structure['strategy']} - {architecture_project_structure['rationale']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "projectStructure", **architecture_project_structure},
+                ts=ts,
+            )
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE and architecture_project_structure is not None
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Directory {item['path']}: {item['purpose']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "directory", **item},
+                ts=ts,
+            )
+            for item in architecture_directory_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Entity {item['name']}: {item['description']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "entity", **item},
+                ts=ts,
+            )
+            for item in architecture_entity_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Entity field {item['entity']}.{item['field']['name']}: {item['field']['type']} - {item['field']['description']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "entityField", **item},
+                ts=ts,
+            )
+            for item in architecture_entity_field_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Integration {item['name']} ({item['kind']}): {item['purpose']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "integration", **item},
+                ts=ts,
+            )
+            for item in architecture_integration_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "codePrinciple"},
+                ts=ts,
+            )
+            for item in normalized_code_principles
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "securityNote"},
+                ts=ts,
+            )
+            for item in normalized_security_notes
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "performanceNote"},
+                ts=ts,
+            )
+            for item in normalized_performance_notes
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
                 item,
                 status=normalized_status,
                 evidence=normalized_evidence,
@@ -1024,6 +1491,126 @@ def capture_stage_memory(
             for item in design_screen_feature_links
         ]
         if normalized_stage == DESIGN_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Entity relationship {item['entity']} -> {item['relationship']['target']} ({item['relationship']['kind']}): {item['relationship']['description']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "entityRelationship", **item},
+                ts=ts,
+            )
+            for item in architecture_entity_relationship_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Entity state {item['entity']}: {item['state']['name']} - {item['state']['description']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "entityState", **item},
+                ts=ts,
+            )
+            for item in architecture_entity_state_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Endpoint {item['operationId']}: {item['method']} {item['path']} - {item['summary']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "endpoint", **item},
+                ts=ts,
+            )
+            for item in architecture_endpoint_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Endpoint {item['operationId']} linked to screen {item['screenId']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "endpointScreen", **item},
+                ts=ts,
+            )
+            for item in architecture_endpoint_screen_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Endpoint field {item['operationId']} {item['field']['section']} {item['field']['name']}: {item['field']['type']} - {item['field']['description']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "endpointField", **item},
+                ts=ts,
+            )
+            for item in architecture_endpoint_field_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Pattern {item['name']}: {item['rationale']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "pattern", **item},
+                ts=ts,
+            )
+            for item in architecture_pattern_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
         else []
     )
     decision_records.extend(
@@ -1222,6 +1809,26 @@ def capture_stage_memory(
         if normalized_stage == TECH_STAGE
         else []
     )
+    contract_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Endpoint error {item['operationId']} {item['error']['status']} {item['error']['code']}: {item['error']['description']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="contract",
+                record_type="contract",
+                metadata={"slot": "endpointError", **item},
+                ts=ts,
+            )
+            for item in architecture_endpoint_error_updates
+        ]
+        if normalized_stage == ARCHITECTURE_STAGE
+        else []
+    )
 
     try:
         if normalized_stage == CONCEPT_STAGE:
@@ -1230,6 +1837,8 @@ def capture_stage_memory(
             save_design_state(paths.design_state, design_state)
         elif normalized_stage == TECH_STAGE:
             save_tech_state(paths.tech_state, tech_state)
+        elif normalized_stage == ARCHITECTURE_STAGE:
+            save_architecture_state(paths.architecture_state, architecture_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, note_records)
         append_jsonl(paths.facts, fact_records)
@@ -1241,6 +1850,8 @@ def capture_stage_memory(
         validation_errors = validate_branch_memory(project_path, branch_name)
         if normalized_stage == DESIGN_STAGE:
             validation_errors = _filter_non_blocking_design_validation_errors(validation_errors)
+        if normalized_stage == ARCHITECTURE_STAGE:
+            validation_errors = _filter_non_blocking_architecture_validation_errors(validation_errors)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
     except Exception as exc:

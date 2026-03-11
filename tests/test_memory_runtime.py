@@ -1354,6 +1354,263 @@ def test_design_checkpoint_can_be_repeated_and_increments_revision(tmp_path: Pat
     assert retrieved_full["artifact_state"]["design"]["checkpointSummary"] == "Design version two"
 
 
+def test_architecture_stage_retrieve_returns_status_and_full_artifact(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _seed_concept_for_design(paths)
+    _write_design_prototypes(paths)
+
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.design",
+        design_overview="A workspace-first web UI with focused transitions between booking, profile tuning, and exports.",
+        platforms=["Web"],
+        zones=[
+            "operations::Operations::Daily scheduling workspace",
+            "settings::Settings::Profile and export configuration",
+        ],
+        screens=[
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "profile-studio::Profile studio::settings::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
+            "export-hub::Export hub::settings::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
+        ],
+        screen_features=[
+            "schedule-board::p1::Booking workflow",
+            "profile-studio::p2::Profile studio",
+            "export-hub::p3::Export hub",
+        ],
+        flows=["manage-booking::Manage booking::Create and review a booking flow from one workspace"],
+        flow_steps=[
+            "manage-booking::schedule-board::Create booking::Open booking details with reminders",
+            "manage-booking::profile-studio::Review profile::Confirm public profile details",
+            "manage-booking::export-hub::Export summary::Download account summary",
+        ],
+        navigation=[
+            "schedule-board::profile-studio::Profile settings shortcut",
+            "profile-studio::export-hub::Export settings CTA",
+        ],
+        screen_data=[
+            "schedule-board::displayed::Upcoming bookings with reminder state",
+            "schedule-board::input::Reminder lead time",
+            "profile-studio::input::Public display name",
+            "export-hub::displayed::Export download url",
+        ],
+        status="validated",
+    )
+
+    captured = capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.architecture",
+        summary="Captured architecture iteration",
+        architecture_overview="A modular web architecture centered on scheduling workflows and server-driven UI contracts.",
+        project_structure="feature-first::Keep booking flows, profile tuning, and exports isolated by capability",
+        directories=[
+            "src/features/scheduling::Booking workflow handlers and orchestration",
+            "src/features/profile::Profile editing logic",
+            "src/features/exports::Export generation handlers",
+        ],
+        entities=[
+            "Booking::Customer booking and reminder configuration",
+            "Profile::Public profile settings",
+            "ExportJob::Generated export package",
+        ],
+        entity_fields=[
+            "Booking::id::uuid::required::Primary booking identifier",
+            "Booking::reminder lead time::integer::required::Reminder lead time in minutes",
+            "Profile::public display name::string::required::Display name shown to customers",
+            "ExportJob::download url::string::required::Download location for generated export",
+        ],
+        entity_relationships=[
+            "Booking::Profile::belongs-to::Bookings are owned by the freelancer profile",
+        ],
+        entity_states=["ExportJob::ready::Export package is ready for download"],
+        endpoints=[
+            "update-booking-reminder::PUT::/bookings/{id}/reminder::Update booking reminder configuration",
+            "update-profile::PUT::/profile::Update freelancer profile settings",
+            "download-export::GET::/exports/latest::Fetch the latest export package",
+        ],
+        endpoint_screens=[
+            "update-booking-reminder::schedule-board",
+            "update-profile::profile-studio",
+            "download-export::export-hub",
+        ],
+        endpoint_fields=[
+            "update-booking-reminder::path::id::uuid::required::Booking identifier",
+            "update-booking-reminder::request::Reminder lead time::integer::required::Reminder lead time in minutes",
+            "update-booking-reminder::response:200::Upcoming bookings with reminder state::array::required::Updated booking cards with reminder state",
+            "update-profile::request::Public display name::string::required::Updated public display name",
+            "update-profile::response:200::profile status::string::required::Profile save status",
+            "download-export::response:200::Export download url::string::required::Download URL for latest export",
+        ],
+        endpoint_errors=["download-export::404::export_not_ready::Export package is not ready yet"],
+        integrations=[
+            "Email provider::external-api::Deliver reminders to customers::schedule-board|background worker",
+        ],
+        code_principles=[
+            "Keep HTTP handlers thin and move workflow rules into feature services.",
+        ],
+        architecture_patterns=["Repository::Isolate persistence details from feature logic"],
+        security_notes=[
+            "Authorize profile and booking mutations against the current freelancer account.",
+        ],
+        performance_notes=[
+            "Reuse precomputed export metadata to avoid rebuilding the package on every download request.",
+        ],
+        next_actions=["Proceed to mvp.plan"],
+        status="validated",
+    )
+    retrieved = retrieve_memory_context(paths["branch_dir"].parents[1], "main", "mvp.architecture")
+
+    assert captured["accepted"] is True
+    assert retrieved["artifact_state"]["architecture"] is None
+    assert retrieved["architecture_status"]["is_complete"] is True
+    assert retrieved["architecture_status"]["counts"] == {
+        "directories": 3,
+        "entities": 3,
+        "endpoints": 3,
+        "integrations": 1,
+        "code_principles": 1,
+        "patterns": 1,
+    }
+
+    checkpointed = checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.architecture",
+        "Architecture ratified for implementation planning",
+        evidence=[
+            ".madspec/main/architecture.md",
+            ".madspec/main/data-model.md",
+            ".madspec/main/contracts/openapi.yaml",
+        ],
+    )
+    retrieved_full = retrieve_memory_context(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.architecture",
+        full_artifact=True,
+        include_history=True,
+    )
+
+    assert checkpointed["accepted"] is True
+    assert retrieved_full["artifact_state"]["architecture"]["checkpointSummary"] == "Architecture ratified for implementation planning"
+    assert retrieved_full["artifact_state"]["architecture"]["revision"] == 1
+    assert "A modular web architecture centered on scheduling workflows" in (paths["branch_dir"] / "architecture.md").read_text(encoding="utf-8")
+    assert "Booking" in (paths["branch_dir"] / "data-model.md").read_text(encoding="utf-8")
+    assert "update-booking-reminder" in (paths["branch_dir"] / "contracts" / "openapi.yaml").read_text(encoding="utf-8")
+    assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
+
+
+def test_validate_detects_out_of_sync_generated_architecture_artifacts(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _seed_concept_for_design(paths)
+    _write_design_prototypes(paths)
+
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.design",
+        design_overview="A workspace-first web UI with focused transitions between booking, profile tuning, and exports.",
+        platforms=["Web"],
+        zones=[
+            "operations::Operations::Daily scheduling workspace",
+            "settings::Settings::Profile and export configuration",
+        ],
+        screens=[
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "profile-studio::Profile studio::settings::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
+            "export-hub::Export hub::settings::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
+        ],
+        screen_features=[
+            "schedule-board::p1::Booking workflow",
+            "profile-studio::p2::Profile studio",
+            "export-hub::p3::Export hub",
+        ],
+        flows=["manage-booking::Manage booking::Create and review a booking flow from one workspace"],
+        flow_steps=[
+            "manage-booking::schedule-board::Create booking::Open booking details with reminders",
+            "manage-booking::profile-studio::Review profile::Confirm public profile details",
+            "manage-booking::export-hub::Export summary::Download account summary",
+        ],
+        navigation=[
+            "schedule-board::profile-studio::Profile settings shortcut",
+            "profile-studio::export-hub::Export settings CTA",
+        ],
+        screen_data=[
+            "schedule-board::displayed::Upcoming bookings with reminder state",
+            "schedule-board::input::Reminder lead time",
+            "profile-studio::input::Public display name",
+            "export-hub::displayed::Export download url",
+        ],
+        status="validated",
+    )
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.architecture",
+        architecture_overview="Architecture baseline.",
+        project_structure="feature-first::Keep booking flows, profile tuning, and exports isolated by capability",
+        directories=[
+            "src/features/scheduling::Booking workflow handlers and orchestration",
+            "src/features/profile::Profile editing logic",
+            "src/features/exports::Export generation handlers",
+        ],
+        entities=[
+            "Booking::Customer booking and reminder configuration",
+            "Profile::Public profile settings",
+            "ExportJob::Generated export package",
+        ],
+        entity_fields=[
+            "Booking::id::uuid::required::Primary booking identifier",
+            "Booking::reminder lead time::integer::required::Reminder lead time in minutes",
+            "Profile::public display name::string::required::Display name shown to customers",
+            "ExportJob::download url::string::required::Download location for generated export",
+        ],
+        endpoints=[
+            "update-booking-reminder::PUT::/bookings/{id}/reminder::Update booking reminder configuration",
+            "update-profile::PUT::/profile::Update freelancer profile settings",
+            "download-export::GET::/exports/latest::Fetch the latest export package",
+        ],
+        endpoint_screens=[
+            "update-booking-reminder::schedule-board",
+            "update-profile::profile-studio",
+            "download-export::export-hub",
+        ],
+        endpoint_fields=[
+            "update-booking-reminder::path::id::uuid::required::Booking identifier",
+            "update-booking-reminder::request::Reminder lead time::integer::required::Reminder lead time in minutes",
+            "update-booking-reminder::response:200::Upcoming bookings with reminder state::array::required::Updated booking cards with reminder state",
+            "update-profile::request::Public display name::string::required::Updated public display name",
+            "update-profile::response:200::profile status::string::required::Profile save status",
+            "download-export::response:200::Export download url::string::required::Download URL for latest export",
+        ],
+        code_principles=["Keep HTTP handlers thin and move workflow rules into feature services."],
+        status="validated",
+    )
+    checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.architecture",
+        "Architecture version one",
+        evidence=[
+            ".madspec/main/architecture.md",
+            ".madspec/main/data-model.md",
+            ".madspec/main/contracts/openapi.yaml",
+        ],
+    )
+
+    (paths["branch_dir"] / "architecture.md").write_text("# drift\n", encoding="utf-8")
+    (paths["branch_dir"] / "data-model.md").write_text("# drift\n", encoding="utf-8")
+    (paths["branch_dir"] / "contracts" / "openapi.yaml").write_text("openapi: drift\n", encoding="utf-8")
+
+    errors = validate_branch_memory(paths["branch_dir"].parents[1], "main")
+
+    assert "architecture.md is out of sync with memory/stages/mvp.architecture.json" in errors
+    assert "data-model.md is out of sync with memory/stages/mvp.architecture.json" in errors
+    assert "contracts/openapi.yaml is out of sync with memory/stages/mvp.architecture.json" in errors
+
+
 def test_validate_detects_out_of_sync_generated_ui_design(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _seed_concept_for_design(paths)

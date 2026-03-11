@@ -94,6 +94,7 @@ def test_init_creates_structured_memory_layout(tmp_path: Path, monkeypatch) -> N
     assert paths["active_session"].exists()
     assert paths["design_state"].exists()
     assert paths["tech_state"].exists()
+    assert paths["architecture_state"].exists()
     assert (project_path / ".madspec" / "procedures" / "next-step-selection.md").exists()
     assert (project_path / ".madspec" / "main" / "project-context.md").exists()
 
@@ -812,6 +813,254 @@ def test_memory_retrieve_returns_tech_status_and_full_artifact(tmp_path: Path, m
     tech_stack = (project_path / ".madspec" / "main" / "tech-stack.md").read_text(encoding="utf-8")
     assert "A Python-first stack optimized for rapid MVP delivery and simple deployment." in tech_stack
     assert "FastAPI" in tech_stack
+
+
+def test_memory_capture_supports_architecture_stage_state_and_retrieve(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    branch_name = "main"
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": branch_name, "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    ui_dir = project_path / ".madspec" / branch_name / "ui-prototype"
+    ui_dir.mkdir(parents=True)
+    for name in ("index.html", "schedule-board.html", "profile-studio.html", "export-hub.html"):
+        (ui_dir / name).write_text(f"<html><body>{name}</body></html>\n", encoding="utf-8")
+
+    concept_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.concept",
+            "--project-name",
+            "MVP scheduling assistant",
+            "--system-overview",
+            "System helps freelancers manage bookings and reminders from one interface.",
+            "--audience",
+            "Freelancers",
+            "--scenario",
+            "Book and reschedule client meetings",
+            "--pain",
+            "Appointments are managed manually across chats and notes",
+            "--feature-p1",
+            "Booking workflow::Capture booking details and send reminders",
+            "--feature-p2",
+            "Profile studio::Customize the public-facing profile",
+            "--feature-p3",
+            "Export hub::Download settings and summaries",
+            "--json-output",
+        ],
+    )
+    assert concept_capture.exit_code == 0, concept_capture.stdout
+
+    design_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.design",
+            "--design-overview",
+            "A workspace-first web UI with clear transitions between planning, profile tuning, and exports.",
+            "--platform",
+            "Web",
+            "--zone",
+            "operations::Operations::Daily scheduling workspace",
+            "--zone",
+            "settings::Settings::Profile and export configuration",
+            "--screen",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "--screen",
+            "profile-studio::Profile studio::settings::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
+            "--screen",
+            "export-hub::Export hub::settings::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
+            "--screen-feature",
+            "schedule-board::p1::Booking workflow",
+            "--screen-feature",
+            "profile-studio::p2::Profile studio",
+            "--screen-feature",
+            "export-hub::p3::Export hub",
+            "--flow",
+            "manage-booking::Manage booking::Create and review a booking flow from one workspace",
+            "--flow-step",
+            "manage-booking::schedule-board::Create booking::Open booking details with reminders",
+            "--flow-step",
+            "manage-booking::profile-studio::Review profile::Confirm public profile details",
+            "--flow-step",
+            "manage-booking::export-hub::Export summary::Download account summary",
+            "--nav",
+            "schedule-board::profile-studio::Profile settings shortcut",
+            "--nav",
+            "profile-studio::export-hub::Export settings CTA",
+            "--screen-data",
+            "schedule-board::displayed::Upcoming bookings with reminder state",
+            "--screen-data",
+            "schedule-board::input::Reminder lead time",
+            "--screen-data",
+            "profile-studio::input::Public display name",
+            "--screen-data",
+            "export-hub::displayed::Export download url",
+            "--json-output",
+        ],
+    )
+    assert design_capture.exit_code == 0, design_capture.stdout
+
+    architecture_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.architecture",
+            "--summary",
+            "Captured architecture iteration",
+            "--architecture-overview",
+            "A modular web architecture centered on scheduling workflows and server-driven UI contracts.",
+            "--project-structure",
+            "feature-first::Keep booking flows, profile tuning, and exports isolated by capability",
+            "--directory",
+            "src/features/scheduling::Booking workflow handlers and orchestration",
+            "--directory",
+            "src/features/profile::Profile editing logic",
+            "--directory",
+            "src/features/exports::Export generation handlers",
+            "--entity",
+            "Booking::Customer booking and reminder configuration",
+            "--entity-field",
+            "Booking::id::uuid::required::Primary booking identifier",
+            "--entity-field",
+            "Booking::reminder lead time::integer::required::Reminder lead time in minutes",
+            "--entity",
+            "Profile::Public profile settings",
+            "--entity-field",
+            "Profile::public display name::string::required::Display name shown to customers",
+            "--entity",
+            "ExportJob::Generated export package",
+            "--entity-field",
+            "ExportJob::download url::string::required::Download location for generated export",
+            "--entity-relationship",
+            "Booking::Profile::belongs-to::Bookings are owned by the freelancer profile",
+            "--entity-state",
+            "ExportJob::ready::Export package is ready for download",
+            "--endpoint",
+            "update-booking-reminder::PUT::/bookings/{id}/reminder::Update booking reminder configuration",
+            "--endpoint-screen",
+            "update-booking-reminder::schedule-board",
+            "--endpoint-field",
+            "update-booking-reminder::path::id::uuid::required::Booking identifier",
+            "--endpoint-field",
+            "update-booking-reminder::request::Reminder lead time::integer::required::Reminder lead time in minutes",
+            "--endpoint-field",
+            "update-booking-reminder::response:200::Upcoming bookings with reminder state::array::required::Updated booking cards with reminder state",
+            "--endpoint",
+            "update-profile::PUT::/profile::Update freelancer profile settings",
+            "--endpoint-screen",
+            "update-profile::profile-studio",
+            "--endpoint-field",
+            "update-profile::request::Public display name::string::required::Updated public display name",
+            "--endpoint-field",
+            "update-profile::response:200::profile status::string::required::Profile save status",
+            "--endpoint",
+            "download-export::GET::/exports/latest::Fetch the latest export package",
+            "--endpoint-screen",
+            "download-export::export-hub",
+            "--endpoint-field",
+            "download-export::response:200::Export download url::string::required::Download URL for latest export",
+            "--endpoint-error",
+            "download-export::404::export_not_ready::Export package is not ready yet",
+            "--integration",
+            "Email provider::external-api::Deliver reminders to customers::schedule-board|background worker",
+            "--code-principle",
+            "Keep HTTP handlers thin and move workflow rules into feature services.",
+            "--pattern",
+            "Repository::Isolate persistence details from feature logic",
+            "--security-note",
+            "Authorize profile and booking mutations against the current freelancer account.",
+            "--performance-note",
+            "Reuse precomputed export metadata to avoid rebuilding the package on every download request.",
+            "--next-action",
+            "Proceed to mvp.plan",
+            "--json-output",
+        ],
+    )
+    assert architecture_capture.exit_code == 0, architecture_capture.stdout
+
+    retrieve_result = runner.invoke(
+        cli.app,
+        ["memory", "retrieve", "--branch", branch_name, "--stage", "mvp.architecture", "--json-output"],
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["architecture_status"]["is_complete"] is True
+    assert retrieve_payload["architecture_status"]["counts"] == {
+        "directories": 3,
+        "entities": 3,
+        "endpoints": 3,
+        "integrations": 1,
+        "code_principles": 1,
+        "patterns": 1,
+    }
+    assert retrieve_payload["artifact_state"]["architecture"] is None
+
+    checkpoint_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.architecture",
+            "--summary",
+            "Architecture ratified for implementation planning",
+            "--evidence",
+            ".madspec/main/architecture.md",
+            "--evidence",
+            ".madspec/main/data-model.md",
+            "--evidence",
+            ".madspec/main/contracts/openapi.yaml",
+            "--json-output",
+        ],
+    )
+    assert checkpoint_result.exit_code == 0, checkpoint_result.stdout
+
+    retrieve_full_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "retrieve",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.architecture",
+            "--full-artifact",
+            "--include-history",
+            "--json-output",
+        ],
+    )
+    assert retrieve_full_result.exit_code == 0, retrieve_full_result.stdout
+    retrieve_full_payload = json.loads(retrieve_full_result.stdout)
+    assert retrieve_full_payload["artifact_state"]["architecture"]["checkpointSummary"] == "Architecture ratified for implementation planning"
+    assert retrieve_full_payload["artifact_state"]["architecture"]["revision"] == 1
+    assert retrieve_full_payload["decision_log"] != []
+
+    architecture_doc = (project_path / ".madspec" / "main" / "architecture.md").read_text(encoding="utf-8")
+    data_model_doc = (project_path / ".madspec" / "main" / "data-model.md").read_text(encoding="utf-8")
+    openapi_doc = (project_path / ".madspec" / "main" / "contracts" / "openapi.yaml").read_text(encoding="utf-8")
+    assert "A modular web architecture centered on scheduling workflows" in architecture_doc
+    assert "Booking" in data_model_doc
+    assert "update-booking-reminder" in openapi_doc
 
 
 def test_memory_capture_and_checkpoint_support_review_and_security(tmp_path: Path, monkeypatch) -> None:

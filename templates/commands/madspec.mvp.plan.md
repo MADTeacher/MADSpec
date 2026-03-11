@@ -25,6 +25,7 @@ $ARGUMENTS
 ## Structured Memory First (обязательно)
 
 - `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
+- Для архитектурного контекста сначала используй `madspec memory retrieve --stage mvp.architecture --json-output`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` считай generated views поверх canonical architecture-state.
 - `planning-context-cache.md`, `planning-context.md` и `project-context.md` являются generated views.
 - После обновления structured memory обязательно запускай `madspec memory consolidate` и `madspec memory validate`.
 - Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage mvp.plan --candidate-step <step-id> --depends-on <dependency>...`.
@@ -127,8 +128,8 @@ $ARGUMENTS
    
    - Загрузи все предыдущие артефакты:
      - `.madspec/<BRANCH>/concept.md` (для понимания функций и приоритетов)
-     - `.madspec/<BRANCH>/architecture.md` (для понимания структуры)
-     - `.madspec/<BRANCH>/ui-design.md`, `.madspec/<BRANCH>/tech-stack.md`, `.madspec/<BRANCH>/data-model.md` (если существуют)
+     - `madspec memory retrieve --stage mvp.architecture --json-output` (как основной summary архитектуры)
+     - `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/ui-design.md`, `.madspec/<BRANCH>/tech-stack.md`, `.madspec/<BRANCH>/data-model.md` (как generated views, если нужны детали)
      - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его и учитывай ограничения деплоя при планировании шагов
    
    - Проанализируй архитектуру и определи базовые шаги
@@ -208,8 +209,8 @@ $ARGUMENTS
    - Загрузи только необходимый контекст:
      - `.madspec/<BRANCH>/concept.md` (для понимания функций и приоритетов)
      - `.madspec/<BRANCH>/planning-context-cache.md` (для понимания структуры - используется вместо полного `architecture.md` для экономии контекста)
-       - Если кэш не существует, загрузи `architecture.md` и создай кэш
-       - Если кэш существует, но дата последнего обновления старше даты последнего изменения `architecture.md`, обнови кэш
+       - Если кэш не существует, сначала загрузи `madspec memory retrieve --stage mvp.architecture --json-output --full-artifact`, затем используй `architecture.md` и `data-model.md` как generated detail views и создай кэш
+       - Если кэш существует, но дата последнего обновления старше даты последнего изменения generated architecture artifacts, обнови кэш
      - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его полностью и учитывай ограничения деплоя при планировании каждого шага
      - `.madspec/<BRANCH>/implementation-plan.md` (для понимания уже запланированных шагов)
      - Список уже запланированных шагов из `.madspec/<BRANCH>/memory/progress.json` (`plannedSteps` и `planningMetadata.stepDependencies`)
@@ -324,7 +325,7 @@ $ARGUMENTS
      - Основные паттерны и подходы
      - Основные зависимости между компонентами
    
-   - В инкрементальном режиме используй кэш вместо полной загрузки `architecture.md`:
+   - В инкрементальном режиме используй кэш вместо полной загрузки generated `architecture.md`:
      - Загружай только `.madspec/<BRANCH>/planning-context-cache.md` для понимания структуры
      - Это значительно уменьшит объем загружаемого контекста
      - Кэш должен обновляться при значительных изменениях архитектуры

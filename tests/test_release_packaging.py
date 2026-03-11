@@ -55,3 +55,8 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
                 assert "mvp.tech.json" in stage_body
                 assert "tech_status" in stage_body
                 assert "generated artifact" in stage_body
+            if stage_name == "madspec.mvp.architecture":
+                assert "mvp.architecture.json" in stage_body
+                assert "architecture_status" in stage_body
+                assert "--full-artifact" in stage_body
+                assert "generated artifacts/views" in stage_body or "generated artifact" in stage_body
