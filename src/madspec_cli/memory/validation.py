@@ -5,6 +5,14 @@ from pathlib import Path
 from typing import Any
 
 from .concept_state import concept_schema_errors, load_concept_state, render_concept_markdown
+from .design_state import (
+    design_reference_errors,
+    design_schema_errors,
+    is_empty_design_state,
+    load_design_state,
+    render_ui_design_markdown,
+    uncovered_design_features,
+)
 from .planning import _compute_progress_metrics, extract_function_catalog
 from .records import MEMORY_STATUSES, SEMANTIC_KINDS
 from .storage import STEP_KINDS, TDD_PHASES, TDD_POLICIES
@@ -266,6 +274,33 @@ def validate_branch_memory(project_path: Path, branch_name: str) -> list[str]:
         errors.append("concept.md is missing; rebuild generated views with `madspec memory consolidate`")
     elif concept_path.read_text(encoding="utf-8") != concept_text:
         errors.append("concept.md is out of sync with memory/stages/mvp.concept.json")
+
+    design_state_raw = read_json(paths.design_state, None)
+    errors.extend(f"{paths.design_state.name}: {item}" for item in design_schema_errors(design_state_raw))
+    design_state = load_design_state(paths.design_state)
+    design_path = paths.branch_dir / "ui-design.md"
+    design_text = render_ui_design_markdown(
+        design_state,
+        branch_name=branch_name,
+        project_name=concept_state.get("projectName", ""),
+    )
+    if not design_path.exists():
+        errors.append("ui-design.md is missing; rebuild generated views with `madspec memory consolidate`")
+    elif not is_empty_design_state(design_state) and design_path.read_text(encoding="utf-8") != design_text:
+        errors.append("ui-design.md is out of sync with memory/stages/mvp.design.json")
+
+    if not is_empty_design_state(design_state):
+        errors.extend(
+            design_reference_errors(
+                design_state,
+                project_path=project_path,
+                branch_name=branch_name,
+            )
+        )
+        uncovered_features = uncovered_design_features(design_state, concept_state)
+        for priority, values in uncovered_features.items():
+            for value in values:
+                errors.append(f"design coverage missing {priority.upper()} concept feature '{value}'")
 
     for path in (
         paths.decision_log,

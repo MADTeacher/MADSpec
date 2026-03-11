@@ -80,10 +80,13 @@ Structured memory:
 
 - Начинай с чтения существующих артефактов в `.madspec/<branch>/`, а не с предположений о текущем этапе
 - Для MVP соблюдай порядок `concept -> design -> tech -> architecture -> plan -> implement`
+- Для `mvp.design` считай нормой длинную итеративную работу через много независимых чатов: новый чат должен восстанавливать состояние из `.madspec/<branch>/memory/`, `ui-design.md` и `ui-prototype/`, а не из истории предыдущего разговора
 - Для feature workflow не пропускай `feature.init` перед `feature.plan`
 - Если деплой влияет на архитектуру, интеграции, секреты, миграции или observability, учитывай `deployment.md` или инициируй `/madspec.deploy`
 - Перед реализацией сверяйся с `implementation-plan.md`, `steps/`, `memory/progress.json` и relevant generated context
 - Если работа идёт через structured memory, сначала обновляй memory, потом пересобирай views, потом валидируй
+- Для `mvp.design` любой подтвержденный change в экране, потоке, навигации, platform-specific поведении, данных на экране или coverage функций обязан сопровождаться проверкой и актуализацией связанных design-артефактов и structured memory
+- Для изменений интерфейса соблюдай порядок `source artifacts -> canonical memory -> generated views -> validate`: сначала обнови прототипы и typed state, затем связанные описания, потом `madspec memory consolidate`, затем `madspec memory validate`
 
 ## Что агент должен проверять сам
 
@@ -141,4 +144,6 @@ Structured memory:
 - Для branch-aware операций используй CLI MADSpec, а не ad-hoc shell-логику
 - Если меняешь или документируешь CLI-поведение, сверяйся с текущим `README.md`, `AGENTS.md` и шаблонами команд
 - Для `mvp.concept` используй краткий `madspec memory retrieve --json-output` в обычных ходах диалога, `--include-history` только при явной необходимости, а `--full-artifact` только перед финальной валидацией, итоговым обзором и `checkpoint`
+- Для `mvp.design` в начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.design --json-output`, затем сверяй `ui-design.md` и файлы в `ui-prototype/`; не считай дизайн завершенным, пока пользователь явно не утвердил текущее состояние
+- Если менялись HTML/CSS-прототипы, проверь, не устарели ли `ui-design.md`, навигационное описание, user flows, coverage функций и ссылки на prototype-файлы
 - Не расширяй этот skill до полной документации продукта; держи его как операторский слой

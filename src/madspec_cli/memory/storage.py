@@ -23,6 +23,7 @@ class MemoryPaths:
     progress: Path
     stages_dir: Path
     concept_state: Path
+    design_state: Path
     working_dir: Path
     active_session: Path
     decision_log: Path
@@ -46,6 +47,7 @@ class MemoryPaths:
             "progress": self.progress,
             "stages_dir": self.stages_dir,
             "concept_state": self.concept_state,
+            "design_state": self.design_state,
             "working_dir": self.working_dir,
             "active_session": self.active_session,
             "decision_log": self.decision_log,
@@ -267,6 +269,7 @@ def get_memory_paths(project_path: Path, branch_name: str) -> MemoryPaths:
         progress=memory_dir / "progress.json",
         stages_dir=memory_dir / "stages",
         concept_state=memory_dir / "stages" / "mvp.concept.json",
+        design_state=memory_dir / "stages" / "mvp.design.json",
         working_dir=memory_dir / "working",
         active_session=memory_dir / "working" / "active-session.json",
         decision_log=memory_dir / "working" / "decision-log.jsonl",
@@ -336,6 +339,7 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
         migrate_legacy_concept_markdown,
         save_concept_state,
     )
+    from .design_state import default_design_state, load_design_state, save_design_state
 
     paths = get_memory_paths(project_path, branch_name)
     created: list[Path] = []
@@ -369,6 +373,13 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
         if legacy_concept_path.exists() and is_empty_concept_state(concept_state):
             concept_state = migrate_legacy_concept_markdown(legacy_concept_path)
         save_concept_state(paths.concept_state, concept_state)
+
+    if not paths.design_state.exists():
+        save_design_state(paths.design_state, default_design_state())
+        created.append(paths.design_state)
+    else:
+        design_state = load_design_state(paths.design_state)
+        save_design_state(paths.design_state, design_state)
 
     for path in (
         paths.decision_log,

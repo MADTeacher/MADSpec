@@ -4,7 +4,15 @@ from pathlib import Path
 from typing import Any
 
 from .concept_state import concept_completeness_errors, load_concept_state, render_concept_markdown
-from .records import make_record
+from .design_state import (
+    design_completeness_errors,
+    design_main_prototype_path,
+    is_empty_design_state,
+    load_design_state,
+    missing_prototype_files,
+    render_ui_design_markdown,
+    uncovered_design_features,
+)
 from .storage import (
     _default_active_session,
     _default_progress_state,
@@ -109,11 +117,90 @@ def _build_concept_status(concept_state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _design_missing_required_fields(
+    design_state: dict[str, Any],
+    concept_state: dict[str, Any],
+    *,
+    project_path: Path,
+    branch_name: str,
+) -> list[str]:
+    error_map = {
+        "design state must include a design overview before checkpoint": "designOverview",
+        "design state must include at least one platform before checkpoint": "platforms",
+        "design state must include at least one screen before checkpoint": "screens",
+        "design state must include at least one user flow before checkpoint": "flows",
+        "design state must include navigation links before checkpoint": "navigation",
+    }
+    missing: list[str] = []
+    for error in design_completeness_errors(
+        design_state,
+        concept_state=concept_state,
+        project_path=project_path,
+        branch_name=branch_name,
+    ):
+        field_name = error_map.get(error)
+        if field_name and field_name not in missing:
+            missing.append(field_name)
+    return missing
+
+
+def _design_filled_fields(design_state: dict[str, Any]) -> list[str]:
+    field_checks = (
+        ("designOverview", bool(design_state.get("designOverview"))),
+        ("platforms", bool(design_state.get("platforms"))),
+        ("zones", bool(design_state.get("zones"))),
+        ("screens", bool(design_state.get("screens"))),
+        ("flows", bool(design_state.get("flows"))),
+        ("navigation", bool(design_state.get("navigation"))),
+        ("platformConstraints", bool(design_state.get("platformConstraints"))),
+        ("nextActions", bool(design_state.get("nextActions"))),
+        ("checkpointSummary", bool(design_state.get("checkpointSummary"))),
+    )
+    return [field_name for field_name, is_filled in field_checks if is_filled]
+
+
+def _build_design_status(
+    design_state: dict[str, Any],
+    concept_state: dict[str, Any],
+    *,
+    project_path: Path,
+    branch_name: str,
+) -> dict[str, Any]:
+    missing_required_fields = _design_missing_required_fields(
+        design_state,
+        concept_state,
+        project_path=project_path,
+        branch_name=branch_name,
+    )
+    uncovered = uncovered_design_features(design_state, concept_state)
+    missing_files = missing_prototype_files(design_state, project_path, branch_name)
+    return {
+        "is_complete": not missing_required_fields and not any(uncovered.values()) and not missing_files,
+        "missing_required_fields": missing_required_fields,
+        "filled_fields": _design_filled_fields(design_state),
+        "uncovered_features": uncovered,
+        "missing_prototype_files": missing_files,
+        "counts": {
+            "platforms": len(design_state.get("platforms", [])),
+            "zones": len(design_state.get("zones", [])),
+            "screens": len(design_state.get("screens", [])),
+            "flows": len(design_state.get("flows", [])),
+            "navigation_links": len(design_state.get("navigation", [])),
+            "platform_constraints": len(design_state.get("platformConstraints", [])),
+        },
+        "last_checkpoint_summary": design_state.get("checkpointSummary") or None,
+        "revision": design_state.get("revision", 0),
+        "ratified_at": design_state.get("ratifiedAt"),
+        "updated_at": design_state.get("updatedAt"),
+    }
+
+
 def _render_project_context(
     branch_name: str,
     progress: dict[str, Any],
     active_session: dict[str, Any],
     concept_state: dict[str, Any],
+    design_state: dict[str, Any],
     generated_at: str,
 ) -> str:
     planned_steps = progress.get("plannedSteps", [])
@@ -154,6 +241,7 @@ def _render_project_context(
             "## Canonical Memory",
             f"- `.madspec/{branch_name}/memory/progress.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.concept.json`",
+            f"- `.madspec/{branch_name}/memory/stages/mvp.design.json`",
             f"- `.madspec/{branch_name}/memory/working/active-session.json`",
             f"- `.madspec/{branch_name}/memory/working/decision-log.jsonl`",
             f"- `.madspec/{branch_name}/memory/episodes/events.jsonl`",
@@ -161,7 +249,14 @@ def _render_project_context(
             "",
             "## Generated Artifacts",
             f"- `.madspec/{branch_name}/concept.md` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/ui-design.md` (generated from structured memory)",
             f"- Concept checkpoint summary: `{concept_state.get('checkpointSummary') or 'N/A'}`",
+            f"- Design checkpoint summary: `{design_state.get('checkpointSummary') or 'N/A'}`",
+            (
+                f"- Design inventory: `{len(design_state.get('screens', []))}` screens, "
+                f"`{len(design_state.get('flows', []))}` flows, main prototype "
+                f"`{design_main_prototype_path(branch_name).as_posix()}`"
+            ),
         ]
     )
     return "\n".join(lines) + "\n"
@@ -276,6 +371,7 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     progress = read_json(paths.progress, _default_progress_state())
     active_session = read_json(paths.active_session, _default_active_session(branch_name))
     concept_state = load_concept_state(paths.concept_state)
+    design_state = load_design_state(paths.design_state)
     generated_at = active_session.get("updated_at") or active_session.get("last_checkpoint_at") or now_iso()
     decision_log = read_jsonl(paths.decision_log)
     events = read_jsonl(paths.events)
@@ -289,9 +385,29 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     concept_path.write_text(render_concept_markdown(concept_state), encoding="utf-8")
     generated.append(concept_path)
 
+    design_path = paths.branch_dir / "ui-design.md"
+    should_preserve_legacy_design = is_empty_design_state(design_state) and design_path.exists()
+    if not should_preserve_legacy_design:
+        design_path.write_text(
+            render_ui_design_markdown(
+                design_state,
+                branch_name=branch_name,
+                project_name=concept_state.get("projectName", ""),
+            ),
+            encoding="utf-8",
+        )
+    generated.append(design_path)
+
     project_context_path = paths.branch_dir / "project-context.md"
     project_context_path.write_text(
-        _render_project_context(branch_name, progress, active_session, concept_state, generated_at),
+        _render_project_context(
+            branch_name,
+            progress,
+            active_session,
+            concept_state,
+            design_state,
+            generated_at,
+        ),
         encoding="utf-8",
     )
     generated.append(project_context_path)
@@ -457,14 +573,16 @@ def retrieve_memory_context(
     active_session = read_json(paths.active_session, _default_active_session(branch_name))
     stage_lower = stage.lower()
     is_concept_stage = stage_lower == "mvp.concept"
-    concept_state = load_concept_state(paths.concept_state) if is_concept_stage else None
+    is_design_stage = stage_lower == "mvp.design"
+    concept_state = load_concept_state(paths.concept_state)
+    design_state = load_design_state(paths.design_state) if is_design_stage else None
     if limit is None:
-        resolved_limit = 3 if is_concept_stage else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage) else 5
     elif limit <= 0:
-        resolved_limit = 3 if is_concept_stage else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage) else 5
     else:
         resolved_limit = limit
-    include_history_records = include_history or not is_concept_stage
+    include_history_records = include_history or not (is_concept_stage or is_design_stage)
     decision_log = read_jsonl(paths.decision_log) if include_history_records else []
     events = read_jsonl(paths.events) if include_history_records else []
     semantic_sets = _load_semantic_record_sets(
@@ -583,9 +701,20 @@ def retrieve_memory_context(
             "contracts": _trim(relevant_contracts),
         },
         "concept_status": _build_concept_status(concept_state) if is_concept_stage else None,
+        "design_status": (
+            _build_design_status(
+                design_state,
+                concept_state,
+                project_path=project_path,
+                branch_name=branch_name,
+            )
+            if is_design_stage and design_state is not None
+            else None
+        ),
         "episodes": trimmed_events if include_history_records else [],
         "decision_log": trimmed_decisions if include_history_records else [],
         "artifact_state": {
             "concept": concept_state if (is_concept_stage and full_artifact) else None,
+            "design": design_state if (is_design_stage and full_artifact) else None,
         },
     }

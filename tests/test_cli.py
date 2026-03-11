@@ -92,6 +92,7 @@ def test_init_creates_structured_memory_layout(tmp_path: Path, monkeypatch) -> N
     paths = get_memory_paths(project_path, "main")
     assert paths["progress"].exists()
     assert paths["active_session"].exists()
+    assert paths["design_state"].exists()
     assert (project_path / ".madspec" / "procedures" / "next-step-selection.md").exists()
     assert (project_path / ".madspec" / "main" / "project-context.md").exists()
 
@@ -503,6 +504,173 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
     assert checkpoint_result.exit_code == 0, checkpoint_result.stdout
     checkpoint_payload = json.loads(checkpoint_result.stdout)
     assert checkpoint_payload["used_existing_stage_memory"] is True
+
+
+def test_memory_capture_supports_design_stage_state_and_retrieve(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    branch_name = "main"
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": branch_name, "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    ui_dir = project_path / ".madspec" / branch_name / "ui-prototype"
+    ui_dir.mkdir(parents=True)
+    for name in ("index.html", "schedule-board.html", "profile-studio.html", "export-hub.html"):
+        (ui_dir / name).write_text(f"<html><body>{name}</body></html>\n", encoding="utf-8")
+
+    concept_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.concept",
+            "--project-name",
+            "MVP scheduling assistant",
+            "--system-overview",
+            "System helps freelancers manage bookings and reminders from one interface.",
+            "--audience",
+            "Freelancers",
+            "--scenario",
+            "Book and reschedule client meetings",
+            "--pain",
+            "Appointments are managed manually across chats and notes",
+            "--feature-p1",
+            "Booking workflow::Capture booking details and send reminders",
+            "--feature-p2",
+            "Profile studio::Customize the public-facing profile",
+            "--feature-p3",
+            "Export hub::Download settings and summaries",
+            "--json-output",
+        ],
+    )
+    assert concept_capture.exit_code == 0, concept_capture.stdout
+
+    design_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.design",
+            "--summary",
+            "Captured design iteration",
+            "--design-overview",
+            "A workspace-first web UI with clear transitions between planning, profile tuning, and exports.",
+            "--platform",
+            "Web",
+            "--zone",
+            "operations::Operations::Daily scheduling workspace",
+            "--zone",
+            "settings::Settings::Profile and export configuration",
+            "--screen",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "--screen",
+            "profile-studio::Profile studio::settings::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
+            "--screen",
+            "export-hub::Export hub::settings::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
+            "--screen-feature",
+            "schedule-board::p1::Booking workflow",
+            "--screen-feature",
+            "profile-studio::p2::Profile studio",
+            "--screen-feature",
+            "export-hub::p3::Export hub",
+            "--flow",
+            "manage-booking::Manage booking::Create and review a booking flow from one workspace",
+            "--flow-step",
+            "manage-booking::schedule-board::Create booking::Open booking details with reminders",
+            "--flow-step",
+            "manage-booking::profile-studio::Review profile::Confirm public profile details",
+            "--flow-alternative",
+            "manage-booking::Skip profile review when no changes are needed",
+            "--nav",
+            "schedule-board::profile-studio::Profile settings shortcut",
+            "--nav",
+            "profile-studio::export-hub::Export settings CTA",
+            "--platform-constraint",
+            "Primary interactions must remain usable on narrow laptop screens",
+            "--screen-data",
+            "schedule-board::displayed::Upcoming bookings with reminder state",
+            "--screen-data",
+            "profile-studio::input::Public display name",
+            "--next-action",
+            "Review the latest prototype with the user",
+            "--json-output",
+        ],
+    )
+    assert design_capture.exit_code == 0, design_capture.stdout
+
+    retrieve_result = runner.invoke(
+        cli.app,
+        ["memory", "retrieve", "--branch", branch_name, "--stage", "mvp.design", "--json-output"],
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["concept_status"] is None
+    assert retrieve_payload["design_status"]["is_complete"] is True
+    assert retrieve_payload["design_status"]["counts"] == {
+        "platforms": 1,
+        "zones": 2,
+        "screens": 3,
+        "flows": 1,
+        "navigation_links": 2,
+        "platform_constraints": 1,
+    }
+    assert retrieve_payload["design_status"]["uncovered_features"] == {
+        "p1": [],
+        "p2": [],
+        "p3": [],
+    }
+    assert retrieve_payload["design_status"]["missing_prototype_files"] == []
+    assert retrieve_payload["decision_log"] == []
+    assert retrieve_payload["artifact_state"]["design"] is None
+
+    checkpoint_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.design",
+            "--summary",
+            "Design ratified for prototype review",
+            "--evidence",
+            ".madspec/main/ui-design.md",
+            "--evidence",
+            ".madspec/main/ui-prototype/index.html",
+            "--json-output",
+        ],
+    )
+    assert checkpoint_result.exit_code == 0, checkpoint_result.stdout
+
+    retrieve_full_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "retrieve",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.design",
+            "--full-artifact",
+            "--include-history",
+            "--json-output",
+        ],
+    )
+    assert retrieve_full_result.exit_code == 0, retrieve_full_result.stdout
+    retrieve_full_payload = json.loads(retrieve_full_result.stdout)
+    assert retrieve_full_payload["artifact_state"]["design"]["checkpointSummary"] == "Design ratified for prototype review"
+    assert retrieve_full_payload["artifact_state"]["design"]["revision"] == 1
+    assert retrieve_full_payload["decision_log"] != []
 
 
 def test_memory_retrieve_preserves_non_concept_behavior_and_limit(tmp_path: Path, monkeypatch) -> None:

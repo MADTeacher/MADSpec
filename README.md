@@ -291,7 +291,7 @@ madspec memory init [--branch <name>]
 madspec memory status [--branch <name>] [--json-output]
 madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
-madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--system-overview <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
+madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--system-overview <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--design-overview <text>] [--platform <text>] [--zone <id::title::description>] [--screen <id::title::zone::prototype::purpose>] [--screen-feature <screen-id::priority::feature>] [--flow <id::title::goal>] [--flow-step <flow-id::screen-id::action::result>] [--flow-alternative <flow-id::description>] [--nav <from-screen::to-screen::trigger>] [--platform-constraint <text>] [--screen-data <screen-id::displayed|input::name>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
 madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--limit <n>] [--full-artifact] [--include-history] [--json-output]
 madspec memory start-step --stage <mvp.implement|feature.implement> [--step-id <id>] [--summary <text>] [--evidence <path-or-note>] [--json-output]
@@ -308,9 +308,9 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory status` - показывает состояние structured memory
 - `memory consolidate` - пересобирает markdown views из memory
 - `memory validate` - проверяет schema, state transitions и согласованность views
-- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.concept` также обновляет основной файл данных этапа через stage-specific flags
+- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.concept` и `mvp.design` также обновляет основной файл данных этапа через stage-specific flags
 - `memory checkpoint` - фиксирует финал non-iterative stage, обновляет active session и semantic records, затем пересобирает generated views
-- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept` по умолчанию отдает краткий `concept_status`, а полный `artifact_state.concept` возвращает только по `--full-artifact`
+- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept` по умолчанию отдает краткий `concept_status`, для `mvp.design` - `design_status`, а полный stage artifact state возвращает только по `--full-artifact`
 - `memory start-step` - переводит implementation step в `in_progress` и делает его текущим шагом
 - `memory checkpoint-step` - записывает промежуточный implementation checkpoint, включая TDD phase и evidence
 - `memory complete-step` - завершает implementation step, обновляет `completedSteps/currentImplementStep` и сохраняет step-level knowledge в memory
@@ -390,15 +390,20 @@ madspec version
 - Прототипы создаются с учетом платформ из концепции - мобильные паттерны для Mobile, десктопные для Desktop, адаптивные для Web
 - Создание локального сервера для просмотра прототипов (Go, Python или Node.js)
 - Автоматическая валидация дизайна (покрытие функций, логика потоков, соответствие платформам)
+- Каноническое состояние дизайна хранится в `.madspec/<BRANCH>/memory/stages/mvp.design.json`
+- `.madspec/<BRANCH>/ui-design.md` пересобирается из structured memory и не редактируется вручную как основной источник истины
+- `madspec memory retrieve --stage mvp.design` по умолчанию возвращает краткий `design_status`, а полный `artifact_state.design` следует запрашивать только через `--full-artifact`
+- Дизайн поддерживает длинную многосессионную работу: можно многократно возвращаться к `mvp.design`, выполнять новые `capture/checkpoint` итерации и продолжать в новых чатах
 - Обязательный checkpoint через `madspec memory checkpoint --stage mvp.design`
 
 **Выходные артефакты:**
+- `.madspec/<BRANCH>/memory/stages/mvp.design.json` - основной файл данных этапа design
 - `.madspec/<BRANCH>/ui-prototype/` - директория с HTML/CSS прототипами
   - `index.html` - главный файл с навигацией
   - `[screen-name].html` - HTML файлы для каждого экрана
   - `README.md` - инструкция по запуску локального сервера
   - Локальный сервер (если создан)
-- `.madspec/<BRANCH>/ui-design.md` - описание дизайна с ссылками на прототипы
+- `.madspec/<BRANCH>/ui-design.md` - generated artifact дизайна с ссылками на прототипы
 - `.madspec/<BRANCH>/project-context.md` - regenerated view контекста проекта
 
 ### Этап 2: Выбор технологий (`madspec.mvp.tech`)
@@ -610,6 +615,7 @@ madspec version
 **Основные memory-файлы:**
 - `memory/progress.json` - состояние workflow
 - `memory/stages/mvp.concept.json` - основной файл данных этапа `mvp.concept`
+- `memory/stages/mvp.design.json` - основной файл данных этапа `mvp.design`
 - `memory/working/active-session.json` - текущая рабочая память
 - `memory/working/decision-log.jsonl` - micro-decisions и checkpoints
 - `memory/episodes/events.jsonl` - опыт выполнения
@@ -617,6 +623,7 @@ madspec version
 
 **Generated views:**
 - `concept.md`
+- `ui-design.md`
 - `project-context.md`
 - `planning-context-cache.md`
 - `steps/*/planning-context.md`
@@ -633,6 +640,8 @@ madspec version
 Для ранних MVP-этапов обновление основных данных выполняется командой `madspec memory checkpoint`, которая делает все три шага автоматически.
 
 Для non-iterative стадий `concept/design/tech/architecture/review/security` рекомендуется сначала накапливать знания через `madspec memory capture`, а потом завершать стадию кратким `madspec memory checkpoint --summary ...`. Это убирает необходимость сжимать весь диалог в один финальный payload.
+
+Для `mvp.design` повторные `capture/checkpoint` циклы до перехода в `mvp.tech` считаются нормальным сценарием: дизайн можно дорабатывать итеративно и продолжать в новых чатах, пока пользователь явно не утвердит текущее состояние интерфейса.
 
 Для `mvp.concept` используйте stage-specific поля `memory capture`, чтобы наполнять основной файл данных этапа напрямую:
 
@@ -667,6 +676,24 @@ madspec memory checkpoint \
 - `concept_status.missing_required_fields`
 - `concept_status.filled_fields`
 - `concept_status.counts`
+
+Для `mvp.design` используйте stage-specific поля `memory capture`, чтобы накапливать canonical design-state между отдельными сессиями и чатами:
+
+1. Краткий `madspec memory retrieve --stage mvp.design --json-output`
+2. `madspec memory capture --stage mvp.design ...`
+3. Обновление HTML/CSS-прототипов в `.madspec/<branch>/ui-prototype/`
+4. При необходимости `madspec memory retrieve --stage mvp.design --json-output --full-artifact`
+5. `madspec memory checkpoint --stage mvp.design ...`
+
+Краткий `retrieve` для `mvp.design` возвращает:
+
+- `design_status.is_complete`
+- `design_status.missing_required_fields`
+- `design_status.uncovered_features`
+- `design_status.missing_prototype_files`
+- `design_status.counts`
+
+Если в `mvp.design` изменились HTML/CSS-прототипы, агент обязан проверить и при необходимости актуализировать `ui-design.md`, navigation, user flows, coverage функций и ссылки на prototype-файлы до завершения работы.
 
 Если нужен полный снимок концепции или история, используйте:
 

@@ -31,7 +31,7 @@ madspec --help
 **Последовательность команд:**
 
 1. `madspec.mvp.concept` — что создаем; реальные данные этапа будут сохранены в `.madspec/<branch>/memory/stages/mvp.concept.json`, `madspec memory retrieve --stage mvp.concept` по умолчанию будет возвращать краткий `concept_status`, а `concept.md` будет собран автоматически
-2. `madspec.mvp.design` — UI прототипы
+2. `madspec.mvp.design` — UI прототипы; canonical state этапа хранится в `.madspec/<branch>/memory/stages/mvp.design.json`, `madspec memory retrieve --stage mvp.design` по умолчанию возвращает краткий `design_status`, а `ui-design.md` пересобирается автоматически
 3. `madspec.mvp.tech` — выбор технологий
 4. `madspec.mvp.architecture` — архитектура
 5. `madspec.mvp.plan` — планирование шагов (повторять пока не спланируете все)
@@ -71,7 +71,7 @@ madspec.feature.implement
 | `madspec.feature.plan` | Спланировать шаги Feature |
 | `madspec.feature.implement` | Реализовать Feature |
 | `madspec.mvp.concept` | Создать проект с нуля — концепция; работает через краткий `concept_status`, по `--full-artifact` возвращает полный концепт и пересобирает `concept.md` |
-| `madspec.mvp.design` | Создать проект — UI прототипы |
+| `madspec.mvp.design` | Создать проект — UI прототипы; работает через `design_status`, а `ui-design.md` считается generated artifact |
 | `madspec.mvp.tech` | Создать проект — выбор технологий |
 | `madspec.mvp.architecture` | Создать проект — архитектура |
 | `madspec.mvp.plan` | Создать проект — планирование |

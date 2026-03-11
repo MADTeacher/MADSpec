@@ -106,7 +106,18 @@ def memory_capture(
     feature_p3: list[str] = typer.Option(None, "--feature-p3", help="Concept-only: P3 feature in '<name>::<description>' format; repeat for multiple values"),
     constraint: list[str] = typer.Option(None, "--constraint", help="Concept-only: technical constraint; repeat for multiple values"),
     assumption: list[str] = typer.Option(None, "--assumption", help="Concept-only: assumption; repeat for multiple values"),
-    next_action: list[str] = typer.Option(None, "--next-action", help="Concept-only: next action; repeat for multiple values"),
+    next_action: list[str] = typer.Option(None, "--next-action", help="Concept/design-only: canonical next action; repeat for multiple values"),
+    design_overview: str = typer.Option(None, "--design-overview", help="Design-only: short summary of the UI/UX approach"),
+    platform: list[str] = typer.Option(None, "--platform", help="Design-only: supported platform; repeat for multiple values"),
+    zone: list[str] = typer.Option(None, "--zone", help="Design-only: zone in '<id>::<title>::<description>' format; repeat for multiple values"),
+    screen: list[str] = typer.Option(None, "--screen", help="Design-only: screen in '<id>::<title>::<zone>::<prototype>::<purpose>' format; repeat for multiple values"),
+    screen_feature: list[str] = typer.Option(None, "--screen-feature", help="Design-only: screen coverage in '<screen-id>::<priority>::<feature-name>' format; repeat for multiple values"),
+    flow: list[str] = typer.Option(None, "--flow", help="Design-only: flow in '<id>::<title>::<goal>' format; repeat for multiple values"),
+    flow_step: list[str] = typer.Option(None, "--flow-step", help="Design-only: flow step in '<flow-id>::<screen-id>::<action>::<result>' format; repeat for multiple values"),
+    flow_alternative: list[str] = typer.Option(None, "--flow-alternative", help="Design-only: alternative path in '<flow-id>::<description>' format; repeat for multiple values"),
+    nav: list[str] = typer.Option(None, "--nav", help="Design-only: navigation link in '<from-screen>::<to-screen>::<trigger>' format; repeat for multiple values"),
+    platform_constraint: list[str] = typer.Option(None, "--platform-constraint", help="Design-only: platform or interaction constraint; repeat for multiple values"),
+    screen_data: list[str] = typer.Option(None, "--screen-data", help="Design-only: screen data in '<screen-id>::<displayed|input>::<name>' format; repeat for multiple values"),
     status: str = typer.Option("validated", "--status", help="Memory record status: proposed, validated, conflicted, or obsolete"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
@@ -136,6 +147,17 @@ def memory_capture(
         constraints=constraint or [],
         assumptions=assumption or [],
         next_actions=next_action or [],
+        design_overview=design_overview,
+        platforms=platform or [],
+        zones=zone or [],
+        screens=screen or [],
+        screen_features=screen_feature or [],
+        flows=flow or [],
+        flow_steps=flow_step or [],
+        flow_alternatives=flow_alternative or [],
+        navigation=nav or [],
+        platform_constraints=platform_constraint or [],
+        screen_data=screen_data or [],
         status=status,
     )
 
@@ -281,19 +303,19 @@ def memory_retrieve(
     limit: int | None = typer.Option(
         None,
         "--limit",
-        help="Max records per section (defaults to 3 for mvp.concept and 5 for other stages)",
+        help="Max records per section (defaults to 3 for mvp.concept/mvp.design and 5 for other stages)",
     ),
     include_obsolete: bool = typer.Option(False, "--include-obsolete", help="Include obsolete semantic records"),
     include_conflicted: bool = typer.Option(False, "--include-conflicted", help="Include conflicted semantic records"),
     full_artifact: bool = typer.Option(
         False,
         "--full-artifact",
-        help="For mvp.concept return the full artifact_state.concept instead of summary-only context",
+        help="For mvp.concept or mvp.design return the full stage artifact state instead of summary-only context",
     ),
     include_history: bool = typer.Option(
         False,
         "--include-history",
-        help="For mvp.concept include episodes and decision log in the response",
+        help="For mvp.concept or mvp.design include episodes and decision log in the response",
     ),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
@@ -301,7 +323,7 @@ def memory_retrieve(
     project_path = Path.cwd()
     target_branch = resolve_branch_name(project_path, branch_name)
     ensure_memory_layout(project_path, target_branch)
-    resolved_limit = limit if limit is not None else (3 if stage.strip().lower() == "mvp.concept" else 5)
+    resolved_limit = limit if limit is not None else (3 if stage.strip().lower() in {"mvp.concept", "mvp.design"} else 5)
     payload = retrieve_memory_context(
         project_path,
         target_branch,

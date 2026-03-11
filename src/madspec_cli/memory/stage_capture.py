@@ -10,6 +10,20 @@ from .concept_state import (
     save_concept_state,
     update_concept_state,
 )
+from .design_state import (
+    DESIGN_STAGE,
+    load_design_state,
+    parse_flow_alternative_value,
+    parse_flow_step_value,
+    parse_flow_value,
+    parse_navigation_value,
+    parse_screen_data_value,
+    parse_screen_feature_value,
+    parse_screen_value,
+    parse_zone_value,
+    save_design_state,
+    update_design_state,
+)
 from .records import make_record
 from .storage import (
     _default_active_session,
@@ -62,6 +76,17 @@ def _append_unique(existing: list[str], values: list[str]) -> list[str]:
     return result
 
 
+def _filter_non_blocking_design_validation_errors(errors: list[str]) -> list[str]:
+    non_blocking_prefixes = (
+        "design coverage missing ",
+        "design references missing prototype file ",
+        "design screen ",
+        "design flow ",
+        "design navigation ",
+    )
+    return [error for error in errors if not error.startswith(non_blocking_prefixes)]
+
+
 def capture_stage_memory(
     project_path: Path,
     branch_name: str,
@@ -85,6 +110,17 @@ def capture_stage_memory(
     constraints: list[str] | None = None,
     assumptions: list[str] | None = None,
     next_actions: list[str] | None = None,
+    design_overview: str | None = None,
+    platforms: list[str] | None = None,
+    zones: list[str] | None = None,
+    screens: list[str] | None = None,
+    screen_features: list[str] | None = None,
+    flows: list[str] | None = None,
+    flow_steps: list[str] | None = None,
+    flow_alternatives: list[str] | None = None,
+    navigation: list[str] | None = None,
+    platform_constraints: list[str] | None = None,
+    screen_data: list[str] | None = None,
     status: str = "validated",
 ) -> dict[str, Any]:
     normalized_stage = stage.strip().lower()
@@ -120,6 +156,9 @@ def capture_stage_memory(
     normalized_next_actions = _normalize_text_list(next_actions)
     normalized_project_name = (project_name or "").strip()
     normalized_system_overview = (system_overview or "").strip()
+    normalized_design_overview = (design_overview or "").strip()
+    normalized_platforms = _normalize_text_list(platforms)
+    normalized_platform_constraints = _normalize_text_list(platform_constraints)
     concept_feature_updates: dict[str, list[dict[str, str]]] = {"p1": [], "p2": [], "p3": []}
     concept_feature_errors: list[str] = []
     for priority, values in {
@@ -136,6 +175,80 @@ def capture_stage_memory(
                 continue
             concept_feature_updates[priority].append(parsed)
 
+    design_zone_updates: list[dict[str, str]] = []
+    design_screen_updates: list[dict[str, Any]] = []
+    design_screen_feature_links: list[dict[str, str]] = []
+    design_flow_updates: list[dict[str, Any]] = []
+    design_flow_step_updates: list[dict[str, str]] = []
+    design_flow_alternative_updates: list[dict[str, str]] = []
+    design_navigation_updates: list[dict[str, str]] = []
+    design_screen_data_updates: list[dict[str, str]] = []
+    design_errors: list[str] = []
+
+    for value in _normalize_text_list(zones):
+        parsed = parse_zone_value(value)
+        if parsed is None:
+            design_errors.append(f"zone must use '<id>::<title>::<description>' format: {value}")
+            continue
+        design_zone_updates.append(parsed)
+
+    for value in _normalize_text_list(screens):
+        parsed = parse_screen_value(value)
+        if parsed is None:
+            design_errors.append(
+                f"screen must use '<id>::<title>::<zone>::<prototype>::<purpose>' format: {value}"
+            )
+            continue
+        design_screen_updates.append(parsed)
+
+    for value in _normalize_text_list(screen_features):
+        parsed = parse_screen_feature_value(value)
+        if parsed is None:
+            design_errors.append(
+                f"screen-feature must use '<screen-id>::<priority>::<feature-name>' format: {value}"
+            )
+            continue
+        design_screen_feature_links.append(parsed)
+
+    for value in _normalize_text_list(flows):
+        parsed = parse_flow_value(value)
+        if parsed is None:
+            design_errors.append(f"flow must use '<id>::<title>::<goal>' format: {value}")
+            continue
+        design_flow_updates.append(parsed)
+
+    for value in _normalize_text_list(flow_steps):
+        parsed = parse_flow_step_value(value)
+        if parsed is None:
+            design_errors.append(
+                f"flow-step must use '<flow-id>::<screen-id>::<action>::<result>' format: {value}"
+            )
+            continue
+        design_flow_step_updates.append(parsed)
+
+    for value in _normalize_text_list(flow_alternatives):
+        parsed = parse_flow_alternative_value(value)
+        if parsed is None:
+            design_errors.append(f"flow-alternative must use '<flow-id>::<description>' format: {value}")
+            continue
+        design_flow_alternative_updates.append(parsed)
+
+    for value in _normalize_text_list(navigation):
+        parsed = parse_navigation_value(value)
+        if parsed is None:
+            design_errors.append(f"nav must use '<from-screen>::<to-screen>::<trigger>' format: {value}")
+            continue
+        design_navigation_updates.append(parsed)
+
+    for value in _normalize_text_list(screen_data):
+        parsed = parse_screen_data_value(value)
+        if parsed is None:
+            design_errors.append(
+                f"screen-data must use '<screen-id>::<displayed|input>::<name>' format: {value}"
+            )
+            continue
+        design_screen_data_updates.append(parsed)
+
     used_concept_fields = any(
         [
             normalized_project_name,
@@ -148,7 +261,21 @@ def capture_stage_memory(
             concept_feature_updates["p3"],
             normalized_constraints,
             normalized_assumptions,
-            normalized_next_actions,
+        ]
+    )
+    used_design_fields = any(
+        [
+            normalized_design_overview,
+            normalized_platforms,
+            design_zone_updates,
+            design_screen_updates,
+            design_screen_feature_links,
+            design_flow_updates,
+            design_flow_step_updates,
+            design_flow_alternative_updates,
+            design_navigation_updates,
+            normalized_platform_constraints,
+            design_screen_data_updates,
         ]
     )
     if used_concept_fields and normalized_stage != CONCEPT_STAGE:
@@ -158,12 +285,33 @@ def capture_stage_memory(
             "stage": normalized_stage,
             "errors": ["concept-specific capture options are only supported for stage mvp.concept"],
         }
+    if used_design_fields and normalized_stage != DESIGN_STAGE:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": ["design-specific capture options are only supported for stage mvp.design"],
+        }
+    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE}:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": ["--next-action is only supported for stages mvp.concept and mvp.design"],
+        }
     if concept_feature_errors:
         return {
             "accepted": False,
             "branch": branch_name,
             "stage": normalized_stage,
             "errors": concept_feature_errors,
+        }
+    if design_errors:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": design_errors,
         }
     normalized_pending_actions = _append_unique(normalized_pending_actions, normalized_next_actions)
     concept_fact_summaries = (
@@ -180,6 +328,45 @@ def capture_stage_memory(
         for feature in concept_feature_updates[priority]
     ]
     concept_contract_summaries = normalized_constraints
+    design_fact_summaries = (
+        ([f"Design overview: {normalized_design_overview}"] if normalized_design_overview else [])
+        + [f"Platform: {item}" for item in normalized_platforms]
+        + [
+            f"Zone {item['id']}: {item['title']} - {item['description']}"
+            for item in design_zone_updates
+        ]
+        + [
+            f"Screen {item['id']}: {item['title']} ({item['prototype']}) - {item['purpose']}"
+            for item in design_screen_updates
+        ]
+        + [
+            f"Flow {item['id']}: {item['title']} - {item['goal']}"
+            for item in design_flow_updates
+        ]
+        + [
+            f"Flow step {item['flowId']}: {item['screenId']} -> {item['action']} -> {item['result']}"
+            for item in design_flow_step_updates
+        ]
+        + [
+            f"Screen data {item['screenId']} ({item['dataKind']}): {item['name']}"
+            for item in design_screen_data_updates
+        ]
+    )
+    design_decision_summaries = (
+        [
+            f"Screen {item['screenId']} covers {item['priority'].upper()} feature {item['featureName']}"
+            for item in design_screen_feature_links
+        ]
+        + [
+            f"Navigation {item['from']} -> {item['to']} via {item['trigger']}"
+            for item in design_navigation_updates
+        ]
+        + [
+            f"Alternative path for {item['flowId']}: {item['description']}"
+            for item in design_flow_alternative_updates
+        ]
+    )
+    design_contract_summaries = normalized_platform_constraints
     if not any(
         [
             normalized_summary,
@@ -191,6 +378,9 @@ def capture_stage_memory(
             concept_fact_summaries,
             concept_decision_summaries,
             concept_contract_summaries,
+            design_fact_summaries,
+            design_decision_summaries,
+            design_contract_summaries,
         ]
     ):
         return {
@@ -209,6 +399,7 @@ def capture_stage_memory(
         paths.decisions: _snapshot_file(paths.decisions),
         paths.contracts: _snapshot_file(paths.contracts),
         paths.concept_state: _snapshot_file(paths.concept_state),
+        paths.design_state: _snapshot_file(paths.design_state),
     }
 
     ts = now_iso()
@@ -227,7 +418,12 @@ def capture_stage_memory(
     )[:20]
     active_session["current_hypotheses"] = _append_unique(
         active_session.get("current_hypotheses", []),
-        concept_decision_summaries or normalized_decisions or concept_fact_summaries or normalized_facts,
+        concept_decision_summaries
+        or design_decision_summaries
+        or normalized_decisions
+        or concept_fact_summaries
+        or design_fact_summaries
+        or normalized_facts,
     )[:20]
     active_session["last_checkpoint_at"] = ts
     active_session["updated_at"] = ts
@@ -253,6 +449,7 @@ def capture_stage_memory(
         )
 
     concept_state = load_concept_state(paths.concept_state)
+    design_state = load_design_state(paths.design_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -264,6 +461,22 @@ def capture_stage_memory(
             features=concept_feature_updates,
             constraints=normalized_constraints,
             assumptions=normalized_assumptions,
+            next_actions=normalized_next_actions,
+        )
+    elif normalized_stage == DESIGN_STAGE:
+        design_state = update_design_state(
+            design_state,
+            design_overview=normalized_design_overview or None,
+            platforms=normalized_platforms,
+            zones=design_zone_updates,
+            screens=design_screen_updates,
+            screen_feature_links=design_screen_feature_links,
+            flows=design_flow_updates,
+            flow_steps=design_flow_step_updates,
+            flow_alternatives=design_flow_alternative_updates,
+            navigation=design_navigation_updates,
+            platform_constraints=normalized_platform_constraints,
+            screen_data_entries=design_screen_data_updates,
             next_actions=normalized_next_actions,
         )
 
@@ -392,6 +605,152 @@ def capture_stage_memory(
             for item in normalized_assumptions
         ]
     )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Design overview: {normalized_design_overview}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "designOverview"},
+                ts=ts,
+            )
+        ]
+        if normalized_design_overview and normalized_stage == DESIGN_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "platform"},
+                ts=ts,
+            )
+            for item in normalized_platforms
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Zone {item['id']}: {item['title']} - {item['description']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "zone", **item},
+                ts=ts,
+            )
+            for item in design_zone_updates
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Screen {item['id']}: {item['title']} ({item['prototype']}) - {item['purpose']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={
+                    "slot": "screen",
+                    "screenId": item["id"],
+                    "title": item["title"],
+                    "zone": item["zone"],
+                    "prototype": item["prototype"],
+                    "purpose": item["purpose"],
+                },
+                ts=ts,
+            )
+            for item in design_screen_updates
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Flow {item['id']}: {item['title']} - {item['goal']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "flow", "flowId": item["id"], "title": item["title"], "goal": item["goal"]},
+                ts=ts,
+            )
+            for item in design_flow_updates
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Flow step {item['flowId']}: {item['screenId']} -> {item['action']} -> {item['result']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "flowStep", **item},
+                ts=ts,
+            )
+            for item in design_flow_step_updates
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Screen data {item['screenId']} ({item['dataKind']}): {item['name']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "screenData", **item},
+                ts=ts,
+            )
+            for item in design_screen_data_updates
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
     decision_records = [
         make_record(
             branch_name,
@@ -426,6 +785,66 @@ def capture_stage_memory(
             for feature in concept_feature_updates[priority]
         ]
     )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Screen {item['screenId']} covers {item['priority'].upper()} feature {item['featureName']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "screenFeature", **item},
+                ts=ts,
+            )
+            for item in design_screen_feature_links
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Navigation {item['from']} -> {item['to']} via {item['trigger']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "navigation", **item},
+                ts=ts,
+            )
+            for item in design_navigation_updates
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Alternative path for {item['flowId']}: {item['description']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "flowAlternative", **item},
+                ts=ts,
+            )
+            for item in design_flow_alternative_updates
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
     contract_records = [
         make_record(
             branch_name,
@@ -459,10 +878,32 @@ def capture_stage_memory(
             for item in normalized_constraints
         ]
     )
+    contract_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="contract",
+                record_type="contract",
+                metadata={"slot": "platformConstraint"},
+                ts=ts,
+            )
+            for item in normalized_platform_constraints
+        ]
+        if normalized_stage == DESIGN_STAGE
+        else []
+    )
 
     try:
         if normalized_stage == CONCEPT_STAGE:
             save_concept_state(paths.concept_state, concept_state)
+        elif normalized_stage == DESIGN_STAGE:
+            save_design_state(paths.design_state, design_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, note_records)
         append_jsonl(paths.facts, fact_records)
@@ -472,6 +913,8 @@ def capture_stage_memory(
         generated = consolidate_branch_memory(project_path, branch_name)
         ensure_memory_layout(project_path, branch_name)
         validation_errors = validate_branch_memory(project_path, branch_name)
+        if normalized_stage == DESIGN_STAGE:
+            validation_errors = _filter_non_blocking_design_validation_errors(validation_errors)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
     except Exception as exc:

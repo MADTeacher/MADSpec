@@ -10,6 +10,13 @@ from .concept_state import (
     save_concept_state,
     update_concept_state,
 )
+from .design_state import (
+    DESIGN_STAGE,
+    design_completeness_errors,
+    load_design_state,
+    save_design_state,
+    update_design_state,
+)
 from .records import make_record
 from .storage import (
     _default_active_session,
@@ -127,6 +134,7 @@ def checkpoint_stage_memory(
         paths.decisions: _snapshot_file(paths.decisions),
         paths.contracts: _snapshot_file(paths.contracts),
         paths.concept_state: _snapshot_file(paths.concept_state),
+        paths.design_state: _snapshot_file(paths.design_state),
     }
 
     ts = now_iso()
@@ -161,6 +169,7 @@ def checkpoint_stage_memory(
         ts=ts,
     )
     concept_state = load_concept_state(paths.concept_state)
+    design_state = load_design_state(paths.design_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -170,6 +179,23 @@ def checkpoint_stage_memory(
             ratify=True,
         )
         errors.extend(concept_completeness_errors(concept_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == DESIGN_STAGE:
+        design_state = update_design_state(
+            design_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(
+            design_completeness_errors(
+                design_state,
+                concept_state=concept_state,
+                project_path=project_path,
+                branch_name=branch_name,
+            )
+        )
         if errors:
             return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
 
@@ -222,6 +248,8 @@ def checkpoint_stage_memory(
     try:
         if normalized_stage == CONCEPT_STAGE:
             save_concept_state(paths.concept_state, concept_state)
+        elif normalized_stage == DESIGN_STAGE:
+            save_design_state(paths.design_state, design_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, [checkpoint_record])
         append_jsonl(paths.facts, fact_records)
