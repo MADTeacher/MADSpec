@@ -471,7 +471,6 @@ def capture_stage_memory(
 
         generated = consolidate_branch_memory(project_path, branch_name)
         ensure_memory_layout(project_path, branch_name)
-        generated = consolidate_branch_memory(project_path, branch_name)
         validation_errors = validate_branch_memory(project_path, branch_name)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))

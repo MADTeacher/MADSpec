@@ -368,14 +368,13 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     return generated
 
 
-def _filtered_semantic_records(
-    path: Path,
+def _filter_records_by_status(
+    records: list[dict[str, Any]],
     *,
     include_obsolete: bool,
     include_conflicted: bool,
     include_proposed: bool = False,
 ) -> list[dict[str, Any]]:
-    records = read_jsonl(path)
     filtered: list[dict[str, Any]] = []
     for record in records:
         status = record.get("status")
@@ -388,6 +387,57 @@ def _filtered_semantic_records(
         if status == "validated" or include_proposed or include_conflicted or include_obsolete:
             filtered.append(record)
     return filtered
+
+
+def _load_semantic_record_sets(
+    paths,
+    *,
+    include_obsolete: bool,
+    include_conflicted: bool,
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    facts_records = read_jsonl(paths.facts)
+    decisions_records = read_jsonl(paths.decisions)
+    contracts_records = read_jsonl(paths.contracts)
+
+    return {
+        "validated": {
+            "facts": _filter_records_by_status(
+                facts_records,
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+            ),
+            "decisions": _filter_records_by_status(
+                decisions_records,
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+            ),
+            "contracts": _filter_records_by_status(
+                contracts_records,
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+            ),
+        },
+        "stage": {
+            "facts": _filter_records_by_status(
+                facts_records,
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+                include_proposed=True,
+            ),
+            "decisions": _filter_records_by_status(
+                decisions_records,
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+                include_proposed=True,
+            ),
+            "contracts": _filter_records_by_status(
+                contracts_records,
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+                include_proposed=True,
+            ),
+        },
+    }
 
 
 def retrieve_memory_context(
@@ -405,24 +455,6 @@ def retrieve_memory_context(
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
     active_session = read_json(paths.active_session, _default_active_session(branch_name))
-    events = read_jsonl(paths.events)
-    decision_log = read_jsonl(paths.decision_log)
-
-    semantic_facts = _filtered_semantic_records(
-        paths.facts,
-        include_obsolete=include_obsolete,
-        include_conflicted=include_conflicted,
-    )
-    semantic_decisions = _filtered_semantic_records(
-        paths.decisions,
-        include_obsolete=include_obsolete,
-        include_conflicted=include_conflicted,
-    )
-    semantic_contracts = _filtered_semantic_records(
-        paths.contracts,
-        include_obsolete=include_obsolete,
-        include_conflicted=include_conflicted,
-    )
     stage_lower = stage.lower()
     is_concept_stage = stage_lower == "mvp.concept"
     concept_state = load_concept_state(paths.concept_state) if is_concept_stage else None
@@ -432,39 +464,35 @@ def retrieve_memory_context(
         resolved_limit = 3 if is_concept_stage else 5
     else:
         resolved_limit = limit
+    include_history_records = include_history or not is_concept_stage
+    decision_log = read_jsonl(paths.decision_log) if include_history_records else []
+    events = read_jsonl(paths.events) if include_history_records else []
+    semantic_sets = _load_semantic_record_sets(
+        paths,
+        include_obsolete=include_obsolete,
+        include_conflicted=include_conflicted,
+    )
+    semantic_facts = semantic_sets["validated"]["facts"]
+    semantic_decisions = semantic_sets["validated"]["decisions"]
+    semantic_contracts = semantic_sets["validated"]["contracts"]
     resolved_step_id = step_id or active_session.get("current_step") or progress.get("currentImplementStep")
     if not resolved_step_id and "implement" in stage_lower:
         resolved_step_id = _select_next_executable_step(progress)
     stage_facts = [
         record
-        for record in _filtered_semantic_records(
-            paths.facts,
-            include_obsolete=include_obsolete,
-            include_conflicted=include_conflicted,
-            include_proposed=True,
-        )
+        for record in semantic_sets["stage"]["facts"]
         if stage_lower in str(record.get("stage", "")).lower()
         and (not resolved_step_id or record.get("step_id") == resolved_step_id)
     ]
     stage_decisions = [
         record
-        for record in _filtered_semantic_records(
-            paths.decisions,
-            include_obsolete=include_obsolete,
-            include_conflicted=include_conflicted,
-            include_proposed=True,
-        )
+        for record in semantic_sets["stage"]["decisions"]
         if stage_lower in str(record.get("stage", "")).lower()
         and (not resolved_step_id or record.get("step_id") == resolved_step_id)
     ]
     stage_contracts = [
         record
-        for record in _filtered_semantic_records(
-            paths.contracts,
-            include_obsolete=include_obsolete,
-            include_conflicted=include_conflicted,
-            include_proposed=True,
-        )
+        for record in semantic_sets["stage"]["contracts"]
         if stage_lower in str(record.get("stage", "")).lower()
         and (not resolved_step_id or record.get("step_id") == resolved_step_id)
     ]
@@ -555,8 +583,8 @@ def retrieve_memory_context(
             "contracts": _trim(relevant_contracts),
         },
         "concept_status": _build_concept_status(concept_state) if is_concept_stage else None,
-        "episodes": trimmed_events if (include_history or not is_concept_stage) else [],
-        "decision_log": trimmed_decisions if (include_history or not is_concept_stage) else [],
+        "episodes": trimmed_events if include_history_records else [],
+        "decision_log": trimmed_decisions if include_history_records else [],
         "artifact_state": {
             "concept": concept_state if (is_concept_stage and full_artifact) else None,
         },

@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import madspec_cli.memory.checkpoint as checkpoint_module
+import madspec_cli.memory.stage_capture as stage_capture_module
+import madspec_cli.memory.views as views_module
 from madspec_cli.memory import (
     checkpoint_stage_memory,
     append_jsonl,
@@ -947,6 +950,145 @@ def test_retrieve_memory_context_returns_concept_status_for_partial_concept(tmp_
         "assumptions": 0,
         "next_actions": 0,
     }
+
+
+def test_retrieve_memory_context_reads_semantic_files_once_and_skips_history_for_concept(tmp_path: Path, monkeypatch) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        project_name="MVP scheduling assistant",
+        system_overview="System helps freelancers manage bookings.",
+        audiences=["Freelancers"],
+        scenarios=["Book client meetings"],
+        pain_points=["Manual follow-ups are slow"],
+        feature_p1=["Booking workflow::Create bookings and reminders"],
+        questions=["Q1"],
+        status="validated",
+    )
+
+    original_read_jsonl = views_module.read_jsonl
+    calls: list[Path] = []
+
+    def counting_read_jsonl(path: Path) -> list[dict[str, object]]:
+        calls.append(path)
+        return original_read_jsonl(path)
+
+    monkeypatch.setattr(views_module, "read_jsonl", counting_read_jsonl)
+
+    retrieved = retrieve_memory_context(paths["branch_dir"].parents[1], "main", "mvp.concept")
+
+    assert retrieved["decision_log"] == []
+    assert retrieved["episodes"] == []
+    assert calls.count(paths["facts"]) == 1
+    assert calls.count(paths["decisions"]) == 1
+    assert calls.count(paths["contracts"]) == 1
+    assert paths["decision_log"] not in calls
+    assert paths["events"] not in calls
+
+
+def test_retrieve_memory_context_reads_history_when_requested_for_concept(tmp_path: Path, monkeypatch) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        project_name="MVP scheduling assistant",
+        system_overview="System helps freelancers manage bookings.",
+        audiences=["Freelancers"],
+        scenarios=["Book client meetings"],
+        pain_points=["Manual follow-ups are slow"],
+        feature_p1=["Booking workflow::Create bookings and reminders"],
+        questions=["Q1"],
+        status="validated",
+    )
+
+    original_read_jsonl = views_module.read_jsonl
+    calls: list[Path] = []
+
+    def counting_read_jsonl(path: Path) -> list[dict[str, object]]:
+        calls.append(path)
+        return original_read_jsonl(path)
+
+    monkeypatch.setattr(views_module, "read_jsonl", counting_read_jsonl)
+
+    retrieved = retrieve_memory_context(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        include_history=True,
+    )
+
+    assert calls.count(paths["decision_log"]) == 1
+    assert calls.count(paths["events"]) == 1
+    assert len(retrieved["decision_log"]) == 1
+
+
+def test_capture_stage_memory_consolidates_once(tmp_path: Path, monkeypatch) -> None:
+    paths = _bootstrap_project(tmp_path)
+    original_consolidate = stage_capture_module.consolidate_branch_memory
+    calls: list[str] = []
+
+    def counting_consolidate(project_path: Path, branch_name: str) -> list[Path]:
+        calls.append(branch_name)
+        return original_consolidate(project_path, branch_name)
+
+    monkeypatch.setattr(stage_capture_module, "consolidate_branch_memory", counting_consolidate)
+
+    captured = capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        project_name="MVP scheduling assistant",
+        system_overview="System helps freelancers manage bookings.",
+        audiences=["Freelancers"],
+        scenarios=["Book client meetings"],
+        pain_points=["Manual follow-ups are slow"],
+        feature_p1=["Booking workflow::Create bookings and reminders"],
+        status="validated",
+    )
+
+    assert captured["accepted"] is True
+    assert calls == ["main"]
+
+
+def test_checkpoint_stage_memory_consolidates_once(tmp_path: Path, monkeypatch) -> None:
+    paths = _bootstrap_project(tmp_path)
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        project_name="MVP scheduling assistant",
+        system_overview="System helps freelancers manage bookings.",
+        audiences=["Freelancers"],
+        scenarios=["Book client meetings"],
+        pain_points=["Manual follow-ups are slow"],
+        feature_p1=["Booking workflow::Create bookings and reminders"],
+        status="validated",
+    )
+
+    original_consolidate = checkpoint_module.consolidate_branch_memory
+    calls: list[str] = []
+
+    def counting_consolidate(project_path: Path, branch_name: str) -> list[Path]:
+        calls.append(branch_name)
+        return original_consolidate(project_path, branch_name)
+
+    monkeypatch.setattr(checkpoint_module, "consolidate_branch_memory", counting_consolidate)
+
+    checkpointed = checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        "Concept ratified after incremental discovery",
+        evidence=[".madspec/main/concept.md"],
+    )
+
+    assert checkpointed["accepted"] is True
+    assert calls == ["main"]
 
 
 def test_validate_detects_out_of_sync_generated_concept(tmp_path: Path) -> None:
