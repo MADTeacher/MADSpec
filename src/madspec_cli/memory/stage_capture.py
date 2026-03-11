@@ -24,6 +24,16 @@ from .design_state import (
     save_design_state,
     update_design_state,
 )
+from .tech_state import (
+    TECH_STAGE,
+    load_tech_state,
+    parse_alternative_value,
+    parse_code_organization_value,
+    parse_library_value,
+    parse_stack_component_value,
+    save_tech_state,
+    update_tech_state,
+)
 from .records import make_record
 from .storage import (
     _default_active_session,
@@ -121,6 +131,15 @@ def capture_stage_memory(
     navigation: list[str] | None = None,
     platform_constraints: list[str] | None = None,
     screen_data: list[str] | None = None,
+    stack_overview: str | None = None,
+    project_type: str | None = None,
+    requirements: list[str] | None = None,
+    preferences: list[str] | None = None,
+    tech_constraints: list[str] | None = None,
+    stack_components: list[str] | None = None,
+    libraries: list[str] | None = None,
+    code_organization: str | None = None,
+    alternatives: list[str] | None = None,
     status: str = "validated",
 ) -> dict[str, Any]:
     normalized_stage = stage.strip().lower()
@@ -159,6 +178,11 @@ def capture_stage_memory(
     normalized_design_overview = (design_overview or "").strip()
     normalized_platforms = _normalize_text_list(platforms)
     normalized_platform_constraints = _normalize_text_list(platform_constraints)
+    normalized_stack_overview = (stack_overview or "").strip()
+    normalized_project_type = (project_type or "").strip()
+    normalized_requirements = _normalize_text_list(requirements)
+    normalized_preferences = _normalize_text_list(preferences)
+    normalized_tech_constraints = _normalize_text_list(tech_constraints)
     concept_feature_updates: dict[str, list[dict[str, str]]] = {"p1": [], "p2": [], "p3": []}
     concept_feature_errors: list[str] = []
     for priority, values in {
@@ -183,7 +207,12 @@ def capture_stage_memory(
     design_flow_alternative_updates: list[dict[str, str]] = []
     design_navigation_updates: list[dict[str, str]] = []
     design_screen_data_updates: list[dict[str, str]] = []
+    tech_component_updates: list[dict[str, str]] = []
+    tech_library_updates: list[dict[str, str]] = []
+    tech_alternative_updates: list[dict[str, str]] = []
+    tech_code_organization: dict[str, str] | None = None
     design_errors: list[str] = []
+    tech_errors: list[str] = []
 
     for value in _normalize_text_list(zones):
         parsed = parse_zone_value(value)
@@ -249,6 +278,40 @@ def capture_stage_memory(
             continue
         design_screen_data_updates.append(parsed)
 
+    for value in _normalize_text_list(stack_components):
+        parsed = parse_stack_component_value(value)
+        if parsed is None:
+            tech_errors.append(
+                f"stack-component must use '<slot>::<name>::<version>::<rationale>' format: {value}"
+            )
+            continue
+        tech_component_updates.append(parsed)
+
+    for value in _normalize_text_list(libraries):
+        parsed = parse_library_value(value)
+        if parsed is None:
+            tech_errors.append(
+                f"library must use '<scope>::<name>::<version>::<purpose>' format: {value}"
+            )
+            continue
+        tech_library_updates.append(parsed)
+
+    for value in _normalize_text_list(alternatives):
+        parsed = parse_alternative_value(value)
+        if parsed is None:
+            tech_errors.append(
+                f"alternative must use '<slot>::<option>::<reason-rejected>' format: {value}"
+            )
+            continue
+        tech_alternative_updates.append(parsed)
+
+    if code_organization:
+        tech_code_organization = parse_code_organization_value(code_organization)
+        if tech_code_organization is None:
+            tech_errors.append(
+                "code-organization must use '<repo-strategy>::<source-layout>::<modularity>::<rationale>' format"
+            )
+
     used_concept_fields = any(
         [
             normalized_project_name,
@@ -278,6 +341,19 @@ def capture_stage_memory(
             design_screen_data_updates,
         ]
     )
+    used_tech_fields = any(
+        [
+            normalized_stack_overview,
+            normalized_project_type,
+            normalized_requirements,
+            normalized_preferences,
+            normalized_tech_constraints,
+            tech_component_updates,
+            tech_library_updates,
+            tech_code_organization,
+            tech_alternative_updates,
+        ]
+    )
     if used_concept_fields and normalized_stage != CONCEPT_STAGE:
         return {
             "accepted": False,
@@ -292,12 +368,19 @@ def capture_stage_memory(
             "stage": normalized_stage,
             "errors": ["design-specific capture options are only supported for stage mvp.design"],
         }
-    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE}:
+    if used_tech_fields and normalized_stage != TECH_STAGE:
         return {
             "accepted": False,
             "branch": branch_name,
             "stage": normalized_stage,
-            "errors": ["--next-action is only supported for stages mvp.concept and mvp.design"],
+            "errors": ["tech-specific capture options are only supported for stage mvp.tech"],
+        }
+    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE}:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": ["--next-action is only supported for stages mvp.concept, mvp.design, and mvp.tech"],
         }
     if concept_feature_errors:
         return {
@@ -312,6 +395,13 @@ def capture_stage_memory(
             "branch": branch_name,
             "stage": normalized_stage,
             "errors": design_errors,
+        }
+    if tech_errors:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": tech_errors,
         }
     normalized_pending_actions = _append_unique(normalized_pending_actions, normalized_next_actions)
     concept_fact_summaries = (
@@ -367,6 +457,38 @@ def capture_stage_memory(
         ]
     )
     design_contract_summaries = normalized_platform_constraints
+    tech_fact_summaries = (
+        ([f"Project type: {normalized_project_type}"] if normalized_project_type else [])
+        + ([f"Stack overview: {normalized_stack_overview}"] if normalized_stack_overview else [])
+        + normalized_requirements
+        + normalized_preferences
+    )
+    tech_decision_summaries = (
+        [
+            f"Stack component {item['slot']}: {item['name']} {item['version']} - {item['rationale']}"
+            for item in tech_component_updates
+        ]
+        + [
+            f"Library {item['scope']}: {item['name']} {item['version']} - {item['purpose']}"
+            for item in tech_library_updates
+        ]
+        + (
+            [
+                "Code organization: "
+                f"{tech_code_organization['repoStrategy']} / "
+                f"{tech_code_organization['sourceLayout']} / "
+                f"{tech_code_organization['modularity']} - "
+                f"{tech_code_organization['rationale']}"
+            ]
+            if tech_code_organization is not None
+            else []
+        )
+        + [
+            f"Rejected alternative for {item['slot']}: {item['option']} - {item['reasonRejected']}"
+            for item in tech_alternative_updates
+        ]
+    )
+    tech_contract_summaries = normalized_tech_constraints
     if not any(
         [
             normalized_summary,
@@ -381,6 +503,9 @@ def capture_stage_memory(
             design_fact_summaries,
             design_decision_summaries,
             design_contract_summaries,
+            tech_fact_summaries,
+            tech_decision_summaries,
+            tech_contract_summaries,
         ]
     ):
         return {
@@ -400,6 +525,7 @@ def capture_stage_memory(
         paths.contracts: _snapshot_file(paths.contracts),
         paths.concept_state: _snapshot_file(paths.concept_state),
         paths.design_state: _snapshot_file(paths.design_state),
+        paths.tech_state: _snapshot_file(paths.tech_state),
     }
 
     ts = now_iso()
@@ -420,9 +546,11 @@ def capture_stage_memory(
         active_session.get("current_hypotheses", []),
         concept_decision_summaries
         or design_decision_summaries
+        or tech_decision_summaries
         or normalized_decisions
         or concept_fact_summaries
         or design_fact_summaries
+        or tech_fact_summaries
         or normalized_facts,
     )[:20]
     active_session["last_checkpoint_at"] = ts
@@ -450,6 +578,7 @@ def capture_stage_memory(
 
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state)
+    tech_state = load_tech_state(paths.tech_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -477,6 +606,20 @@ def capture_stage_memory(
             navigation=design_navigation_updates,
             platform_constraints=normalized_platform_constraints,
             screen_data_entries=design_screen_data_updates,
+            next_actions=normalized_next_actions,
+        )
+    elif normalized_stage == TECH_STAGE:
+        tech_state = update_tech_state(
+            tech_state,
+            project_type=normalized_project_type or None,
+            stack_overview=normalized_stack_overview or None,
+            requirements=normalized_requirements,
+            preferences=normalized_preferences,
+            constraints=normalized_tech_constraints,
+            components=tech_component_updates,
+            libraries=tech_library_updates,
+            code_organization=tech_code_organization,
+            alternatives=tech_alternative_updates,
             next_actions=normalized_next_actions,
         )
 
@@ -650,6 +793,84 @@ def capture_stage_memory(
                 branch_name,
                 normalized_stage,
                 "memory.capture",
+                f"Project type: {normalized_project_type}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "projectType"},
+                ts=ts,
+            )
+        ]
+        if normalized_project_type and normalized_stage == TECH_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Stack overview: {normalized_stack_overview}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "stackOverview"},
+                ts=ts,
+            )
+        ]
+        if normalized_stack_overview and normalized_stage == TECH_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "requirement"},
+                ts=ts,
+            )
+            for item in normalized_requirements
+        ]
+        if normalized_stage == TECH_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "preference"},
+                ts=ts,
+            )
+            for item in normalized_preferences
+        ]
+        if normalized_stage == TECH_STAGE
+        else []
+    )
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
                 f"Zone {item['id']}: {item['title']} - {item['description']}",
                 status=normalized_status,
                 evidence=normalized_evidence,
@@ -811,6 +1032,89 @@ def capture_stage_memory(
                 branch_name,
                 normalized_stage,
                 "memory.capture",
+                f"Stack component {item['slot']}: {item['name']} {item['version']} - {item['rationale']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "stackComponent", **item},
+                ts=ts,
+            )
+            for item in tech_component_updates
+        ]
+        if normalized_stage == TECH_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Library {item['scope']}: {item['name']} {item['version']} - {item['purpose']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "library", **item},
+                ts=ts,
+            )
+            for item in tech_library_updates
+        ]
+        if normalized_stage == TECH_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                "Code organization: "
+                f"{tech_code_organization['repoStrategy']} / "
+                f"{tech_code_organization['sourceLayout']} / "
+                f"{tech_code_organization['modularity']} - "
+                f"{tech_code_organization['rationale']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "codeOrganization", **tech_code_organization},
+                ts=ts,
+            )
+        ]
+        if normalized_stage == TECH_STAGE and tech_code_organization is not None
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Rejected alternative for {item['slot']}: {item['option']} - {item['reasonRejected']}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "alternative", **item},
+                ts=ts,
+            )
+            for item in tech_alternative_updates
+        ]
+        if normalized_stage == TECH_STAGE
+        else []
+    )
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
                 f"Navigation {item['from']} -> {item['to']} via {item['trigger']}",
                 status=normalized_status,
                 evidence=normalized_evidence,
@@ -898,12 +1202,34 @@ def capture_stage_memory(
         if normalized_stage == DESIGN_STAGE
         else []
     )
+    contract_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="contract",
+                record_type="contract",
+                metadata={"slot": "techConstraint"},
+                ts=ts,
+            )
+            for item in normalized_tech_constraints
+        ]
+        if normalized_stage == TECH_STAGE
+        else []
+    )
 
     try:
         if normalized_stage == CONCEPT_STAGE:
             save_concept_state(paths.concept_state, concept_state)
         elif normalized_stage == DESIGN_STAGE:
             save_design_state(paths.design_state, design_state)
+        elif normalized_stage == TECH_STAGE:
+            save_tech_state(paths.tech_state, tech_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, note_records)
         append_jsonl(paths.facts, fact_records)

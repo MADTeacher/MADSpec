@@ -17,6 +17,13 @@ from .design_state import (
     save_design_state,
     update_design_state,
 )
+from .tech_state import (
+    TECH_STAGE,
+    load_tech_state,
+    save_tech_state,
+    tech_completeness_errors,
+    update_tech_state,
+)
 from .records import make_record
 from .storage import (
     _default_active_session,
@@ -135,6 +142,7 @@ def checkpoint_stage_memory(
         paths.contracts: _snapshot_file(paths.contracts),
         paths.concept_state: _snapshot_file(paths.concept_state),
         paths.design_state: _snapshot_file(paths.design_state),
+        paths.tech_state: _snapshot_file(paths.tech_state),
     }
 
     ts = now_iso()
@@ -147,7 +155,11 @@ def checkpoint_stage_memory(
             "current_step": None,
             "pending_actions": normalized_pending_actions,
             "open_questions": normalized_questions,
-            "current_hypotheses": (normalized_decisions or normalized_facts)[:5],
+            "current_hypotheses": (
+                normalized_decisions
+                or normalized_facts
+                or active_session.get("current_hypotheses", [])
+            )[:5],
             "last_checkpoint_at": ts,
             "updated_at": ts,
         }
@@ -170,6 +182,7 @@ def checkpoint_stage_memory(
     )
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state)
+    tech_state = load_tech_state(paths.tech_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -196,6 +209,17 @@ def checkpoint_stage_memory(
                 branch_name=branch_name,
             )
         )
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == TECH_STAGE:
+        tech_state = update_tech_state(
+            tech_state,
+            constraints=normalized_contracts,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(tech_completeness_errors(tech_state))
         if errors:
             return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
 
@@ -250,6 +274,8 @@ def checkpoint_stage_memory(
             save_concept_state(paths.concept_state, concept_state)
         elif normalized_stage == DESIGN_STAGE:
             save_design_state(paths.design_state, design_state)
+        elif normalized_stage == TECH_STAGE:
+            save_tech_state(paths.tech_state, tech_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, [checkpoint_record])
         append_jsonl(paths.facts, fact_records)

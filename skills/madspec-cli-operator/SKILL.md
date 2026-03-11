@@ -72,7 +72,7 @@ Structured memory:
 - `madspec memory status` — проверить текущее состояние memory
 - `madspec memory capture` — накапливать validated facts/decisions/contracts/questions по stage
 - `madspec memory checkpoint` — завершить non-iterative stage и обновить derived state
-- `madspec memory retrieve` — получить минимальный контекст stage/step; для `mvp.concept` по умолчанию возвращает краткий `concept_status`, а полный `artifact_state.concept` отдает только по `--full-artifact`
+- `madspec memory retrieve` — получить минимальный контекст stage/step; для `mvp.concept` по умолчанию возвращает краткий `concept_status`, для `mvp.design` — `design_status`, для `mvp.tech` — `tech_status`, а полный stage artifact state отдает только по `--full-artifact`
 - `madspec memory consolidate` — пересобрать markdown views из structured memory
 - `madspec memory validate` — проверить согласованность памяти и generated views
 
@@ -81,6 +81,7 @@ Structured memory:
 - Начинай с чтения существующих артефактов в `.madspec/<branch>/`, а не с предположений о текущем этапе
 - Для MVP соблюдай порядок `concept -> design -> tech -> architecture -> plan -> implement`
 - Для `mvp.design` считай нормой длинную итеративную работу через много независимых чатов: новый чат должен восстанавливать состояние из `.madspec/<branch>/memory/`, `ui-design.md` и `ui-prototype/`, а не из истории предыдущего разговора
+- Для `mvp.tech` работай так же memory-first: источник истины — `.madspec/<branch>/memory/stages/mvp.tech.json`, а `tech-stack.md` является generated artifact и не редактируется вручную
 - Для feature workflow не пропускай `feature.init` перед `feature.plan`
 - Если деплой влияет на архитектуру, интеграции, секреты, миграции или observability, учитывай `deployment.md` или инициируй `/madspec.deploy`
 - Перед реализацией сверяйся с `implementation-plan.md`, `steps/`, `memory/progress.json` и relevant generated context

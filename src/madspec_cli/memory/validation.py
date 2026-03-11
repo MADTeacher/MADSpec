@@ -13,6 +13,11 @@ from .design_state import (
     render_ui_design_markdown,
     uncovered_design_features,
 )
+from .tech_state import (
+    load_tech_state,
+    render_tech_stack_markdown,
+    tech_schema_errors,
+)
 from .planning import _compute_progress_metrics, extract_function_catalog
 from .records import MEMORY_STATUSES, SEMANTIC_KINDS
 from .storage import STEP_KINDS, TDD_PHASES, TDD_POLICIES
@@ -301,6 +306,20 @@ def validate_branch_memory(project_path: Path, branch_name: str) -> list[str]:
         for priority, values in uncovered_features.items():
             for value in values:
                 errors.append(f"design coverage missing {priority.upper()} concept feature '{value}'")
+
+    tech_state_raw = read_json(paths.tech_state, None)
+    errors.extend(f"{paths.tech_state.name}: {item}" for item in tech_schema_errors(tech_state_raw))
+    tech_state = load_tech_state(paths.tech_state)
+    tech_text = render_tech_stack_markdown(
+        tech_state,
+        branch_name=branch_name,
+        project_name=concept_state.get("projectName", ""),
+    )
+    tech_path = paths.branch_dir / "tech-stack.md"
+    if not tech_path.exists():
+        errors.append("tech-stack.md is missing; rebuild generated views with `madspec memory consolidate`")
+    elif tech_path.read_text(encoding="utf-8") != tech_text:
+        errors.append("tech-stack.md is out of sync with memory/stages/mvp.tech.json")
 
     for path in (
         paths.decision_log,

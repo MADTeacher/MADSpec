@@ -7,11 +7,15 @@ from .concept_state import concept_completeness_errors, load_concept_state, rend
 from .design_state import (
     design_completeness_errors,
     design_main_prototype_path,
-    is_empty_design_state,
     load_design_state,
     missing_prototype_files,
     render_ui_design_markdown,
     uncovered_design_features,
+)
+from .tech_state import (
+    load_tech_state,
+    render_tech_stack_markdown,
+    tech_completeness_errors,
 )
 from .storage import (
     _default_active_session,
@@ -195,12 +199,80 @@ def _build_design_status(
     }
 
 
+def _tech_missing_required_fields(tech_state: dict[str, Any]) -> list[str]:
+    error_map = {
+        "tech state must include a project type before checkpoint": "projectType",
+        "tech state must include a stack overview before checkpoint": "stackOverview",
+        "tech state must include at least one language component before checkpoint": "components.language",
+        "tech state must include at least one build component before checkpoint": "components.build",
+        "tech state must include at least one testing component before checkpoint": "components.testing",
+        "tech state must include code organization before checkpoint": "codeOrganization",
+    }
+    missing: list[str] = []
+    for error in tech_completeness_errors(tech_state):
+        field_name = error_map.get(error)
+        if field_name and field_name not in missing:
+            missing.append(field_name)
+    return missing
+
+
+def _tech_filled_fields(tech_state: dict[str, Any]) -> list[str]:
+    slots = {item.get("slot", "") for item in tech_state.get("components", [])}
+    field_checks = (
+        ("projectType", bool(tech_state.get("projectType"))),
+        ("stackOverview", bool(tech_state.get("stackOverview"))),
+        ("requirements", bool(tech_state.get("requirements"))),
+        ("preferences", bool(tech_state.get("preferences"))),
+        ("constraints", bool(tech_state.get("constraints"))),
+        ("components", bool(tech_state.get("components"))),
+        ("libraries", bool(tech_state.get("libraries"))),
+        ("codeOrganization", bool(tech_state.get("codeOrganization"))),
+        ("alternatives", bool(tech_state.get("alternatives"))),
+        ("nextActions", bool(tech_state.get("nextActions"))),
+        ("checkpointSummary", bool(tech_state.get("checkpointSummary"))),
+        ("components.language", "language" in slots),
+        ("components.build", "build" in slots),
+        (
+            "components.testing",
+            any(slot in slots for slot in {"unit-testing", "integration-testing", "e2e-testing", "testing"}),
+        ),
+    )
+    return [field_name for field_name, is_filled in field_checks if is_filled]
+
+
+def _build_tech_status(tech_state: dict[str, Any]) -> dict[str, Any]:
+    missing_required_fields = _tech_missing_required_fields(tech_state)
+    selected_slots = sorted(
+        {item.get("slot", "") for item in tech_state.get("components", []) if item.get("slot", "")}
+    )
+    return {
+        "is_complete": not missing_required_fields,
+        "missing_required_fields": missing_required_fields,
+        "filled_fields": _tech_filled_fields(tech_state),
+        "counts": {
+            "requirements": len(tech_state.get("requirements", [])),
+            "preferences": len(tech_state.get("preferences", [])),
+            "constraints": len(tech_state.get("constraints", [])),
+            "components": len(tech_state.get("components", [])),
+            "libraries": len(tech_state.get("libraries", [])),
+            "alternatives": len(tech_state.get("alternatives", [])),
+            "next_actions": len(tech_state.get("nextActions", [])),
+        },
+        "selected_slots": selected_slots,
+        "last_checkpoint_summary": tech_state.get("checkpointSummary") or None,
+        "revision": tech_state.get("revision", 0),
+        "ratified_at": tech_state.get("ratifiedAt"),
+        "updated_at": tech_state.get("updatedAt"),
+    }
+
+
 def _render_project_context(
     branch_name: str,
     progress: dict[str, Any],
     active_session: dict[str, Any],
     concept_state: dict[str, Any],
     design_state: dict[str, Any],
+    tech_state: dict[str, Any],
     generated_at: str,
 ) -> str:
     planned_steps = progress.get("plannedSteps", [])
@@ -242,6 +314,7 @@ def _render_project_context(
             f"- `.madspec/{branch_name}/memory/progress.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.concept.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.design.json`",
+            f"- `.madspec/{branch_name}/memory/stages/mvp.tech.json`",
             f"- `.madspec/{branch_name}/memory/working/active-session.json`",
             f"- `.madspec/{branch_name}/memory/working/decision-log.jsonl`",
             f"- `.madspec/{branch_name}/memory/episodes/events.jsonl`",
@@ -250,13 +323,29 @@ def _render_project_context(
             "## Generated Artifacts",
             f"- `.madspec/{branch_name}/concept.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/ui-design.md` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/tech-stack.md` (generated from structured memory)",
             f"- Concept checkpoint summary: `{concept_state.get('checkpointSummary') or 'N/A'}`",
             f"- Design checkpoint summary: `{design_state.get('checkpointSummary') or 'N/A'}`",
+            f"- Tech checkpoint summary: `{tech_state.get('checkpointSummary') or 'N/A'}`",
             (
                 f"- Design inventory: `{len(design_state.get('screens', []))}` screens, "
                 f"`{len(design_state.get('flows', []))}` flows, main prototype "
                 f"`{design_main_prototype_path(branch_name).as_posix()}`"
             ),
+            "- Tech slots: `"
+            + (
+                ", ".join(
+                    sorted(
+                        {
+                            item.get("slot", "")
+                            for item in tech_state.get("components", [])
+                            if item.get("slot", "")
+                        }
+                    )
+                )
+                or "N/A"
+            )
+            + "`",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -372,6 +461,7 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     active_session = read_json(paths.active_session, _default_active_session(branch_name))
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state)
+    tech_state = load_tech_state(paths.tech_state)
     generated_at = active_session.get("updated_at") or active_session.get("last_checkpoint_at") or now_iso()
     decision_log = read_jsonl(paths.decision_log)
     events = read_jsonl(paths.events)
@@ -386,17 +476,26 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     generated.append(concept_path)
 
     design_path = paths.branch_dir / "ui-design.md"
-    should_preserve_legacy_design = is_empty_design_state(design_state) and design_path.exists()
-    if not should_preserve_legacy_design:
-        design_path.write_text(
-            render_ui_design_markdown(
-                design_state,
-                branch_name=branch_name,
-                project_name=concept_state.get("projectName", ""),
-            ),
-            encoding="utf-8",
-        )
+    design_path.write_text(
+        render_ui_design_markdown(
+            design_state,
+            branch_name=branch_name,
+            project_name=concept_state.get("projectName", ""),
+        ),
+        encoding="utf-8",
+    )
     generated.append(design_path)
+
+    tech_path = paths.branch_dir / "tech-stack.md"
+    tech_path.write_text(
+        render_tech_stack_markdown(
+            tech_state,
+            branch_name=branch_name,
+            project_name=concept_state.get("projectName", ""),
+        ),
+        encoding="utf-8",
+    )
+    generated.append(tech_path)
 
     project_context_path = paths.branch_dir / "project-context.md"
     project_context_path.write_text(
@@ -406,6 +505,7 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
             active_session,
             concept_state,
             design_state,
+            tech_state,
             generated_at,
         ),
         encoding="utf-8",
@@ -574,15 +674,17 @@ def retrieve_memory_context(
     stage_lower = stage.lower()
     is_concept_stage = stage_lower == "mvp.concept"
     is_design_stage = stage_lower == "mvp.design"
+    is_tech_stage = stage_lower == "mvp.tech"
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state) if is_design_stage else None
+    tech_state = load_tech_state(paths.tech_state) if is_tech_stage else None
     if limit is None:
-        resolved_limit = 3 if (is_concept_stage or is_design_stage) else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage) else 5
     elif limit <= 0:
-        resolved_limit = 3 if (is_concept_stage or is_design_stage) else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage) else 5
     else:
         resolved_limit = limit
-    include_history_records = include_history or not (is_concept_stage or is_design_stage)
+    include_history_records = include_history or not (is_concept_stage or is_design_stage or is_tech_stage)
     decision_log = read_jsonl(paths.decision_log) if include_history_records else []
     events = read_jsonl(paths.events) if include_history_records else []
     semantic_sets = _load_semantic_record_sets(
@@ -711,10 +813,12 @@ def retrieve_memory_context(
             if is_design_stage and design_state is not None
             else None
         ),
+        "tech_status": _build_tech_status(tech_state) if is_tech_stage and tech_state is not None else None,
         "episodes": trimmed_events if include_history_records else [],
         "decision_log": trimmed_decisions if include_history_records else [],
         "artifact_state": {
             "concept": concept_state if (is_concept_stage and full_artifact) else None,
             "design": design_state if (is_design_stage and full_artifact) else None,
+            "tech": tech_state if (is_tech_stage and full_artifact) else None,
         },
     }

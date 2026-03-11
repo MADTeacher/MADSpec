@@ -291,7 +291,7 @@ madspec memory init [--branch <name>]
 madspec memory status [--branch <name>] [--json-output]
 madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
-madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--system-overview <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--design-overview <text>] [--platform <text>] [--zone <id::title::description>] [--screen <id::title::zone::prototype::purpose>] [--screen-feature <screen-id::priority::feature>] [--flow <id::title::goal>] [--flow-step <flow-id::screen-id::action::result>] [--flow-alternative <flow-id::description>] [--nav <from-screen::to-screen::trigger>] [--platform-constraint <text>] [--screen-data <screen-id::displayed|input::name>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
+madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--system-overview <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--design-overview <text>] [--platform <text>] [--zone <id::title::description>] [--screen <id::title::zone::prototype::purpose>] [--screen-feature <screen-id::priority::feature>] [--flow <id::title::goal>] [--flow-step <flow-id::screen-id::action::result>] [--flow-alternative <flow-id::description>] [--nav <from-screen::to-screen::trigger>] [--platform-constraint <text>] [--screen-data <screen-id::displayed|input::name>] [--stack-overview <text>] [--project-type <text>] [--requirement <text>] [--preference <text>] [--tech-constraint <text>] [--stack-component <slot::name::version::rationale>] [--library <scope::name::version::purpose>] [--code-organization <repo-strategy::source-layout::modularity::rationale>] [--alternative <slot::option::reason-rejected>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
 madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--limit <n>] [--full-artifact] [--include-history] [--json-output]
 madspec memory start-step --stage <mvp.implement|feature.implement> [--step-id <id>] [--summary <text>] [--evidence <path-or-note>] [--json-output]
@@ -308,9 +308,9 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory status` - показывает состояние structured memory
 - `memory consolidate` - пересобирает markdown views из memory
 - `memory validate` - проверяет schema, state transitions и согласованность views
-- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.concept` и `mvp.design` также обновляет основной файл данных этапа через stage-specific flags
+- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.concept`, `mvp.design` и `mvp.tech` также обновляет основной файл данных этапа через stage-specific flags
 - `memory checkpoint` - фиксирует финал non-iterative stage, обновляет active session и semantic records, затем пересобирает generated views
-- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept` по умолчанию отдает краткий `concept_status`, для `mvp.design` - `design_status`, а полный stage artifact state возвращает только по `--full-artifact`
+- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept` по умолчанию отдает краткий `concept_status`, для `mvp.design` - `design_status`, для `mvp.tech` - `tech_status`, а полный stage artifact state возвращает только по `--full-artifact`
 - `memory start-step` - переводит implementation step в `in_progress` и делает его текущим шагом
 - `memory checkpoint-step` - записывает промежуточный implementation checkpoint, включая TDD phase и evidence
 - `memory complete-step` - завершает implementation step, обновляет `completedSteps/currentImplementStep` и сохраняет step-level knowledge в memory
@@ -415,10 +415,14 @@ madspec version
 - Обсуждение каждого выбора
 - Консультация по структуре проекта
 - Автоматическая валидация выбора технологий
+- Каноническое состояние этапа хранится в `.madspec/<BRANCH>/memory/stages/mvp.tech.json`
+- `.madspec/<BRANCH>/tech-stack.md` пересобирается из structured memory и не редактируется вручную
+- `madspec memory retrieve --stage mvp.tech` по умолчанию возвращает краткий `tech_status`, а полный `artifact_state.tech` следует запрашивать только через `--full-artifact`
 - Обязательный checkpoint через `madspec memory checkpoint --stage mvp.tech`
 
 **Выходные артефакты:**
-- `.madspec/<BRANCH>/tech-stack.md` - выбранный стек
+- `.madspec/<BRANCH>/memory/stages/mvp.tech.json` - основной файл данных этапа tech
+- `.madspec/<BRANCH>/tech-stack.md` - generated artifact стека
 - `.madspec/<BRANCH>/project-context.md` - regenerated view контекста проекта
 
 ### Этап 3: Архитектура (`madspec.mvp.architecture`)
@@ -616,6 +620,7 @@ madspec version
 - `memory/progress.json` - состояние workflow
 - `memory/stages/mvp.concept.json` - основной файл данных этапа `mvp.concept`
 - `memory/stages/mvp.design.json` - основной файл данных этапа `mvp.design`
+- `memory/stages/mvp.tech.json` - основной файл данных этапа `mvp.tech`
 - `memory/working/active-session.json` - текущая рабочая память
 - `memory/working/decision-log.jsonl` - micro-decisions и checkpoints
 - `memory/episodes/events.jsonl` - опыт выполнения

@@ -51,3 +51,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             )
             stage_body = zf.read(stage_command).decode("utf-8")
             assert "madspec memory checkpoint" in stage_body
+            if stage_name == "madspec.mvp.tech":
+                assert "mvp.tech.json" in stage_body
+                assert "tech_status" in stage_body
+                assert "generated artifact" in stage_body

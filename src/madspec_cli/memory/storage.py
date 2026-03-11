@@ -24,6 +24,7 @@ class MemoryPaths:
     stages_dir: Path
     concept_state: Path
     design_state: Path
+    tech_state: Path
     working_dir: Path
     active_session: Path
     decision_log: Path
@@ -48,6 +49,7 @@ class MemoryPaths:
             "stages_dir": self.stages_dir,
             "concept_state": self.concept_state,
             "design_state": self.design_state,
+            "tech_state": self.tech_state,
             "working_dir": self.working_dir,
             "active_session": self.active_session,
             "decision_log": self.decision_log,
@@ -270,6 +272,7 @@ def get_memory_paths(project_path: Path, branch_name: str) -> MemoryPaths:
         stages_dir=memory_dir / "stages",
         concept_state=memory_dir / "stages" / "mvp.concept.json",
         design_state=memory_dir / "stages" / "mvp.design.json",
+        tech_state=memory_dir / "stages" / "mvp.tech.json",
         working_dir=memory_dir / "working",
         active_session=memory_dir / "working" / "active-session.json",
         decision_log=memory_dir / "working" / "decision-log.jsonl",
@@ -340,6 +343,7 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
         save_concept_state,
     )
     from .design_state import default_design_state, load_design_state, save_design_state
+    from .tech_state import default_tech_state, load_tech_state, save_tech_state
 
     paths = get_memory_paths(project_path, branch_name)
     created: list[Path] = []
@@ -380,6 +384,13 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
     else:
         design_state = load_design_state(paths.design_state)
         save_design_state(paths.design_state, design_state)
+
+    if not paths.tech_state.exists():
+        save_tech_state(paths.tech_state, default_tech_state())
+        created.append(paths.tech_state)
+    else:
+        tech_state = load_tech_state(paths.tech_state)
+        save_tech_state(paths.tech_state, tech_state)
 
     for path in (
         paths.decision_log,

@@ -93,6 +93,7 @@ def test_init_creates_structured_memory_layout(tmp_path: Path, monkeypatch) -> N
     assert paths["progress"].exists()
     assert paths["active_session"].exists()
     assert paths["design_state"].exists()
+    assert paths["tech_state"].exists()
     assert (project_path / ".madspec" / "procedures" / "next-step-selection.md").exists()
     assert (project_path / ".madspec" / "main" / "project-context.md").exists()
 
@@ -673,7 +674,7 @@ def test_memory_capture_supports_design_stage_state_and_retrieve(tmp_path: Path,
     assert retrieve_full_payload["decision_log"] != []
 
 
-def test_memory_retrieve_preserves_non_concept_behavior_and_limit(tmp_path: Path, monkeypatch) -> None:
+def test_memory_retrieve_returns_tech_status_and_full_artifact(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     project_path = tmp_path
     (project_path / ".madspec").mkdir()
@@ -691,14 +692,38 @@ def test_memory_retrieve_preserves_non_concept_behavior_and_limit(tmp_path: Path
             "main",
             "--stage",
             "mvp.tech",
-            "--fact",
+            "--summary",
+            "Captured initial tech direction",
+            "--project-type",
+            "Web application",
+            "--stack-overview",
+            "A Python-first stack optimized for rapid MVP delivery and simple deployment.",
+            "--requirement",
             "Need web delivery and fast iteration",
-            "--fact",
-            "Need predictable hosting costs",
-            "--decision",
-            "Use FastAPI for backend and HTMX for frontend",
-            "--decision",
-            "Use PostgreSQL for persistence",
+            "--preference",
+            "Prefer a Python backend and server-rendered UI",
+            "--tech-constraint",
+            "Hosting must stay simple enough for a single small container",
+            "--stack-component",
+            "language::Python::3.13::Primary language for backend and tooling",
+            "--stack-component",
+            "frontend::HTMX::2.x::Keep frontend interactions server-driven and lightweight",
+            "--stack-component",
+            "backend::FastAPI::0.115::Provide async HTTP APIs with strong typing",
+            "--stack-component",
+            "database::PostgreSQL::16::Reliable relational storage for bookings and reminders",
+            "--stack-component",
+            "unit-testing::pytest::8.x::Fast unit and integration test execution",
+            "--stack-component",
+            "build::Docker::27.x::Standardize local and deployment builds",
+            "--library",
+            "backend::SQLAlchemy::2.x::ORM and SQL composition",
+            "--code-organization",
+            "monorepo::feature-first::modular service boundaries::Keep product slices close while preserving clear ownership",
+            "--alternative",
+            "frontend::React SPA::Too much client complexity for the first MVP iteration",
+            "--next-action",
+            "Proceed to mvp.architecture",
             "--question",
             "Do we need offline mode?",
             "--json-output",
@@ -723,9 +748,70 @@ def test_memory_retrieve_preserves_non_concept_behavior_and_limit(tmp_path: Path
     assert retrieve_result.exit_code == 0, retrieve_result.stdout
     retrieve_payload = json.loads(retrieve_result.stdout)
     assert retrieve_payload["concept_status"] is None
-    assert len(retrieve_payload["semantic"]["facts"]) == 1
-    assert len(retrieve_payload["semantic"]["decisions"]) == 1
-    assert len(retrieve_payload["decision_log"]) == 1
+    assert retrieve_payload["tech_status"]["is_complete"] is True
+    assert retrieve_payload["tech_status"]["missing_required_fields"] == []
+    assert retrieve_payload["tech_status"]["counts"] == {
+        "requirements": 1,
+        "preferences": 1,
+        "constraints": 1,
+        "components": 6,
+        "libraries": 1,
+        "alternatives": 1,
+        "next_actions": 1,
+    }
+    assert retrieve_payload["tech_status"]["selected_slots"] == [
+        "backend",
+        "build",
+        "database",
+        "frontend",
+        "language",
+        "unit-testing",
+    ]
+    assert retrieve_payload["decision_log"] == []
+    assert retrieve_payload["artifact_state"]["tech"] is None
+
+    checkpoint_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.tech",
+            "--summary",
+            "Tech stack ratified for MVP architecture",
+            "--evidence",
+            ".madspec/main/tech-stack.md",
+            "--json-output",
+        ],
+    )
+    assert checkpoint_result.exit_code == 0, checkpoint_result.stdout
+
+    retrieve_full_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "retrieve",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.tech",
+            "--full-artifact",
+            "--include-history",
+            "--json-output",
+        ],
+    )
+    assert retrieve_full_result.exit_code == 0, retrieve_full_result.stdout
+    retrieve_full_payload = json.loads(retrieve_full_result.stdout)
+    assert retrieve_full_payload["artifact_state"]["tech"]["projectType"] == "Web application"
+    assert retrieve_full_payload["artifact_state"]["tech"]["checkpointSummary"] == "Tech stack ratified for MVP architecture"
+    assert retrieve_full_payload["artifact_state"]["tech"]["revision"] == 1
+    assert retrieve_full_payload["decision_log"] != []
+
+    tech_stack = (project_path / ".madspec" / "main" / "tech-stack.md").read_text(encoding="utf-8")
+    assert "A Python-first stack optimized for rapid MVP delivery and simple deployment." in tech_stack
+    assert "FastAPI" in tech_stack
 
 
 def test_memory_capture_and_checkpoint_support_review_and_security(tmp_path: Path, monkeypatch) -> None:
@@ -815,6 +901,53 @@ def test_memory_capture_and_checkpoint_support_review_and_security(tmp_path: Pat
     security_view = (project_path / ".madspec" / "main" / "security-audit.md").read_text(encoding="utf-8")
     assert "Refactor auth service boundaries before scaling" in review_view
     assert "No rate limiting on login endpoint" in security_view
+
+
+def test_memory_checkpoint_rejects_incomplete_tech_state(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    capture_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.tech",
+            "--project-type",
+            "API service",
+            "--json-output",
+        ],
+    )
+    assert capture_result.exit_code == 0, capture_result.stdout
+
+    checkpoint_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.tech",
+            "--summary",
+            "Attempt to ratify incomplete tech stack",
+            "--evidence",
+            ".madspec/main/tech-stack.md",
+            "--json-output",
+        ],
+    )
+    assert checkpoint_result.exit_code == 1, checkpoint_result.stdout
+    payload = json.loads(checkpoint_result.stdout)
+    assert payload["accepted"] is False
+    assert "tech state must include a stack overview before checkpoint" in payload["errors"]
 
 
 def test_memory_checkpoint_rejects_invalid_stage_and_empty_summary(tmp_path: Path, monkeypatch) -> None:
