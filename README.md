@@ -291,14 +291,14 @@ madspec memory init [--branch <name>]
 madspec memory status [--branch <name>] [--json-output]
 madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
-madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--system-overview <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--design-overview <text>] [--platform <text>] [--zone <id::title::description>] [--screen <id::title::zone::prototype::purpose>] [--screen-feature <screen-id::priority::feature>] [--flow <id::title::goal>] [--flow-step <flow-id::screen-id::action::result>] [--flow-alternative <flow-id::description>] [--nav <from-screen::to-screen::trigger>] [--platform-constraint <text>] [--screen-data <screen-id::displayed|input::name>] [--stack-overview <text>] [--project-type <text>] [--requirement <text>] [--preference <text>] [--tech-constraint <text>] [--stack-component <slot::name::version::rationale>] [--library <scope::name::version::purpose>] [--code-organization <repo-strategy::source-layout::modularity::rationale>] [--alternative <slot::option::reason-rejected>] [--architecture-overview <text>] [--project-structure <strategy::rationale>] [--directory <path::purpose>] [--entity <name::description>] [--entity-field <entity::field::type::required|optional::description>] [--entity-relationship <entity::target::kind::description>] [--entity-state <entity::state::description>] [--endpoint <operation-id::METHOD::/path::summary>] [--endpoint-screen <operation-id::screen-id>] [--endpoint-field <operation-id::section::name::type::required|optional::description>] [--endpoint-error <operation-id::status::code::description>] [--integration <name::kind::purpose::touchpoints>] [--code-principle <text>] [--pattern <name::rationale>] [--security-note <text>] [--performance-note <text>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
-madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
+madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|mvp.plan|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--system-overview <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--design-overview <text>] [--platform <text>] [--zone <id::title::description>] [--screen <id::title::zone::prototype::purpose>] [--screen-feature <screen-id::priority::feature>] [--flow <id::title::goal>] [--flow-step <flow-id::screen-id::action::result>] [--flow-alternative <flow-id::description>] [--nav <from-screen::to-screen::trigger>] [--platform-constraint <text>] [--screen-data <screen-id::displayed|input::name>] [--stack-overview <text>] [--project-type <text>] [--requirement <text>] [--preference <text>] [--tech-constraint <text>] [--stack-component <slot::name::version::rationale>] [--library <scope::name::version::purpose>] [--code-organization <repo-strategy::source-layout::modularity::rationale>] [--alternative <slot::option::reason-rejected>] [--architecture-overview <text>] [--project-structure <strategy::rationale>] [--directory <path::purpose>] [--entity <name::description>] [--entity-field <entity::field::type::required|optional::description>] [--entity-relationship <entity::target::kind::description>] [--entity-state <entity::state::description>] [--endpoint <operation-id::METHOD::/path::summary>] [--endpoint-screen <operation-id::screen-id>] [--endpoint-field <operation-id::section::name::type::required|optional::description>] [--endpoint-error <operation-id::status::code::description>] [--integration <name::kind::purpose::touchpoints>] [--code-principle <text>] [--pattern <name::rationale>] [--security-note <text>] [--performance-note <text>] [--plan-overview <text>] [--planning-principle <text>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
+madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|mvp.plan|review|security> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--limit <n>] [--full-artifact] [--include-history] [--json-output]
 madspec memory start-step --stage <mvp.implement|feature.implement> [--step-id <id>] [--summary <text>] [--evidence <path-or-note>] [--json-output]
 madspec memory checkpoint-step --stage <mvp.implement|feature.implement> [--step-id <id>] [--summary <text>] [--tdd-phase <phase>] [--red-evidence <text>] [--green-evidence <text>] [--refactor-note <text>] [--evidence <path-or-note>] [--json-output]
 madspec memory complete-step --stage <mvp.implement|feature.implement> --summary <text> [--step-id <id>] [--red-evidence <text>] [--green-evidence <text>] [--refactor-note <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--json-output]
 madspec memory next-step --stage <stage> [--candidate-step <id>] [--depends-on <id>] [--json-output]
-madspec memory register-step --stage <stage> --step-id <id> --step-kind <code|non-code> [--covers <function>] [--tdd-policy <required|waived|not-applicable>] [--waiver-reason <text>] [--depends-on <id>] [--json-output]
+madspec memory register-step --stage <stage> --step-id <id> --step-kind <code|non-code> [--covers <function>] [--tdd-policy <required|waived|not-applicable>] [--waiver-reason <text>] [--title <text>] [--related-artifact <path>] [--size <small|medium|large>] [--complexity <low|medium|high>] [--depends-on <id>] [--json-output]
 madspec memory promote [--branch <name>] [--json-output]
 madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-output]
 ```
@@ -308,14 +308,14 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory status` - показывает состояние structured memory
 - `memory consolidate` - пересобирает markdown views из memory
 - `memory validate` - проверяет schema, state transitions и согласованность views
-- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.concept`, `mvp.design`, `mvp.tech` и `mvp.architecture` также обновляет основной файл данных этапа через stage-specific flags
+- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.concept`, `mvp.design`, `mvp.tech`, `mvp.architecture` и `mvp.plan` также обновляет основной файл данных этапа через stage-specific flags
 - `memory checkpoint` - фиксирует финал non-iterative stage, обновляет active session и semantic records, затем пересобирает generated views
-- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept` по умолчанию отдает краткий `concept_status`, для `mvp.design` - `design_status`, для `mvp.tech` - `tech_status`, для `mvp.architecture` - `architecture_status`, а полный stage artifact state возвращает только по `--full-artifact`
+- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept` по умолчанию отдает краткий `concept_status`, для `mvp.design` - `design_status`, для `mvp.tech` - `tech_status`, для `mvp.architecture` - `architecture_status`, для `mvp.plan` - `plan_status`, а полный stage artifact state возвращает только по `--full-artifact`
 - `memory start-step` - переводит implementation step в `in_progress` и делает его текущим шагом
 - `memory checkpoint-step` - записывает промежуточный implementation checkpoint, включая TDD phase и evidence
 - `memory complete-step` - завершает implementation step, обновляет `completedSteps/currentImplementStep` и сохраняет step-level knowledge в memory
 - `memory next-step` - детерминированно выбирает следующий исполнимый шаг или валидирует нового кандидата для planning
-- `memory register-step` - регистрирует новый planned step, его TDD metadata и автоматически обновляет coverage metadata в `progress.json`; `--covers` обязателен для `code` шагов и опционален для `non-code`
+- `memory register-step` - регистрирует новый planned step, его TDD metadata и автоматически обновляет coverage metadata в `progress.json` и `memory/stages/mvp.plan.json`; `--covers` обязателен для `code` шагов и опционален для `non-code`
 - `memory promote` - переносит validated records в semantic memory
 - `memory learn` - превращает test/review outcomes в learning records
 
@@ -460,14 +460,19 @@ madspec version
 - Автоматическое определение следующего шага на основе зависимостей и приоритетов (P1 → P2 → P3)
 - Каждый шаг классифицируется как `code` или `non-code`
 - Для `code` шагов обязателен TDD-план `red -> green -> refactor`; для `non-code` шагов обязателен `waiver` или `not-applicable`
+- Каноническое состояние этапа хранится в `.madspec/<BRANCH>/memory/stages/mvp.plan.json`
+- `.madspec/<BRANCH>/implementation-plan.md` пересобирается из structured memory и не редактируется вручную как источник истины
 - Кэширование контекста планирования (`.madspec/<BRANCH>/planning-context-cache.md`) как generated view поверх semantic memory
 - Визуализация прогресса планирования после каждого шага (покрытие функций P1, P2, P3)
 - Автоматическое отслеживание метрик покрытия функций по приоритетам
 - Запись ключевых решений о подходе к разбивке
 - Structured memory first: сначала обновляются основные memory-файлы, затем выполняются `madspec memory consolidate` и `madspec memory validate`
+- `madspec memory retrieve --stage mvp.plan` по умолчанию возвращает краткий `plan_status`, а полный `artifact_state.plan` следует запрашивать только через `--full-artifact`
+- Повторный `madspec memory checkpoint --stage mvp.plan` допустим: он ратифицирует новую версию плана без изменения `currentImplementStep`
 
 **Выходные артефакты:**
-- `.madspec/<BRANCH>/implementation-plan.md` - план реализации (обновляется инкрементально)
+- `.madspec/<BRANCH>/memory/stages/mvp.plan.json` - основной файл данных этапа plan
+- `.madspec/<BRANCH>/implementation-plan.md` - generated artifact плана реализации
 - `.madspec/<BRANCH>/steps/step-[NN]-[name]/` - директория с описаниями шагов (создается по одному за запуск)
 - `.madspec/<BRANCH>/memory/progress.json` - файл отслеживания прогресса с метриками планирования
 - `.madspec/<BRANCH>/planning-context-cache.md` - generated view кэша контекста планирования
@@ -589,6 +594,8 @@ madspec version
 │   │   │   └── decision-log.jsonl    # Micro-decisions и checkpoints
 │   │   ├── episodes/
 │   │   │   └── events.jsonl          # История действий и результатов
+│   │   ├── stages/
+│   │   │   └── mvp.plan.json         # Canonical plan artifact state
 │   │   └── semantic/
 │   │       ├── facts.jsonl           # Подтвержденные факты
 │   │       ├── decisions.jsonl       # Подтвержденные решения
@@ -600,7 +607,7 @@ madspec version
 │   ├── architecture.md  # Архитектура проекта (с ключевыми решениями)
 │   ├── data-model.md     # Модель данных
 │   ├── deployment.md     # План деплоя и эксплуатации (создается командой madspec.deploy)
-│   ├── implementation-plan.md # План реализации
+│   ├── implementation-plan.md # Generated view плана реализации
 │   ├── project-context.md # Generated view навигации по памяти проекта
 │   ├── security-audit.md # Отчет по безопасности (с ключевыми решениями)
 │   ├── review.md         # Generated view review
@@ -626,6 +633,7 @@ madspec version
 - `memory/stages/mvp.design.json` - основной файл данных этапа `mvp.design`
 - `memory/stages/mvp.tech.json` - основной файл данных этапа `mvp.tech`
 - `memory/stages/mvp.architecture.json` - основной файл данных этапа `mvp.architecture`
+- `memory/stages/mvp.plan.json` - основной файл данных этапа `mvp.plan`
 - `memory/working/active-session.json` - текущая рабочая память
 - `memory/working/decision-log.jsonl` - micro-decisions и checkpoints
 - `memory/episodes/events.jsonl` - опыт выполнения
@@ -638,6 +646,7 @@ madspec version
 - `architecture.md`
 - `data-model.md`
 - `contracts/openapi.yaml`
+- `implementation-plan.md`
 - `project-context.md`
 - `planning-context-cache.md`
 - `steps/*/planning-context.md`
@@ -653,11 +662,13 @@ madspec version
 
 Для ранних MVP-этапов обновление основных данных выполняется командой `madspec memory checkpoint`, которая делает все три шага автоматически.
 
-Для non-iterative стадий `concept/design/tech/architecture/review/security` рекомендуется сначала накапливать знания через `madspec memory capture`, а потом завершать стадию кратким `madspec memory checkpoint --summary ...`. Это убирает необходимость сжимать весь диалог в один финальный payload.
+Для non-iterative стадий `concept/design/tech/architecture/plan/review/security` рекомендуется сначала накапливать знания через `madspec memory capture`, а потом завершать стадию кратким `madspec memory checkpoint --summary ...`. Это убирает необходимость сжимать весь диалог в один финальный payload.
 
 Для `mvp.design` повторные `capture/checkpoint` циклы до перехода в `mvp.tech` считаются нормальным сценарием: дизайн можно дорабатывать итеративно и продолжать в новых чатах, пока пользователь явно не утвердит текущее состояние интерфейса.
 
 Для `mvp.architecture` действует тот же memory-first принцип: структура проекта, сущности, поля, связи, endpoint'ы, интеграции и архитектурные принципы сначала пишутся в `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` являются generated views.
+
+Для `mvp.plan` действует тот же memory-first принцип: стратегия реализации, planning principles и catalog шагов сначала пишутся в `.madspec/<BRANCH>/memory/stages/mvp.plan.json`, а `implementation-plan.md` и `planning-context-cache.md` являются generated views. При этом `progress.json` остается runtime-state для `plannedSteps/completedSteps/currentImplementStep/TDD`.
 
 Для `mvp.concept` используйте stage-specific поля `memory capture`, чтобы наполнять основной файл данных этапа напрямую:
 
@@ -710,6 +721,15 @@ madspec memory checkpoint \
 - `design_status.counts`
 
 Если в `mvp.design` изменились HTML/CSS-прототипы, агент обязан проверить и при необходимости актуализировать `ui-design.md`, navigation, user flows, coverage функций и ссылки на prototype-файлы до завершения работы.
+
+Для `mvp.plan` используйте следующий цикл:
+1. Краткий `madspec memory retrieve --stage mvp.plan --json-output`
+2. `madspec memory capture --stage mvp.plan --plan-overview ... --planning-principle ... --next-action ...`
+3. Создание или обновление step source artifacts в `.madspec/<branch>/steps/<step-id>/`
+4. `madspec memory next-step --stage mvp.plan --candidate-step ...`
+5. `madspec memory register-step --stage mvp.plan ...`
+6. При необходимости `madspec memory retrieve --stage mvp.plan --json-output --full-artifact`
+7. `madspec memory checkpoint --stage mvp.plan ...`
 
 Если нужен полный снимок концепции или история, используйте:
 
@@ -778,6 +798,11 @@ MADSpec использует модульную систему контекст�
 - Метрики покрытия функций по приоритетам
 - Текущий этап проекта
 - История изменений
+
+Файл `.madspec/<branch-name>/memory/stages/mvp.plan.json` отслеживает:
+- `planOverview` и `planningPrinciples`
+- `stepCatalog` с snapshot planning metadata для generated implementation plan
+- `nextActions`, `checkpointSummary`, `revision`, `ratifiedAt`
 
 ### Автоматическая валидация
 

@@ -21,6 +21,7 @@ from ..shared.storage import (
     write_json,
 )
 from ..projection.views import consolidate_branch_memory
+from ..stages.plan.state import load_plan_state, save_plan_state, upsert_step_catalog_entry
 
 
 @dataclass(frozen=True)
@@ -286,6 +287,10 @@ def register_planned_step(
     waiver_reason: str | None = None,
     depends_on: list[str] | None = None,
     summary: str | None = None,
+    title: str | None = None,
+    related_artifacts: list[str] | None = None,
+    size: str | None = None,
+    complexity: str | None = None,
 ) -> dict[str, Any]:
     ensure_memory_layout(project_path, branch_name)
     paths = get_memory_paths(project_path, branch_name)
@@ -421,7 +426,23 @@ def register_planned_step(
         catalog,
         covers_functions,
     )
+    plan_state = load_plan_state(paths.plan_state)
+    plan_state = upsert_step_catalog_entry(
+        plan_state,
+        step_id=step_id,
+        title=title,
+        summary=summary,
+        step_kind=step_kind,
+        tdd_policy=effective_tdd_policy,
+        waiver_reason=waiver_reason,
+        covers=covers_functions[step_id],
+        depends_on=list(depends_on or []),
+        related_artifacts=related_artifacts or [],
+        size=size,
+        complexity=complexity,
+    )
     write_json(paths.progress, progress)
+    save_plan_state(paths.plan_state, plan_state)
 
     active_session = read_json(paths.active_session, _default_active_session(branch_name))
     active_session["stage"] = stage
@@ -449,6 +470,10 @@ def register_planned_step(
                     "step_kind": step_kind,
                     "tdd_policy": effective_tdd_policy,
                     "waiver_reason": waiver_reason,
+                    "title": title,
+                    "related_artifacts": related_artifacts or [],
+                    "size": size,
+                    "complexity": complexity,
                 },
             )
         ],

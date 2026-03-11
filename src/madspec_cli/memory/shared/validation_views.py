@@ -21,6 +21,13 @@ from ..stages.design.state import (
     uncovered_design_features,
 )
 from ..stages.tech.state import load_tech_state, render_tech_stack_markdown, tech_schema_errors
+from ..stages.plan.state import (
+    is_empty_plan_state,
+    load_plan_state,
+    plan_reference_errors,
+    plan_schema_errors,
+    render_implementation_plan_markdown,
+)
 from .storage import read_json
 
 
@@ -114,5 +121,29 @@ def validate_generated_stage_views(paths, *, project_path: Path, branch_name: st
         errors.append("contracts/openapi.yaml is out of sync with memory/stages/mvp.architecture.json")
     if not is_empty_architecture_state(architecture_state):
         errors.extend(architecture_reference_errors(architecture_state, design_state=design_state))
+
+    plan_state_raw = read_json(paths.plan_state, None)
+    errors.extend(f"{paths.plan_state.name}: {item}" for item in plan_schema_errors(plan_state_raw))
+    plan_state = load_plan_state(paths.plan_state)
+    implementation_plan_text = render_implementation_plan_markdown(
+        plan_state,
+        branch_name=branch_name,
+        progress=read_json(paths.progress, {}),
+        project_name=concept_state.get("projectName", ""),
+    )
+    implementation_plan_path = paths.branch_dir / "implementation-plan.md"
+    if not implementation_plan_path.exists():
+        errors.append("implementation-plan.md is missing; rebuild generated views with `madspec memory consolidate`")
+    elif not is_empty_plan_state(plan_state) and implementation_plan_path.read_text(encoding="utf-8") != implementation_plan_text:
+        errors.append("implementation-plan.md is out of sync with memory/stages/mvp.plan.json")
+    if not is_empty_plan_state(plan_state):
+        errors.extend(
+            plan_reference_errors(
+                plan_state,
+                project_path=project_path,
+                branch_name=branch_name,
+                progress=read_json(paths.progress, {}),
+            )
+        )
 
     return errors

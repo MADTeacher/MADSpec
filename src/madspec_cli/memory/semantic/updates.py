@@ -6,6 +6,7 @@ from typing import Any
 from ..stages.architecture.state import ARCHITECTURE_STAGE, update_architecture_state
 from ..stages.concept.state import CONCEPT_STAGE, update_concept_state
 from ..stages.design.state import DESIGN_STAGE, update_design_state
+from ..stages.plan.state import PLAN_STAGE, update_plan_state
 from ..stages.tech.state import TECH_STAGE, update_tech_state
 
 
@@ -23,6 +24,9 @@ class StageSummaryBundles:
     architecture_fact_summaries: list[str]
     architecture_decision_summaries: list[str]
     architecture_contract_summaries: list[str]
+    plan_fact_summaries: list[str]
+    plan_decision_summaries: list[str]
+    plan_contract_summaries: list[str]
 
 
 def build_stage_summary_bundles(
@@ -64,6 +68,8 @@ def build_stage_summary_bundles(
     normalized_code_principles: list[str],
     normalized_security_notes: list[str],
     normalized_performance_notes: list[str],
+    normalized_plan_overview: str,
+    normalized_planning_principles: list[str],
     architecture_entity_relationship_updates: list[dict[str, Any]],
     architecture_entity_state_updates: list[dict[str, Any]],
     architecture_endpoint_updates: list[dict[str, Any]],
@@ -205,6 +211,9 @@ def build_stage_summary_bundles(
             f"{item['error']['code']}: {item['error']['description']}"
             for item in architecture_endpoint_error_updates
         ],
+        plan_fact_summaries=([f"Plan overview: {normalized_plan_overview}"] if normalized_plan_overview else []),
+        plan_decision_summaries=[f"Planning principle: {item}" for item in normalized_planning_principles],
+        plan_contract_summaries=[],
     )
 
 
@@ -238,6 +247,9 @@ def has_capture_payload(
             bundles.architecture_fact_summaries,
             bundles.architecture_decision_summaries,
             bundles.architecture_contract_summaries,
+            bundles.plan_fact_summaries,
+            bundles.plan_decision_summaries,
+            bundles.plan_contract_summaries,
         ]
     )
 
@@ -249,6 +261,7 @@ def apply_stage_state_update(
     design_state: dict[str, Any],
     tech_state: dict[str, Any],
     architecture_state: dict[str, Any],
+    plan_state: dict[str, Any],
     normalized_project_name: str,
     normalized_system_overview: str,
     normalized_audiences: list[str],
@@ -293,8 +306,10 @@ def apply_stage_state_update(
     architecture_pattern_updates: list[dict[str, str]],
     normalized_security_notes: list[str],
     normalized_performance_notes: list[str],
+    normalized_plan_overview: str,
+    normalized_planning_principles: list[str],
     normalized_next_actions: list[str],
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -359,4 +374,11 @@ def apply_stage_state_update(
             performance_notes=normalized_performance_notes,
             next_actions=normalized_next_actions,
         )
-    return concept_state, design_state, tech_state, architecture_state
+    elif normalized_stage == PLAN_STAGE:
+        plan_state = update_plan_state(
+            plan_state,
+            plan_overview=normalized_plan_overview or None,
+            planning_principles=normalized_planning_principles,
+            next_actions=normalized_next_actions,
+        )
+    return concept_state, design_state, tech_state, architecture_state, plan_state

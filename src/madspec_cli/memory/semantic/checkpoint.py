@@ -24,6 +24,13 @@ from ..stages.design.state import (
     save_design_state,
     update_design_state,
 )
+from ..stages.plan.state import (
+    PLAN_STAGE,
+    load_plan_state,
+    plan_completeness_errors,
+    save_plan_state,
+    update_plan_state,
+)
 from ..stages.tech.state import (
     TECH_STAGE,
     load_tech_state,
@@ -50,6 +57,7 @@ CHECKPOINT_STAGES = {
     "mvp.design",
     "mvp.tech",
     "mvp.architecture",
+    "mvp.plan",
     "review",
     "security",
 }
@@ -151,6 +159,7 @@ def checkpoint_stage_memory(
         paths.design_state: _snapshot_file(paths.design_state),
         paths.tech_state: _snapshot_file(paths.tech_state),
         paths.architecture_state: _snapshot_file(paths.architecture_state),
+        paths.plan_state: _snapshot_file(paths.plan_state),
     }
 
     ts = now_iso()
@@ -192,6 +201,7 @@ def checkpoint_stage_memory(
     design_state = load_design_state(paths.design_state)
     tech_state = load_tech_state(paths.tech_state)
     architecture_state = load_architecture_state(paths.architecture_state)
+    plan_state = load_plan_state(paths.plan_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -244,6 +254,16 @@ def checkpoint_stage_memory(
                 design_state=design_state,
             )
         )
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == PLAN_STAGE:
+        plan_state = update_plan_state(
+            plan_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(plan_completeness_errors(plan_state))
         if errors:
             return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
 
@@ -302,6 +322,8 @@ def checkpoint_stage_memory(
             save_tech_state(paths.tech_state, tech_state)
         elif normalized_stage == ARCHITECTURE_STAGE:
             save_architecture_state(paths.architecture_state, architecture_state)
+        elif normalized_stage == PLAN_STAGE:
+            save_plan_state(paths.plan_state, plan_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, [checkpoint_record])
         append_jsonl(paths.facts, fact_records)

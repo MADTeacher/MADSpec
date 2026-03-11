@@ -41,6 +41,13 @@ def _step_metadata(kind: str, policy: str, waiver_reason: str | None = None) -> 
     }
 
 
+def _create_step_artifacts(branch_dir: Path, step_id: str) -> None:
+    step_dir = branch_dir / "steps" / step_id
+    step_dir.mkdir(parents=True, exist_ok=True)
+    for file_name in ("description.md", "tasks.md", "tests.md", "validation.md"):
+        (step_dir / file_name).write_text(f"# {step_id} {file_name}\n", encoding="utf-8")
+
+
 def _fake_download(
     project_path: Path,
     ai_assistant: str,
@@ -95,8 +102,10 @@ def test_init_creates_structured_memory_layout(tmp_path: Path, monkeypatch) -> N
     assert paths["design_state"].exists()
     assert paths["tech_state"].exists()
     assert paths["architecture_state"].exists()
+    assert paths["plan_state"].exists()
     assert (project_path / ".madspec" / "procedures" / "next-step-selection.md").exists()
     assert (project_path / ".madspec" / "main" / "project-context.md").exists()
+    assert (project_path / ".madspec" / "main" / "implementation-plan.md").exists()
 
 
 def test_memory_commands_support_validation_and_retrieve_json(tmp_path: Path, monkeypatch) -> None:
@@ -227,6 +236,7 @@ def test_memory_register_step_updates_progress_and_views(tmp_path: Path, monkeyp
 
     init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
     assert init_result.exit_code == 0, init_result.stdout
+    _create_step_artifacts(branch_dir, "step-01-authentication")
 
     register_result = runner.invoke(
         cli.app,
@@ -1260,6 +1270,7 @@ def test_memory_register_step_requires_waiver_reason_for_waived_policy(tmp_path:
 
     init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
     assert init_result.exit_code == 0, init_result.stdout
+    _create_step_artifacts(branch_dir, "step-01-doc-refresh")
 
     result = runner.invoke(
         cli.app,
@@ -1306,6 +1317,7 @@ def test_memory_register_step_accepts_non_code_not_applicable_policy(tmp_path: P
 
     init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
     assert init_result.exit_code == 0, init_result.stdout
+    _create_step_artifacts(branch_dir, "step-01-doc-refresh")
 
     result = runner.invoke(
         cli.app,
@@ -1376,6 +1388,55 @@ def test_memory_register_step_requires_covers_for_code_steps(tmp_path: Path, mon
 
     assert result.exit_code == 1, result.stdout
     assert "code steps must declare at least one covered function" in result.stdout
+
+
+def test_memory_register_step_rolls_back_when_step_artifacts_are_missing(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".madspec").mkdir()
+    (tmp_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = tmp_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- Authentication: sign in users
+""",
+        encoding="utf-8",
+    )
+
+    init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-authentication",
+            "--step-kind",
+            "code",
+            "--covers",
+            "Authentication",
+            "--json-output",
+        ],
+    )
+
+    paths = get_memory_paths(tmp_path, "main")
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+    plan_state = json.loads(paths["plan_state"].read_text(encoding="utf-8"))
+
+    assert result.exit_code == 1, result.stdout
+    assert progress["plannedSteps"] == []
+    assert plan_state["stepCatalog"] == []
 
 
 def test_memory_register_step_rejects_invalid_step_kind_and_tdd_policy(tmp_path: Path, monkeypatch) -> None:
@@ -1466,6 +1527,7 @@ def test_memory_implementation_commands_drive_step_lifecycle(tmp_path: Path, mon
 
     init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
     assert init_result.exit_code == 0, init_result.stdout
+    _create_step_artifacts(branch_dir, "step-01-authentication")
 
     register_result = runner.invoke(
         cli.app,

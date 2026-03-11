@@ -8,6 +8,7 @@ from ..stages.architecture.state import architecture_completeness_errors
 from ..stages.concept.state import concept_completeness_errors
 from ..stages.design.state import design_completeness_errors, missing_prototype_files, uncovered_design_features
 from ..stages.tech.state import tech_completeness_errors
+from ..stages.plan.state import plan_completeness_errors
 from ..shared.storage import read_jsonl
 
 
@@ -308,6 +309,46 @@ def build_architecture_status(architecture_state: dict[str, Any], *, design_stat
         "revision": architecture_state.get("revision", 0),
         "ratified_at": architecture_state.get("ratifiedAt"),
         "updated_at": architecture_state.get("updatedAt"),
+    }
+
+
+def _plan_filled_fields(plan_state: dict[str, Any]) -> list[str]:
+    field_checks = (
+        ("planOverview", bool(plan_state.get("planOverview"))),
+        ("planningPrinciples", bool(plan_state.get("planningPrinciples"))),
+        ("stepCatalog", bool(plan_state.get("stepCatalog"))),
+        ("nextActions", bool(plan_state.get("nextActions"))),
+        ("checkpointSummary", bool(plan_state.get("checkpointSummary"))),
+    )
+    return [field_name for field_name, is_filled in field_checks if is_filled]
+
+
+def build_plan_status(plan_state: dict[str, Any], *, progress: dict[str, Any]) -> dict[str, Any]:
+    missing_required_fields: list[str] = []
+    error_map = {
+        "plan state must include a plan overview before checkpoint": "planOverview",
+        "plan state must include at least one step before checkpoint": "stepCatalog",
+    }
+    for error in plan_completeness_errors(plan_state):
+        field_name = error_map.get(error)
+        if field_name and field_name not in missing_required_fields:
+            missing_required_fields.append(field_name)
+    return {
+        "is_complete": not missing_required_fields,
+        "missing_required_fields": missing_required_fields,
+        "filled_fields": _plan_filled_fields(plan_state),
+        "counts": {
+            "planned_steps": len(progress.get("plannedSteps", [])),
+            "catalog_steps": len(plan_state.get("stepCatalog", [])),
+            "completed_steps": len(progress.get("completedSteps", [])),
+            "planning_principles": len(plan_state.get("planningPrinciples", [])),
+            "next_actions": len(plan_state.get("nextActions", [])),
+        },
+        "coverage_snapshot": progress.get("planningMetadata", {}).get("progressMetrics", {}),
+        "last_checkpoint_summary": plan_state.get("checkpointSummary") or None,
+        "revision": plan_state.get("revision", 0),
+        "ratified_at": plan_state.get("ratifiedAt"),
+        "updated_at": plan_state.get("updatedAt"),
     }
 
 

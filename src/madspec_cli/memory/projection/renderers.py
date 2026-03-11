@@ -15,6 +15,7 @@ def render_project_context(
     design_state: dict[str, Any],
     tech_state: dict[str, Any],
     architecture_state: dict[str, Any],
+    plan_state: dict[str, Any],
     generated_at: str,
 ) -> str:
     planned_steps = progress.get("plannedSteps", [])
@@ -58,6 +59,7 @@ def render_project_context(
             f"- `.madspec/{branch_name}/memory/stages/mvp.design.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.tech.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.architecture.json`",
+            f"- `.madspec/{branch_name}/memory/stages/mvp.plan.json`",
             f"- `.madspec/{branch_name}/memory/working/active-session.json`",
             f"- `.madspec/{branch_name}/memory/working/decision-log.jsonl`",
             f"- `.madspec/{branch_name}/memory/episodes/events.jsonl`",
@@ -70,10 +72,12 @@ def render_project_context(
             f"- `.madspec/{branch_name}/architecture.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/data-model.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/contracts/openapi.yaml` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/implementation-plan.md` (generated from structured memory)",
             f"- Concept checkpoint summary: `{concept_state.get('checkpointSummary') or 'N/A'}`",
             f"- Design checkpoint summary: `{design_state.get('checkpointSummary') or 'N/A'}`",
             f"- Tech checkpoint summary: `{tech_state.get('checkpointSummary') or 'N/A'}`",
             f"- Architecture checkpoint summary: `{architecture_state.get('checkpointSummary') or 'N/A'}`",
+            f"- Plan checkpoint summary: `{plan_state.get('checkpointSummary') or 'N/A'}`",
             (
                 f"- Design inventory: `{len(design_state.get('screens', []))}` screens, "
                 f"`{len(design_state.get('flows', []))}` flows, main prototype "
@@ -91,6 +95,10 @@ def render_project_context(
                 f"- Architecture inventory: `{len(architecture_state.get('projectStructure', {}).get('directories', []))}` directories, "
                 f"`{len(architecture_state.get('dataModel', {}).get('entities', []))}` entities, "
                 f"`{len(architecture_state.get('contracts', {}).get('endpoints', []))}` endpoints"
+            ),
+            (
+                f"- Planning inventory: `{len(plan_state.get('stepCatalog', []))}` catalog steps, "
+                f"`{len(plan_state.get('planningPrinciples', []))}` principles"
             ),
         ]
     )

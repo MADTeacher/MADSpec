@@ -13,7 +13,7 @@ from ..domain.branch_layout import resolve_target_branch
 
 
 def memory_capture(
-    stage: str = typer.Option(..., "--stage", help="Stage to capture: mvp.concept, mvp.design, mvp.tech, mvp.architecture, review, or security"),
+    stage: str = typer.Option(..., "--stage", help="Stage to capture: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, review, or security"),
     summary: str = typer.Option(None, "--summary", help="Optional stage note summary"),
     fact: list[str] = typer.Option(None, "--fact", help="Fact to capture; repeat for multiple values"),
     decision: list[str] = typer.Option(None, "--decision", help="Decision to capture; repeat for multiple values"),
@@ -31,7 +31,7 @@ def memory_capture(
     feature_p3: list[str] = typer.Option(None, "--feature-p3", help="Concept-only: P3 feature in '<name>::<description>' format; repeat for multiple values"),
     constraint: list[str] = typer.Option(None, "--constraint", help="Concept-only: technical constraint; repeat for multiple values"),
     assumption: list[str] = typer.Option(None, "--assumption", help="Concept-only: assumption; repeat for multiple values"),
-    next_action: list[str] = typer.Option(None, "--next-action", help="Concept/design/tech-only: canonical next action; repeat for multiple values"),
+    next_action: list[str] = typer.Option(None, "--next-action", help="Concept/design/tech/plan-only: canonical next action; repeat for multiple values"),
     design_overview: str = typer.Option(None, "--design-overview", help="Design-only: short summary of the UI/UX approach"),
     platform: list[str] = typer.Option(None, "--platform", help="Design-only: supported platform; repeat for multiple values"),
     zone: list[str] = typer.Option(None, "--zone", help="Design-only: zone in '<id>::<title>::<description>' format; repeat for multiple values"),
@@ -68,6 +68,8 @@ def memory_capture(
     pattern: list[str] = typer.Option(None, "--pattern", help="Architecture-only: pattern in '<name>::<rationale>' format; repeat for multiple values"),
     security_note: list[str] = typer.Option(None, "--security-note", help="Architecture-only: security note; repeat for multiple values"),
     performance_note: list[str] = typer.Option(None, "--performance-note", help="Architecture-only: performance note; repeat for multiple values"),
+    plan_overview: str = typer.Option(None, "--plan-overview", help="Plan-only: short summary of the implementation strategy"),
+    planning_principle: list[str] = typer.Option(None, "--planning-principle", help="Plan-only: planning principle or invariant; repeat for multiple values"),
     status: str = typer.Option("validated", "--status", help="Memory record status: proposed, validated, conflicted, or obsolete"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
@@ -135,6 +137,8 @@ def memory_capture(
                 "architecture_patterns": pattern or [],
                 "security_notes": security_note or [],
                 "performance_notes": performance_note or [],
+                "plan_overview": plan_overview,
+                "planning_principles": planning_principle or [],
                 "status": status,
             },
         )

@@ -18,6 +18,11 @@ from ..stages.design.state import (
     load_design_state,
     save_design_state,
 )
+from ..stages.plan.state import (
+    PLAN_STAGE,
+    load_plan_state,
+    save_plan_state,
+)
 from ..stages.tech.state import (
     TECH_STAGE,
     load_tech_state,
@@ -59,6 +64,7 @@ CAPTURE_STAGES = {
     "mvp.design",
     "mvp.tech",
     "mvp.architecture",
+    "mvp.plan",
     "review",
     "security",
 }
@@ -144,6 +150,8 @@ def capture_stage_memory(
     architecture_patterns: list[str] | None = None,
     security_notes: list[str] | None = None,
     performance_notes: list[str] | None = None,
+    plan_overview: str | None = None,
+    planning_principles: list[str] | None = None,
     status: str = "validated",
 ) -> dict[str, Any]:
     normalized_stage = stage.strip().lower()
@@ -191,6 +199,8 @@ def capture_stage_memory(
     normalized_code_principles = normalize_text_list(code_principles)
     normalized_security_notes = normalize_text_list(security_notes)
     normalized_performance_notes = normalize_text_list(performance_notes)
+    normalized_plan_overview = (plan_overview or "").strip()
+    normalized_planning_principles = normalize_text_list(planning_principles)
 
     concept_parse = parse_concept_capture(
         feature_p1=feature_p1,
@@ -305,6 +315,8 @@ def capture_stage_memory(
         architecture_pattern_updates=architecture_pattern_updates,
         normalized_security_notes=normalized_security_notes,
         normalized_performance_notes=normalized_performance_notes,
+        normalized_plan_overview=normalized_plan_overview,
+        normalized_planning_principles=normalized_planning_principles,
         normalized_next_actions=normalized_next_actions,
     )
     if scope_errors:
@@ -381,6 +393,8 @@ def capture_stage_memory(
         normalized_code_principles=normalized_code_principles,
         normalized_security_notes=normalized_security_notes,
         normalized_performance_notes=normalized_performance_notes,
+        normalized_plan_overview=normalized_plan_overview,
+        normalized_planning_principles=normalized_planning_principles,
         architecture_entity_relationship_updates=architecture_entity_relationship_updates,
         architecture_entity_state_updates=architecture_entity_state_updates,
         architecture_endpoint_updates=architecture_endpoint_updates,
@@ -417,6 +431,7 @@ def capture_stage_memory(
         paths.design_state: snapshot_file(paths.design_state),
         paths.tech_state: snapshot_file(paths.tech_state),
         paths.architecture_state: snapshot_file(paths.architecture_state),
+        paths.plan_state: snapshot_file(paths.plan_state),
     }
 
     ts = now_iso()
@@ -439,11 +454,13 @@ def capture_stage_memory(
         or bundles.design_decision_summaries
         or bundles.tech_decision_summaries
         or bundles.architecture_decision_summaries
+        or bundles.plan_decision_summaries
         or normalized_decisions
         or bundles.concept_fact_summaries
         or bundles.design_fact_summaries
         or bundles.tech_fact_summaries
         or bundles.architecture_fact_summaries
+        or bundles.plan_fact_summaries
         or normalized_facts,
     )[:20]
     active_session["last_checkpoint_at"] = ts
@@ -464,12 +481,14 @@ def capture_stage_memory(
     design_state = load_design_state(paths.design_state)
     tech_state = load_tech_state(paths.tech_state)
     architecture_state = load_architecture_state(paths.architecture_state)
-    concept_state, design_state, tech_state, architecture_state = apply_stage_state_update(
+    plan_state = load_plan_state(paths.plan_state)
+    concept_state, design_state, tech_state, architecture_state, plan_state = apply_stage_state_update(
         normalized_stage=normalized_stage,
         concept_state=concept_state,
         design_state=design_state,
         tech_state=tech_state,
         architecture_state=architecture_state,
+        plan_state=plan_state,
         normalized_project_name=normalized_project_name,
         normalized_system_overview=normalized_system_overview,
         normalized_audiences=normalized_audiences,
@@ -514,6 +533,8 @@ def capture_stage_memory(
         architecture_pattern_updates=architecture_pattern_updates,
         normalized_security_notes=normalized_security_notes,
         normalized_performance_notes=normalized_performance_notes,
+        normalized_plan_overview=normalized_plan_overview,
+        normalized_planning_principles=normalized_planning_principles,
         normalized_next_actions=normalized_next_actions,
     )
 
@@ -544,6 +565,7 @@ def capture_stage_memory(
         normalized_security_notes=normalized_security_notes,
         normalized_performance_notes=normalized_performance_notes,
         normalized_preferences=normalized_preferences,
+        normalized_plan_overview=normalized_plan_overview,
         design_zone_updates=design_zone_updates,
         design_screen_updates=design_screen_updates,
         design_flow_updates=design_flow_updates,
@@ -571,6 +593,7 @@ def capture_stage_memory(
         tech_alternative_updates=tech_alternative_updates,
         design_navigation_updates=design_navigation_updates,
         design_flow_alternative_updates=design_flow_alternative_updates,
+        normalized_planning_principles=normalized_planning_principles,
         ts=ts,
     )
     contract_records = build_contract_records(
@@ -595,6 +618,8 @@ def capture_stage_memory(
             save_tech_state(paths.tech_state, tech_state)
         elif normalized_stage == ARCHITECTURE_STAGE:
             save_architecture_state(paths.architecture_state, architecture_state)
+        elif normalized_stage == PLAN_STAGE:
+            save_plan_state(paths.plan_state, plan_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, note_records)
         append_jsonl(paths.facts, fact_records)

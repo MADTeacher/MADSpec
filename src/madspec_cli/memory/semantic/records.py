@@ -5,6 +5,7 @@ from typing import Any
 from ..stages.architecture.state import ARCHITECTURE_STAGE
 from ..stages.concept.state import CONCEPT_STAGE
 from ..stages.design.state import DESIGN_STAGE
+from ..stages.plan.state import PLAN_STAGE
 from ..shared.records import make_record
 from ..stages.tech.state import TECH_STAGE
 
@@ -69,6 +70,7 @@ def build_fact_records(
     normalized_security_notes: list[str],
     normalized_performance_notes: list[str],
     normalized_preferences: list[str],
+    normalized_plan_overview: str,
     design_zone_updates: list[dict[str, str]],
     design_screen_updates: list[dict[str, Any]],
     design_flow_updates: list[dict[str, Any]],
@@ -91,6 +93,25 @@ def build_fact_records(
         )
         for item in normalized_facts
     ]
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"Plan overview: {normalized_plan_overview}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "planOverview"},
+                ts=ts,
+            )
+        ]
+        if normalized_plan_overview and normalized_stage == PLAN_STAGE
+        else []
+    )
     fact_records.extend(
         [
             make_record(
@@ -629,6 +650,7 @@ def build_decision_records(
     tech_alternative_updates: list[dict[str, str]],
     design_navigation_updates: list[dict[str, str]],
     design_flow_alternative_updates: list[dict[str, str]],
+    normalized_planning_principles: list[str],
     ts: str,
 ) -> list[dict[str, Any]]:
     decision_records = [
@@ -646,6 +668,26 @@ def build_decision_records(
         )
         for item in normalized_decisions
     ]
+    decision_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                item,
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="decision",
+                record_type="decision",
+                metadata={"slot": "planningPrinciple"},
+                ts=ts,
+            )
+            for item in normalized_planning_principles
+        ]
+        if normalized_stage == PLAN_STAGE
+        else []
+    )
     decision_records.extend(
         [
             make_record(

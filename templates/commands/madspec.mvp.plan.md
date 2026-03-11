@@ -25,11 +25,17 @@ $ARGUMENTS
 ## Structured Memory First (обязательно)
 
 - `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
+- Каноническое состояние этапа plan хранится в `.madspec/<BRANCH>/memory/stages/mvp.plan.json`.
 - Для архитектурного контекста сначала используй `madspec memory retrieve --stage mvp.architecture --json-output`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` считай generated views поверх canonical architecture-state.
-- `planning-context-cache.md`, `planning-context.md` и `project-context.md` являются generated views.
+- `implementation-plan.md`, `planning-context-cache.md`, `planning-context.md` и `project-context.md` являются generated views.
+- В обычных ходах диалога сначала используй `madspec memory retrieve --stage mvp.plan --json-output` и опирайся на `plan_status`.
+- Полный `artifact_state.plan` запрашивай только перед финальной проверкой и `madspec memory checkpoint --stage mvp.plan`, используя `--full-artifact`.
+- Для planning-level state используй `madspec memory capture --stage mvp.plan --plan-overview ... --planning-principle ... --next-action ...`.
 - После обновления structured memory обязательно запускай `madspec memory consolidate` и `madspec memory validate`.
 - Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage mvp.plan --candidate-step <step-id> --depends-on <dependency>...`.
-- Для записи нового planned step в canonical state используй `madspec memory register-step --stage mvp.plan --step-id <step-id> --step-kind <code|non-code> --covers <function> ...`, а не ручное редактирование `progress.json`.
+- Перед `madspec memory register-step` сначала создай или обнови step source artifacts в `.madspec/<BRANCH>/steps/<step-id>/`.
+- Для записи нового planned step в canonical state используй `madspec memory register-step --stage mvp.plan --step-id <step-id> --step-kind <code|non-code> --title <title> --summary <summary> --covers <function> --related-artifact <path> --size <small|medium|large> --complexity <low|medium|high> ...`, а не ручное редактирование `progress.json`.
+- После каждого подтвержденного изменения стратегии или catalog шагов ратифицируй состояние через `madspec memory checkpoint --stage mvp.plan ...`.
 
 ## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
 
@@ -107,9 +113,9 @@ $ARGUMENTS
    - Сохрани имя ветки для использования в дальнейших шагах
 
 1. **Проверка состояния планирования**:
-   - Проверь существование `.madspec/<BRANCH>/memory/progress.json` (где `<BRANCH>` - имя ветки, определенное в шаге 0)
-   - Если файл не существует:
-     - Создай файл на основе шаблона `.madspec/templates/planning-state-template.json` (шаблоны хранятся в корне `.madspec/templates/`)
+   - Проверь существование `.madspec/<BRANCH>/memory/progress.json` и `.madspec/<BRANCH>/memory/stages/mvp.plan.json` (где `<BRANCH>` - имя ветки, определенное в шаге 0)
+   - Если файлов нет:
+     - Выполни `madspec memory init`
      - Установи режим работы: **`initial`**
    - Если файл существует:
      - Прочитай `plannedSteps` и `planningMetadata`
@@ -167,22 +173,7 @@ $ARGUMENTS
        - Установи начальные значения: все функции непокрыты (covered: 0)
      - **КРИТИЧЕСКИ ВАЖНО**: Если файл уже существует, **НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ НЕ ИЗМЕНЯЙ** значение поля `currentImplementStep`. Прочитай текущее значение `currentImplementStep` из файла и сохрани его без изменений.
    
-   - **Создай кэш контекста**: Создай `.madspec/<BRANCH>/planning-context-cache.md`:
-     - Загрузи шаблон `.madspec/templates/planning-context-cache-template.md`
-     - Замени токены-заполнители в квадратных скобках (например, [ДАТА], [Основные компоненты, слои, взаимодействия]) на конкретные значения из концепции проекта
-     - Заполни кратким резюме архитектуры проекта:
-       - Основные компоненты и их взаимодействие
-       - Ключевые технические решения
-       - Структура данных и модели
-       - Основные паттерны и подходы
-       - Основные зависимости между компонентами
-     - Это будет использоваться в инкрементальном режиме для экономии контекста
-   
-   - Создай или обнови `.madspec/<BRANCH>/implementation-plan.md`:
-     - Загрузи шаблон `.madspec/templates/implementation-plan-template.md`
-     - Заполни заголовок и описание проекта
-     - Добавь первый шаг в список шагов
-     - Пока не заполняй полный список шагов - они будут добавляться инкрементально
+   - Не редактируй `planning-context-cache.md` и `implementation-plan.md` вручную как primary source: они пересобираются из structured memory.
    
    - Создай структуру первого шага:
      - Создай директорию `.madspec/<BRANCH>/steps/step-01-[name]/`
@@ -198,7 +189,7 @@ $ARGUMENTS
          - Связанные артефакты (UI прототипы, API контракты, модели данных)
          - Размер и сложность шага
        - Сохрани в `.madspec/<BRANCH>/steps/step-01-[name]/planning-context.md`
-     - Зарегистрируй шаг через `madspec memory register-step --stage mvp.plan --step-id step-01-[name] --step-kind <code|non-code> --covers <function> ...`
+     - Зарегистрируй шаг через `madspec memory register-step --stage mvp.plan --step-id step-01-[name] --step-kind <code|non-code> --title "<человекочитаемый заголовок>" --summary "<краткое описание шага>" --covers <function> --related-artifact <path> --size <small|medium|large> --complexity <low|medium|high> ...`
      - Для `non-code` шага обязательно передай `--tdd-policy waived --waiver-reason "<причина>"` или `--tdd-policy not-applicable`
      - Команда должна автоматически обновить `plannedSteps`, `stepStatus`, `stepMetadata`, `coversFunctions`, `planningMetadata.stepDependencies`, `planningMetadata.lastPlannedStep` и `planningMetadata.progressMetrics`
    
@@ -258,9 +249,9 @@ $ARGUMENTS
        - Команда **обязана** сохранить `currentImplementStep` без изменений
        - Команда **обязана** автоматически обновить `plannedSteps`, `stepStatus`, `stepMetadata`, `coversFunctions`, `planningMetadata.stepDependencies`, `planningMetadata.lastPlannedStep` и `planningMetadata.progressMetrics`
    
-   - Обнови `.madspec/<BRANCH>/implementation-plan.md`, добавив новый шаг в список
-   
-   - Проверь, что `madspec memory register-step` пересчитал метрики в `planningMetadata.progressMetrics` и записал покрытие в `coversFunctions`
+   - Не редактируй `.madspec/<BRANCH>/implementation-plan.md` вручную: проверь, что он был пересобран после `register-step` / `checkpoint`
+
+   - Проверь, что `madspec memory register-step` пересчитал метрики в `planningMetadata.progressMetrics`, записал покрытие в `coversFunctions` и обновил `memory/stages/mvp.plan.json`
    
    - Отобрази визуализацию прогресса планирования (см. раздел 6)
 
@@ -317,20 +308,13 @@ $ARGUMENTS
 
 5. **Кэширование контекста** (для оптимизации инкрементального режима):
    
-   - После первого запуска (initial mode) создай файл `.madspec/<BRANCH>/planning-context-cache.md`:
-     - Краткое резюме архитектуры проекта
-     - Основные компоненты и их взаимодействие
-     - Ключевые технические решения
-     - Структура данных и модели
-     - Основные паттерны и подходы
-     - Основные зависимости между компонентами
+   - `planning-context-cache.md` является generated view и должен пересобираться из structured memory после `register-step`/`checkpoint`.
+   - Не редактируй `.madspec/<BRANCH>/planning-context-cache.md` вручную как primary source.
    
    - В инкрементальном режиме используй кэш вместо полной загрузки generated `architecture.md`:
      - Загружай только `.madspec/<BRANCH>/planning-context-cache.md` для понимания структуры
      - Это значительно уменьшит объем загружаемого контекста
      - Кэш должен обновляться при значительных изменениях архитектуры
-   
-   - Формат кэша описан в шаблоне `.madspec/templates/planning-context-cache-template.md`
 
 6. **Визуализация прогресса планирования**:
    
@@ -456,9 +440,10 @@ $ARGUMENTS
     - Выведи путь к созданным файлам:
      - `.madspec/<BRANCH>/steps/step-[NN]-[name]/` - директория нового шага
      - `.madspec/<BRANCH>/steps/step-[NN]-[name]/planning-context.md` - контекст планирования шага
-     - `.madspec/<BRANCH>/implementation-plan.md` - обновленный план реализации
+     - `.madspec/<BRANCH>/implementation-plan.md` - regenerated plan view
+     - `.madspec/<BRANCH>/memory/stages/mvp.plan.json` - canonical state этапа plan
      - `.madspec/<BRANCH>/memory/progress.json` - обновленный файл прогресса
-     - `.madspec/<BRANCH>/planning-context-cache.md` - кэш контекста (если создан)
+     - `.madspec/<BRANCH>/planning-context-cache.md` - regenerated planning cache
     
     - Покажи информацию о новом шаге:
       - Номер и название шага
@@ -499,11 +484,12 @@ $ARGUMENTS
 
 ## Выходные артефакты
 
-- `.madspec/<BRANCH>/implementation-plan.md` - основной план реализации (обновляется инкрементально, где `<BRANCH>` - имя текущей ветки)
+- `.madspec/<BRANCH>/memory/stages/mvp.plan.json` - основной файл данных этапа plan
+- `.madspec/<BRANCH>/implementation-plan.md` - generated plan view (обновляется инкрементально, где `<BRANCH>` - имя текущей ветки)
 - `.madspec/<BRANCH>/steps/step-[NN]-[name]/` - директория с описанием нового шага
 - `.madspec/<BRANCH>/steps/step-[NN]-[name]/planning-context.md` - контекст планирования шага с решениями
 - `.madspec/<BRANCH>/memory/progress.json` - файл отслеживания прогресса (обновляется после каждого шага)
-- `.madspec/<BRANCH>/planning-context-cache.md` - кэш контекста планирования (создается в initial mode)
+- `.madspec/<BRANCH>/planning-context-cache.md` - generated view кэша контекста планирования
 - `.madspec/<BRANCH>/project-context.md` - обновленный контекст проекта (навигация и ссылки)
 
 ## Подсказки и помощь

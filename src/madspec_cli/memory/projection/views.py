@@ -15,6 +15,7 @@ from ..stages.design.state import (
     load_design_state,
     render_ui_design_markdown,
 )
+from ..stages.plan.state import load_plan_state, render_implementation_plan_markdown
 from ..stages.tech.state import (
     load_tech_state,
     render_tech_stack_markdown,
@@ -24,6 +25,7 @@ from .projections import (
     build_architecture_status,
     build_concept_status,
     build_design_status,
+    build_plan_status,
     build_tech_status,
     group_records_by_step,
     load_semantic_record_sets,
@@ -53,6 +55,7 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     design_state = load_design_state(paths.design_state)
     tech_state = load_tech_state(paths.tech_state)
     architecture_state = load_architecture_state(paths.architecture_state)
+    plan_state = load_plan_state(paths.plan_state)
     generated_at = active_session.get("updated_at") or active_session.get("last_checkpoint_at") or now_iso()
     decision_log = read_jsonl(paths.decision_log)
     events = read_jsonl(paths.events)
@@ -129,6 +132,7 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
             design_state,
             tech_state,
             architecture_state,
+            plan_state,
             generated_at,
         ),
         encoding="utf-8",
@@ -141,6 +145,18 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
         encoding="utf-8",
     )
     generated.append(planning_cache_path)
+
+    implementation_plan_path = paths.branch_dir / "implementation-plan.md"
+    implementation_plan_path.write_text(
+        render_implementation_plan_markdown(
+            plan_state,
+            branch_name=branch_name,
+            progress=progress,
+            project_name=concept_state.get("projectName", ""),
+        ),
+        encoding="utf-8",
+    )
+    generated.append(implementation_plan_path)
 
     all_records = decision_log + events + facts + decisions + contracts
     grouped_records = group_records_by_step(all_records)
@@ -227,17 +243,19 @@ def retrieve_memory_context(
     is_design_stage = stage_lower == "mvp.design"
     is_tech_stage = stage_lower == "mvp.tech"
     is_architecture_stage = stage_lower == "mvp.architecture"
+    is_plan_stage = stage_lower == "mvp.plan"
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state) if is_design_stage else None
     tech_state = load_tech_state(paths.tech_state) if is_tech_stage else None
     architecture_state = load_architecture_state(paths.architecture_state) if is_architecture_stage else None
+    plan_state = load_plan_state(paths.plan_state) if is_plan_stage else None
     if limit is None:
-        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage) else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage) else 5
     elif limit <= 0:
-        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage) else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage) else 5
     else:
         resolved_limit = limit
-    include_history_records = include_history or not (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage)
+    include_history_records = include_history or not (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage)
     decision_log = read_jsonl(paths.decision_log) if include_history_records else []
     events = read_jsonl(paths.events) if include_history_records else []
     semantic_sets = load_semantic_record_sets(
@@ -376,6 +394,11 @@ def retrieve_memory_context(
             if is_architecture_stage and architecture_state is not None
             else None
         ),
+        "plan_status": (
+            build_plan_status(plan_state, progress=progress)
+            if is_plan_stage and plan_state is not None
+            else None
+        ),
         "episodes": trimmed_events if include_history_records else [],
         "decision_log": trimmed_decisions if include_history_records else [],
         "artifact_state": {
@@ -383,5 +406,6 @@ def retrieve_memory_context(
             "design": design_state if (is_design_stage and full_artifact) else None,
             "tech": tech_state if (is_tech_stage and full_artifact) else None,
             "architecture": architecture_state if (is_architecture_stage and full_artifact) else None,
+            "plan": plan_state if (is_plan_stage and full_artifact) else None,
         },
     }

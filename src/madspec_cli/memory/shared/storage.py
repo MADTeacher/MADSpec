@@ -26,6 +26,7 @@ class MemoryPaths:
     design_state: Path
     tech_state: Path
     architecture_state: Path
+    plan_state: Path
     working_dir: Path
     active_session: Path
     decision_log: Path
@@ -52,6 +53,7 @@ class MemoryPaths:
             "design_state": self.design_state,
             "tech_state": self.tech_state,
             "architecture_state": self.architecture_state,
+            "plan_state": self.plan_state,
             "working_dir": self.working_dir,
             "active_session": self.active_session,
             "decision_log": self.decision_log,
@@ -276,6 +278,7 @@ def get_memory_paths(project_path: Path, branch_name: str) -> MemoryPaths:
         design_state=memory_dir / "stages" / "mvp.design.json",
         tech_state=memory_dir / "stages" / "mvp.tech.json",
         architecture_state=memory_dir / "stages" / "mvp.architecture.json",
+        plan_state=memory_dir / "stages" / "mvp.plan.json",
         working_dir=memory_dir / "working",
         active_session=memory_dir / "working" / "active-session.json",
         decision_log=memory_dir / "working" / "decision-log.jsonl",
@@ -352,6 +355,12 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
         load_architecture_state,
         save_architecture_state,
     )
+    from ..stages.plan.state import (
+        default_plan_state,
+        load_plan_state,
+        migrate_legacy_plan_state,
+        save_plan_state,
+    )
 
     paths = get_memory_paths(project_path, branch_name)
     created: list[Path] = []
@@ -406,6 +415,23 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
     else:
         architecture_state = load_architecture_state(paths.architecture_state)
         save_architecture_state(paths.architecture_state, architecture_state)
+
+    if not paths.plan_state.exists():
+        progress = read_json(paths.progress, _default_progress_state())
+        if isinstance(progress, dict):
+            progress, _ = normalize_progress_state(progress)
+        else:
+            progress = _default_progress_state()
+        plan_state = migrate_legacy_plan_state(
+            progress=progress,
+            implementation_plan_path=paths.branch_dir / "implementation-plan.md",
+            steps_dir=paths.branch_dir / "steps",
+        )
+        save_plan_state(paths.plan_state, plan_state)
+        created.append(paths.plan_state)
+    else:
+        plan_state = load_plan_state(paths.plan_state)
+        save_plan_state(paths.plan_state, plan_state)
 
     for path in (
         paths.decision_log,

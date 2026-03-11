@@ -60,9 +60,13 @@ def memory_register_step(
     step_kind: str = typer.Option(..., "--step-kind", help="Step kind: code or non-code"),
     tdd_policy: str = typer.Option(None, "--tdd-policy", help="TDD policy: required, waived, or not-applicable"),
     waiver_reason: str = typer.Option(None, "--waiver-reason", help="Reason for waiving TDD on non-code steps"),
+    title: str = typer.Option(None, "--title", help="Optional human-readable step title for the generated implementation plan"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     depends_on: list[str] = typer.Option(None, "--depends-on", help="Dependency step ids"),
     summary: str = typer.Option(None, "--summary", help="Optional summary for the decision log"),
+    related_artifact: list[str] = typer.Option(None, "--related-artifact", help="Related artifact path; repeat for multiple values"),
+    size: str = typer.Option(None, "--size", help="Step size: small, medium, large"),
+    complexity: str = typer.Option(None, "--complexity", help="Step complexity: low, medium, high"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Register a planned step and update coverage metadata in progress.json."""
@@ -80,6 +84,10 @@ def memory_register_step(
             waiver_reason=waiver_reason,
             depends_on=depends_on or [],
             summary=summary,
+            title=title,
+            related_artifacts=related_artifact or [],
+            size=size,
+            complexity=complexity,
         )
     )
     payload = result.to_payload()

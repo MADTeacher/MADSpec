@@ -30,6 +30,7 @@ from ..stages.design.state import (
     parse_screen_value,
     parse_zone_value,
 )
+from ..stages.plan.state import PLAN_STAGE
 from ..stages.tech.state import (
     TECH_STAGE,
     parse_alternative_value,
@@ -430,6 +431,8 @@ def validate_capture_scope(
     architecture_pattern_updates: list[dict[str, str]],
     normalized_security_notes: list[str],
     normalized_performance_notes: list[str],
+    normalized_plan_overview: str,
+    normalized_planning_principles: list[str],
     normalized_next_actions: list[str],
 ) -> list[str]:
     used_concept_fields = any(
@@ -494,6 +497,7 @@ def validate_capture_scope(
             normalized_performance_notes,
         ]
     )
+    used_plan_fields = any([normalized_plan_overview, normalized_planning_principles])
 
     if used_concept_fields and normalized_stage != CONCEPT_STAGE:
         return ["concept-specific capture options are only supported for stage mvp.concept"]
@@ -503,6 +507,8 @@ def validate_capture_scope(
         return ["tech-specific capture options are only supported for stage mvp.tech"]
     if used_architecture_fields and normalized_stage != ARCHITECTURE_STAGE:
         return ["architecture-specific capture options are only supported for stage mvp.architecture"]
-    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE, ARCHITECTURE_STAGE}:
-        return ["--next-action is only supported for stages mvp.concept, mvp.design, mvp.tech, and mvp.architecture"]
+    if used_plan_fields and normalized_stage != PLAN_STAGE:
+        return ["plan-specific capture options are only supported for stage mvp.plan"]
+    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE, ARCHITECTURE_STAGE, PLAN_STAGE}:
+        return ["--next-action is only supported for stages mvp.concept, mvp.design, mvp.tech, mvp.architecture, and mvp.plan"]
     return []

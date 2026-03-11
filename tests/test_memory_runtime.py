@@ -94,6 +94,13 @@ def _write_mvp_concept(branch_dir: Path) -> None:
     )
 
 
+def _create_step_artifacts(branch_dir: Path, step_id: str) -> None:
+    step_dir = branch_dir / "steps" / step_id
+    step_dir.mkdir(parents=True, exist_ok=True)
+    for file_name in ("description.md", "tasks.md", "tests.md", "validation.md"):
+        (step_dir / file_name).write_text(f"# {step_id} {file_name}\n", encoding="utf-8")
+
+
 def _seed_concept_for_design(paths: dict[str, Path]) -> None:
     capture_stage_memory(
         paths["branch_dir"].parents[1],
@@ -417,6 +424,8 @@ def test_determine_next_step_validates_candidate_and_selects_ready_step(tmp_path
 def test_register_planned_step_updates_coverage_metrics(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _write_mvp_concept(paths["branch_dir"])
+    _create_step_artifacts(paths["branch_dir"], "step-01-authentication")
+    _create_step_artifacts(paths["branch_dir"], "step-02-session-persistence")
 
     first = register_planned_step(
         paths["branch_dir"].parents[1],
@@ -467,6 +476,7 @@ def test_register_planned_step_updates_coverage_metrics(tmp_path: Path) -> None:
 def test_register_planned_step_supports_non_code_waiver(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _write_mvp_concept(paths["branch_dir"])
+    _create_step_artifacts(paths["branch_dir"], "step-01-design-polish")
 
     payload = register_planned_step(
         paths["branch_dir"].parents[1],
@@ -493,6 +503,7 @@ def test_register_planned_step_supports_non_code_waiver(tmp_path: Path) -> None:
 def test_register_planned_step_supports_non_code_without_coverage(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _write_mvp_concept(paths["branch_dir"])
+    _create_step_artifacts(paths["branch_dir"], "step-01-project-setup")
 
     payload = register_planned_step(
         paths["branch_dir"].parents[1],
@@ -523,6 +534,7 @@ def test_register_planned_step_normalizes_markdown_catalog_labels(tmp_path: Path
 """,
         encoding="utf-8",
     )
+    _create_step_artifacts(paths["branch_dir"], "step-01-posting-foundation")
 
     payload = register_planned_step(
         paths["branch_dir"].parents[1],
@@ -546,6 +558,7 @@ def test_register_planned_step_normalizes_markdown_catalog_labels(tmp_path: Path
 def test_register_planned_step_reports_known_labels_for_unknown_cover(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _write_mvp_concept(paths["branch_dir"])
+    _create_step_artifacts(paths["branch_dir"], "step-01-authentication")
 
     payload = register_planned_step(
         paths["branch_dir"].parents[1],
@@ -561,9 +574,112 @@ def test_register_planned_step_reports_known_labels_for_unknown_cover(tmp_path: 
     assert "User authentication" in payload["errors"][0]
 
 
+def test_capture_retrieve_and_checkpoint_plan_stage(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+    _create_step_artifacts(paths["branch_dir"], "step-01-authentication")
+
+    register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-01-authentication",
+        covers=["User authentication"],
+        step_kind="code",
+        title="Authentication foundation",
+        summary="Create the first executable slice for sign-in and session bootstrapping.",
+        related_artifacts=[".madspec/main/contracts/openapi.yaml"],
+        size="medium",
+        complexity="medium",
+    )
+
+    captured = capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        plan_overview="Build thin vertical slices from authentication to profile settings.",
+        planning_principles=[
+            "Prefer executable vertical slices over layer-first decomposition.",
+            "Keep each code step independently testable.",
+        ],
+        next_actions=["Plan session persistence after authentication foundation."],
+        status="validated",
+    )
+    retrieved = retrieve_memory_context(paths["branch_dir"].parents[1], "main", "mvp.plan")
+    retrieved_full = retrieve_memory_context(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        full_artifact=True,
+    )
+    checkpointed = checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        "Planning baseline ratified for implementation kickoff",
+        evidence=[".madspec/main/implementation-plan.md"],
+    )
+
+    implementation_plan = (paths["branch_dir"] / "implementation-plan.md").read_text(encoding="utf-8")
+    plan_state = json.loads(paths["plan_state"].read_text(encoding="utf-8"))
+
+    assert captured["accepted"] is True
+    assert retrieved["plan_status"]["is_complete"] is True
+    assert retrieved["plan_status"]["counts"]["catalog_steps"] == 1
+    assert retrieved_full["artifact_state"]["plan"]["planOverview"] == (
+        "Build thin vertical slices from authentication to profile settings."
+    )
+    assert checkpointed["accepted"] is True
+    assert "Authentication foundation" in implementation_plan
+    assert "Planning baseline ratified for implementation kickoff" in implementation_plan
+    assert plan_state["checkpointSummary"] == "Planning baseline ratified for implementation kickoff"
+
+
+def test_ensure_memory_layout_migrates_plan_state_from_legacy_progress(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+    _create_step_artifacts(paths["branch_dir"], "step-01-authentication")
+    write_json(
+        paths["progress"],
+        {
+            "currentImplementStep": None,
+            "completedSteps": [],
+            "plannedSteps": ["step-01-authentication"],
+            "stepStatus": {"step-01-authentication": _step_status(status="planned")},
+            "stepMetadata": {"step-01-authentication": _step_metadata("code", "required")},
+            "coversFunctions": {"step-01-authentication": {"p1": ["User authentication"], "p2": [], "p3": []}},
+            "planningMetadata": {
+                "lastPlannedStep": "step-01-authentication",
+                "planningPhase": "initial",
+                "totalStepsEstimated": None,
+                "stepDependencies": {"step-01-authentication": []},
+                "progressMetrics": {
+                    "p1Coverage": {"covered": 1, "total": 2, "percentage": 50},
+                    "p2Coverage": {"covered": 0, "total": 1, "percentage": 0},
+                    "p3Coverage": {"covered": 0, "total": 1, "percentage": 0},
+                    "overallProgress": 25,
+                },
+            },
+        },
+    )
+    (paths["branch_dir"] / "implementation-plan.md").write_text(
+        "# План реализации: Auth Demo\n\n## Обзор\nLegacy overview\n",
+        encoding="utf-8",
+    )
+    paths["plan_state"].unlink()
+
+    ensure_memory_layout(paths["branch_dir"].parents[1], "main")
+
+    migrated = json.loads(paths["plan_state"].read_text(encoding="utf-8"))
+    assert migrated["planOverview"] == "Legacy overview"
+    assert migrated["stepCatalog"][0]["stepId"] == "step-01-authentication"
+
+
 def test_implementation_lifecycle_updates_memory_incrementally(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _write_mvp_concept(paths["branch_dir"])
+    _create_step_artifacts(paths["branch_dir"], "step-01-authentication")
+    _create_step_artifacts(paths["branch_dir"], "step-02-session-persistence")
 
     register_planned_step(
         paths["branch_dir"].parents[1],
