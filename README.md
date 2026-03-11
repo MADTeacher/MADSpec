@@ -291,8 +291,12 @@ madspec memory init [--branch <name>]
 madspec memory status [--branch <name>] [--json-output]
 madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
-madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
+madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
+madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--json-output]
+madspec memory start-step --stage <mvp.implement|feature.implement> [--step-id <id>] [--summary <text>] [--evidence <path-or-note>] [--json-output]
+madspec memory checkpoint-step --stage <mvp.implement|feature.implement> [--step-id <id>] [--summary <text>] [--tdd-phase <phase>] [--red-evidence <text>] [--green-evidence <text>] [--refactor-note <text>] [--evidence <path-or-note>] [--json-output]
+madspec memory complete-step --stage <mvp.implement|feature.implement> --summary <text> [--step-id <id>] [--red-evidence <text>] [--green-evidence <text>] [--refactor-note <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--json-output]
 madspec memory next-step --stage <stage> [--candidate-step <id>] [--depends-on <id>] [--json-output]
 madspec memory register-step --stage <stage> --step-id <id> --step-kind <code|non-code> [--covers <function>] [--tdd-policy <required|waived|not-applicable>] [--waiver-reason <text>] [--depends-on <id>] [--json-output]
 madspec memory promote [--branch <name>] [--json-output]
@@ -304,8 +308,12 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory status` - показывает состояние structured memory
 - `memory consolidate` - пересобирает markdown views из memory
 - `memory validate` - проверяет schema, state transitions и согласованность views
-- `memory checkpoint` - канонически фиксирует checkpoint неитеративного этапа MVP, обновляет active session и semantic records, затем пересобирает generated views
+- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions для `concept/design/tech/architecture/review/security`
+- `memory checkpoint` - канонически фиксирует финал non-iterative stage, обновляет active session и semantic records, затем пересобирает generated views
 - `memory retrieve` - возвращает минимальный контекст для stage/step
+- `memory start-step` - канонически переводит implementation step в `in_progress` и делает его текущим шагом
+- `memory checkpoint-step` - записывает промежуточный implementation checkpoint, включая TDD phase и evidence
+- `memory complete-step` - завершает implementation step, обновляет `completedSteps/currentImplementStep` и сохраняет step-level knowledge в memory
 - `memory next-step` - детерминированно выбирает следующий исполнимый шаг или валидирует нового кандидата для planning
 - `memory register-step` - канонически регистрирует новый planned step, его TDD metadata и автоматически обновляет coverage metadata в `progress.json`; `--covers` обязателен для `code` шагов и опционален для `non-code`
 - `memory promote` - переносит validated records в semantic memory
@@ -503,7 +511,7 @@ madspec version
 ```
 
 **Выходные артефакты:**
-- `.madspec/<BRANCH>/security-audit.md` - детальный отчет по безопасности с Security Score
+- `.madspec/<BRANCH>/security-audit.md` - generated view детального отчета по безопасности с Security Score
 
 **Особенность**: Команда может быть вызвана в любой момент после создания кода проекта. Рекомендуется проводить проверку после каждого значимого изменения кода или перед релизом.
 
@@ -605,6 +613,7 @@ madspec version
 - `planning-context-cache.md`
 - `steps/*/planning-context.md`
 - `steps/*/implementation-context.md`
+- `security-audit.md`
 - `review.md`
 - `improvements.md`
 
@@ -614,6 +623,13 @@ madspec version
 3. Выполнить `madspec memory validate`
 
 Для ранних MVP-этапов canonical update выполняется командой `madspec memory checkpoint`, которая делает все три шага автоматически.
+
+Для non-iterative стадий `concept/design/tech/architecture/review/security` рекомендуется сначала накапливать знания через `madspec memory capture`, а потом завершать стадию кратким `madspec memory checkpoint --summary ...`. Это убирает необходимость сжимать весь диалог в один финальный payload.
+
+Для iterative implementation-этапов canonical update больше не требует ручного редактирования `progress.json`:
+- `madspec memory start-step` - выбрать/запустить текущий шаг
+- `madspec memory checkpoint-step` - сохранить red/green/refactor progress по ходу шага
+- `madspec memory complete-step` - закрыть шаг, продвинуть workflow и записать step-level facts/decisions/contracts
 
 ### Новая система контекстов
 

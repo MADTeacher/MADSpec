@@ -331,6 +331,160 @@ def test_memory_checkpoint_updates_memory_and_retrieve_context(tmp_path: Path, m
     assert "Active goal: `Concept validated for MVP scheduling assistant`" in project_context
 
 
+def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    capture_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.concept",
+            "--summary",
+            "Captured discovery notes",
+            "--fact",
+            "Primary audience: freelancers",
+            "--decision",
+            "Prioritize appointment booking first",
+            "--question",
+            "Do we need team scheduling in MVP?",
+            "--json-output",
+        ],
+    )
+    assert capture_result.exit_code == 0, capture_result.stdout
+    capture_payload = json.loads(capture_result.stdout)
+    assert capture_payload["written"]["facts"] == 1
+    assert capture_payload["written"]["decisions"] == 1
+
+    retrieve_result = runner.invoke(
+        cli.app,
+        ["memory", "retrieve", "--branch", "main", "--stage", "mvp.concept", "--json-output"],
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["stage_memory"]["facts"][0]["summary"] == "Primary audience: freelancers"
+    assert retrieve_payload["stage_memory"]["decisions"][0]["summary"] == "Prioritize appointment booking first"
+    assert retrieve_payload["active_session"]["open_questions"] == ["Do we need team scheduling in MVP?"]
+
+    checkpoint_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.concept",
+            "--summary",
+            "Concept ratified from accumulated memory",
+            "--evidence",
+            ".madspec/main/concept.md",
+            "--json-output",
+        ],
+    )
+    assert checkpoint_result.exit_code == 0, checkpoint_result.stdout
+    checkpoint_payload = json.loads(checkpoint_result.stdout)
+    assert checkpoint_payload["used_existing_stage_memory"] is True
+
+
+def test_memory_capture_and_checkpoint_support_review_and_security(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    review_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "review",
+            "--summary",
+            "Captured review findings",
+            "--fact",
+            "Architecture matches the chosen stack",
+            "--decision",
+            "Refactor auth service boundaries before scaling",
+            "--pending-action",
+            "Create follow-up refactor task",
+            "--json-output",
+        ],
+    )
+    assert review_capture.exit_code == 0, review_capture.stdout
+
+    security_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "security",
+            "--summary",
+            "Captured security findings",
+            "--fact",
+            "No rate limiting on login endpoint",
+            "--contract",
+            "Reset tokens expire within 15 minutes",
+            "--json-output",
+        ],
+    )
+    assert security_capture.exit_code == 0, security_capture.stdout
+
+    review_checkpoint = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "review",
+            "--summary",
+            "Review ratified",
+            "--json-output",
+        ],
+    )
+    assert review_checkpoint.exit_code == 0, review_checkpoint.stdout
+
+    security_checkpoint = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "security",
+            "--summary",
+            "Security audit ratified",
+            "--json-output",
+        ],
+    )
+    assert security_checkpoint.exit_code == 0, security_checkpoint.stdout
+
+    review_view = (project_path / ".madspec" / "main" / "review.md").read_text(encoding="utf-8")
+    security_view = (project_path / ".madspec" / "main" / "security-audit.md").read_text(encoding="utf-8")
+    assert "Refactor auth service boundaries before scaling" in review_view
+    assert "No rate limiting on login endpoint" in security_view
+
+
 def test_memory_checkpoint_rejects_invalid_stage_and_empty_summary(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".madspec").mkdir()
@@ -574,6 +728,125 @@ def test_memory_register_step_rejects_invalid_step_kind_and_tdd_policy(tmp_path:
     assert "step kind must be one of" in invalid_kind.stdout
     assert invalid_policy.exit_code == 1, invalid_policy.stdout
     assert "tdd policy must be one of" in invalid_policy.stdout
+
+
+def test_memory_implementation_commands_drive_step_lifecycle(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = project_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        """# Concept
+
+### Приоритет 1
+- Authentication: sign in users
+- Sessions: keep users logged in
+""",
+        encoding="utf-8",
+    )
+
+    init_result = runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    register_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-authentication",
+            "--step-kind",
+            "code",
+            "--covers",
+            "Authentication",
+            "--json-output",
+        ],
+    )
+    assert register_result.exit_code == 0, register_result.stdout
+
+    start_result = runner.invoke(
+        cli.app,
+        ["memory", "start-step", "--branch", "main", "--stage", "mvp.implement", "--json-output"],
+    )
+    assert start_result.exit_code == 0, start_result.stdout
+    assert json.loads(start_result.stdout)["step_id"] == "step-01-authentication"
+
+    red_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.implement",
+            "--step-id",
+            "step-01-authentication",
+            "--tdd-phase",
+            "red",
+            "--summary",
+            "Auth test is red",
+            "--red-evidence",
+            "uv run pytest tests/test_auth.py -q",
+            "--json-output",
+        ],
+    )
+    assert red_result.exit_code == 0, red_result.stdout
+
+    complete_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "complete-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.implement",
+            "--step-id",
+            "step-01-authentication",
+            "--summary",
+            "Authentication implemented",
+            "--green-evidence",
+            "uv run pytest tests/test_auth.py -q",
+            "--refactor-note",
+            "No refactor needed.",
+            "--fact",
+            "Authentication persists session data",
+            "--json-output",
+        ],
+    )
+    assert complete_result.exit_code == 0, complete_result.stdout
+    complete_payload = json.loads(complete_result.stdout)
+    assert complete_payload["written"]["facts"] == 1
+
+    retrieve_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "retrieve",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.implement",
+            "--step-id",
+            "step-01-authentication",
+            "--json-output",
+        ],
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["step"]["status"]["status"] == "completed"
+    assert retrieve_payload["step"]["status"]["tddPhase"] == "completed"
+    assert retrieve_payload["semantic"]["facts"][0]["summary"] == "Authentication persists session data"
 
 
 def test_git_current_branch_uses_config_fallback_json(tmp_path: Path, monkeypatch) -> None:

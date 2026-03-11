@@ -26,12 +26,12 @@ $ARGUMENTS
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - Архитектурные решения сначала записывай как semantic records, а markdown-контексты считай generated views.
+- Перед началом и после каждого подтвержденного блока по модели данных, контрактам, интеграциям или ограничениям используй `madspec memory retrieve --stage mvp.architecture --json-output` и `madspec memory capture --stage mvp.architecture ...`.
+- Через `memory capture` фиксируй сущности, API decisions, integration constraints и open questions сразу после их согласования, а не в финальном сжатии.
 - Для этапа architecture **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.architecture ...`.
 - Минимальный payload checkpoint:
   - `--summary` — итог архитектурного решения
-  - `--fact` — ключевые сущности, интеграции и ограничения
-  - `--decision` — структура проекта и архитектурные паттерны
-  - `--contract` — inventory API/contracts и важные интерфейсные ограничения
+  - `--fact/--decision/--contract` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`
   - `--evidence` — ссылки на `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/data-model.md`, `.madspec/<BRANCH>/contracts/openapi.yaml`
 - `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 
@@ -110,6 +110,7 @@ $ARGUMENTS
    - Для каждого эндпоинта создай файл с описанием контракта
    - Используй формат OpenAPI/Swagger, если возможно
    - Свяжи каждый контракт с соответствующим экраном из прототипа
+   - После согласования набора сущностей, интеграций и контрактов фиксируй их через `madspec memory capture --stage mvp.architecture`
 
 4. **Объединение контрактов в один документ**:
   - **КРИТИЧНО**: объедини все API контракты (Rest API) в один файл в нотации OpenAPI v.3 - `.madspec/<BRANCH>/contracts/openapi.yaml`
@@ -187,14 +188,12 @@ $ARGUMENTS
 
 8. **Checkpoint в structured memory**:
    - После успешной валидации архитектуры **обязательно** выполни `madspec memory checkpoint --stage mvp.architecture`
-   - Передай минимум:
+   - Если stage memory уже накоплена инкрементально, достаточно:
      - `--summary` с итогом архитектуры
-     - `--fact` с ключевыми сущностями, интеграциями и ограничениями
-     - `--decision` о структуре проекта и архитектурных паттернах
-     - `--contract` с перечнем API/контрактов и интерфейсных ограничений
      - `--evidence .madspec/<BRANCH>/architecture.md`
      - `--evidence .madspec/<BRANCH>/data-model.md`
      - `--evidence .madspec/<BRANCH>/contracts/openapi.yaml`
+   - Если по ходу этапа не были сохранены какие-то сущности, решения или контракты, добавь недостающие `--fact`, `--decision` и `--contract` прямо в checkpoint
    - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 9. **Сохранение артефактов**:

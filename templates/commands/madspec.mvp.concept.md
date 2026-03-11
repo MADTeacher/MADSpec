@@ -26,11 +26,12 @@ $ARGUMENTS
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - Файлы `project-context.md`, `planning-context-cache.md`, `planning-context.md`, `implementation-context.md`, `review.md`, `improvements.md` считаются **generated views**, а не source of truth.
+- Перед началом и после каждого подтвержденного смыслового блока используй `madspec memory retrieve --stage mvp.concept --json-output` и `madspec memory capture --stage mvp.concept ...`.
+- В `memory capture` фиксируй не только финальные выводы, но и подтвержденные по ходу диалога facts/decisions/questions/pending-actions.
 - Для этапа concept **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.concept ...`.
 - Минимальный payload checkpoint:
   - `--summary` — краткий итог концепции
-  - `--fact` — проблема проекта, целевая аудитория, ограничения
-  - `--decision` — приоритизация функций P1/P2/P3
+  - `--fact/--decision` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`
   - `--evidence` — ссылки на `.madspec/<BRANCH>/concept.md` и другие опорные артефакты
 - `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 
@@ -86,6 +87,7 @@ $ARGUMENTS
    - Если пользовательский ввод (диалог) содержит значение, используй его.
    - В противном случае сделай вывод на основе существующего контекста репозитория (README, документации, предыдущей версии концепции, если они имеются в проекте).
    - Для дат принятия решений: ДАТА_РАТИФИКАЦИИ — исходная дата принятия (если неизвестна, спроси или отметь как TODO), ДАТА_ПОСЛЕДНЕГО_ИЗМЕНЕНИЯ — сегодняшняя дата, если были внесены изменения, в противном случае оставь предыдущее значение.
+   - После каждого подтвержденного факта о ЦА, боли, ограничениях или приоритизации функций сразу фиксируй это через `madspec memory capture --stage mvp.concept`.
 
 4. **Анализ и приоритизация**:
    - Проанализируй собранные данные и определи приоритеты заполнения разделов концепции
@@ -161,13 +163,10 @@ $ARGUMENTS
 
 7. **Checkpoint в structured memory**:
    - После финальной валидации **обязательно** выполни `madspec memory checkpoint --stage mvp.concept`
-   - Передай минимум:
+   - Если facts/decisions уже накоплены через `madspec memory capture --status validated`, финальный checkpoint может содержать только:
      - `--summary` с итогом концепции
-     - `--fact` с формулировкой проблемы проекта
-     - `--fact` с описанием целевой аудитории
-     - `--fact` с ключевыми ограничениями или предположениями
-     - `--decision` с итоговой приоритизацией функций P1/P2/P3
      - `--evidence .madspec/<BRANCH>/concept.md`
+   - Если что-то еще не было зафиксировано по ходу работы, добавь недостающие `--fact` и `--decision` прямо в checkpoint
    - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 8. **Сохранение файлов**:

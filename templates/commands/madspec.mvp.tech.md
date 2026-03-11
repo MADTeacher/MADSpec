@@ -26,12 +26,12 @@ $ARGUMENTS
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - `project-context.md` и другие markdown-контексты обновляются только как generated views.
+- Перед обсуждением и после каждого согласованного trade-off используй `madspec memory retrieve --stage mvp.tech --json-output` и `madspec memory capture --stage mvp.tech ...`.
+- Через `memory capture` фиксируй требования, ограничения, rejected alternatives, утвержденные технологии и open questions не в конце, а по мере ратификации.
 - Для этапа tech **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.tech ...`.
 - Минимальный payload checkpoint:
   - `--summary` — итог выбранного стека
-  - `--fact` — ограничения и требования проекта, повлиявшие на выбор
-  - `--decision` — утвержденные технологии и способ организации кода
-  - `--contract` — важные compatibility constraints или обязательные версии
+  - `--fact/--decision/--contract` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`
   - `--evidence` — ссылки на `.madspec/<BRANCH>/tech-stack.md`
 - `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 
@@ -119,6 +119,7 @@ $ARGUMENTS
    - Предложи рекомендацию с обоснованием
    - Получи согласие
    - **НЕ ПЕРЕХОДИ** к следующему этапу пока не выбран подход для организации кода
+   - После каждого подтвержденного выбора фиксируй его в `madspec memory capture --stage mvp.tech`
 
 5. **Создание документации стека**:
    - Загрузи шаблон `.madspec/templates/tech-stack-template.md` (шаблоны хранятся в корне `.madspec/templates/`) 
@@ -176,13 +177,10 @@ $ARGUMENTS
 
 7. **Checkpoint в structured memory**:
    - После утверждения стека **обязательно** выполни `madspec memory checkpoint --stage mvp.tech`
-   - Передай минимум:
+   - Если stage memory уже накоплена инкрементально, достаточно:
      - `--summary` с итогом выбранного технологического стека
-     - `--fact` с ключевыми требованиями и ограничениями проекта
-     - `--decision` для каждого утвержденного компонента стека
-     - `--decision` с выбранным подходом организации кода
-     - `--contract` для обязательных compatibility constraints или фиксированных версий
      - `--evidence .madspec/<BRANCH>/tech-stack.md`
+   - Если что-то не было сохранено в памяти по ходу обсуждения, добавь недостающие `--fact`, `--decision` и `--contract` прямо в checkpoint
    - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 8. **Отчет**:

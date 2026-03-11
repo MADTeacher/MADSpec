@@ -36,6 +36,20 @@ def _format_record_lines(records: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
+def _select_next_executable_step(progress: dict[str, Any]) -> str | None:
+    completed_steps = set(progress.get("completedSteps", []))
+    step_dependencies = progress.get("planningMetadata", {}).get("stepDependencies", {})
+    step_status = progress.get("stepStatus", {})
+    for step_id in progress.get("plannedSteps", []):
+        if step_id in completed_steps:
+            continue
+        if step_status.get(step_id, {}).get("status") == "completed":
+            continue
+        if all(dependency in completed_steps for dependency in step_dependencies.get(step_id, [])):
+            return step_id
+    return None
+
+
 def _render_project_context(
     branch_name: str,
     progress: dict[str, Any],
@@ -175,6 +189,23 @@ def _render_review_artifacts(
     return "\n".join(review_lines) + "\n", "\n".join(improvement_lines) + "\n"
 
 
+def _render_security_artifact(
+    security_records: list[dict[str, Any]],
+    generated_at: str,
+) -> str:
+    lines = [
+        "# Security Audit",
+        "",
+        "> Generated from security-stage structured memory.",
+        "",
+        f"- Last generated: `{generated_at}`",
+        "",
+        "## Findings And Notes",
+    ]
+    lines.extend(_format_record_lines(security_records))
+    return "\n".join(lines) + "\n"
+
+
 def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path]:
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
@@ -256,6 +287,14 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     improvements_path = paths.branch_dir / "improvements.md"
     improvements_path.write_text(improvements_text, encoding="utf-8")
     generated.extend([review_path, improvements_path])
+
+    security_records = [record for record in all_records if record.get("stage") == "security"]
+    security_path = paths.branch_dir / "security-audit.md"
+    security_path.write_text(
+        _render_security_artifact(security_records, generated_at),
+        encoding="utf-8",
+    )
+    generated.append(security_path)
     return generated
 
 
@@ -264,16 +303,19 @@ def _filtered_semantic_records(
     *,
     include_obsolete: bool,
     include_conflicted: bool,
+    include_proposed: bool = False,
 ) -> list[dict[str, Any]]:
     records = read_jsonl(path)
     filtered: list[dict[str, Any]] = []
     for record in records:
         status = record.get("status")
+        if status == "proposed" and not include_proposed:
+            continue
         if status == "obsolete" and not include_obsolete:
             continue
         if status == "conflicted" and not include_conflicted:
             continue
-        if status == "validated" or include_conflicted or include_obsolete:
+        if status == "validated" or include_proposed or include_conflicted or include_obsolete:
             filtered.append(record)
     return filtered
 
@@ -309,18 +351,53 @@ def retrieve_memory_context(
         include_obsolete=include_obsolete,
         include_conflicted=include_conflicted,
     )
-
     stage_lower = stage.lower()
+    resolved_step_id = step_id or active_session.get("current_step") or progress.get("currentImplementStep")
+    if not resolved_step_id and "implement" in stage_lower:
+        resolved_step_id = _select_next_executable_step(progress)
+    stage_facts = [
+        record
+        for record in _filtered_semantic_records(
+            paths.facts,
+            include_obsolete=include_obsolete,
+            include_conflicted=include_conflicted,
+            include_proposed=True,
+        )
+        if stage_lower in str(record.get("stage", "")).lower()
+        and (not resolved_step_id or record.get("step_id") == resolved_step_id)
+    ]
+    stage_decisions = [
+        record
+        for record in _filtered_semantic_records(
+            paths.decisions,
+            include_obsolete=include_obsolete,
+            include_conflicted=include_conflicted,
+            include_proposed=True,
+        )
+        if stage_lower in str(record.get("stage", "")).lower()
+        and (not resolved_step_id or record.get("step_id") == resolved_step_id)
+    ]
+    stage_contracts = [
+        record
+        for record in _filtered_semantic_records(
+            paths.contracts,
+            include_obsolete=include_obsolete,
+            include_conflicted=include_conflicted,
+            include_proposed=True,
+        )
+        if stage_lower in str(record.get("stage", "")).lower()
+        and (not resolved_step_id or record.get("step_id") == resolved_step_id)
+    ]
     scoped_events = [
         record
         for record in events
-        if (not step_id or record.get("step_id") == step_id)
+        if (not resolved_step_id or record.get("step_id") == resolved_step_id)
         and stage_lower in str(record.get("stage", "")).lower()
     ]
     scoped_decisions = [
         record
         for record in decision_log
-        if (not step_id or record.get("step_id") == step_id)
+        if (not resolved_step_id or record.get("step_id") == resolved_step_id)
         and stage_lower in str(record.get("stage", "")).lower()
     ]
 
@@ -359,7 +436,7 @@ def retrieve_memory_context(
     return {
         "branch": branch_name,
         "stage": stage,
-        "step_id": step_id,
+        "step_id": resolved_step_id,
         "active_session": {
             "active_goal": active_session.get("active_goal"),
             "stage": active_session.get("stage"),
@@ -372,6 +449,22 @@ def retrieve_memory_context(
             "plannedSteps": progress.get("plannedSteps", [])[:limit],
             "completedSteps": progress.get("completedSteps", [])[:limit],
             "stepDependencies": progress.get("planningMetadata", {}).get("stepDependencies", {}),
+            "nextExecutableStep": _select_next_executable_step(progress) if "implement" in stage_lower else None,
+        },
+        "step": {
+            "step_id": resolved_step_id,
+            "metadata": progress.get("stepMetadata", {}).get(resolved_step_id, {}) if resolved_step_id else {},
+            "status": progress.get("stepStatus", {}).get(resolved_step_id, {}) if resolved_step_id else {},
+            "dependencies": progress.get("planningMetadata", {}).get("stepDependencies", {}).get(resolved_step_id, [])
+            if resolved_step_id
+            else [],
+            "covers": progress.get("coversFunctions", {}).get(resolved_step_id, {}) if resolved_step_id else {},
+        },
+        "stage_memory": {
+            "facts": _trim(stage_facts),
+            "decisions": _trim(stage_decisions),
+            "contracts": _trim(stage_contracts),
+            "notes": _trim(scoped_decisions + scoped_events),
         },
         "semantic": {
             "facts": _trim(relevant_facts),

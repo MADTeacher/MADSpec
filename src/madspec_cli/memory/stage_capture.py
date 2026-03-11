@@ -11,13 +11,12 @@ from .storage import (
     get_memory_paths,
     now_iso,
     read_json,
-    read_jsonl,
     write_json,
 )
 from .validation import validate_branch_memory
 from .views import consolidate_branch_memory
 
-CHECKPOINT_STAGES = {
+CAPTURE_STAGES = {
     "mvp.concept",
     "mvp.design",
     "mvp.tech",
@@ -48,71 +47,72 @@ def _restore_file(path: Path, content: str | None) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def checkpoint_stage_memory(
+def _append_unique(existing: list[str], values: list[str]) -> list[str]:
+    result = list(existing)
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return result
+
+
+def capture_stage_memory(
     project_path: Path,
     branch_name: str,
     stage: str,
-    summary: str,
     *,
+    summary: str | None = None,
     facts: list[str] | None = None,
     decisions: list[str] | None = None,
     contracts: list[str] | None = None,
     evidence: list[str] | None = None,
     questions: list[str] | None = None,
     pending_actions: list[str] | None = None,
+    status: str = "validated",
 ) -> dict[str, Any]:
     normalized_stage = stage.strip().lower()
-    normalized_summary = summary.strip()
+    if normalized_stage not in CAPTURE_STAGES:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": ["stage must be one of: " + ", ".join(sorted(CAPTURE_STAGES))],
+        }
+
+    normalized_status = status.strip().lower()
+    if normalized_status not in {"proposed", "validated", "conflicted", "obsolete"}:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": ["status must be one of: conflicted, obsolete, proposed, validated"],
+        }
+
+    normalized_summary = (summary or "").strip()
     normalized_facts = _normalize_text_list(facts)
     normalized_decisions = _normalize_text_list(decisions)
     normalized_contracts = _normalize_text_list(contracts)
     normalized_evidence = _normalize_text_list(evidence)
     normalized_questions = _normalize_text_list(questions)
     normalized_pending_actions = _normalize_text_list(pending_actions)
-
-    errors: list[str] = []
-    if normalized_stage not in CHECKPOINT_STAGES:
-        errors.append(
-            "stage must be one of: "
-            + ", ".join(sorted(CHECKPOINT_STAGES))
-        )
-    if not normalized_summary:
-        errors.append("summary must not be empty")
-    ensure_memory_layout(project_path, branch_name)
-    paths = get_memory_paths(project_path, branch_name)
-    existing_stage_facts = [
-        record
-        for record in read_jsonl(paths.facts)
-        if record.get("stage") == normalized_stage and record.get("status") == "validated"
-    ]
-    existing_stage_decisions = [
-        record
-        for record in read_jsonl(paths.decisions)
-        if record.get("stage") == normalized_stage and record.get("status") == "validated"
-    ]
-    existing_stage_contracts = [
-        record
-        for record in read_jsonl(paths.contracts)
-        if record.get("stage") == normalized_stage and record.get("status") == "validated"
-    ]
-    has_existing_stage_memory = any(
-        [existing_stage_facts, existing_stage_decisions, existing_stage_contracts]
-    )
     if not any(
         [
             normalized_summary,
             normalized_facts,
             normalized_decisions,
             normalized_contracts,
-            has_existing_stage_memory,
+            normalized_questions,
+            normalized_pending_actions,
         ]
     ):
-        errors.append(
-            "checkpoint payload must include summary plus fact/decision/contract content or use previously captured validated stage memory"
-        )
-    if errors:
-        return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": ["capture payload must include summary, fact, decision, contract, question, or pending action"],
+        }
 
+    ensure_memory_layout(project_path, branch_name)
+    paths = get_memory_paths(project_path, branch_name)
     snapshots = {
         paths.active_session: _snapshot_file(paths.active_session),
         paths.decision_log: _snapshot_file(paths.decision_log),
@@ -123,42 +123,52 @@ def checkpoint_stage_memory(
 
     ts = now_iso()
     active_session = read_json(paths.active_session, _default_active_session(branch_name))
-    active_session.update(
-        {
-            "branch": branch_name,
-            "active_goal": normalized_summary,
-            "stage": normalized_stage,
-            "current_step": None,
-            "pending_actions": normalized_pending_actions,
-            "open_questions": normalized_questions,
-            "current_hypotheses": (normalized_decisions or normalized_facts)[:5],
-            "last_checkpoint_at": ts,
-            "updated_at": ts,
-        }
-    )
+    active_session["branch"] = branch_name
+    active_session["stage"] = normalized_stage
+    if normalized_summary:
+        active_session["active_goal"] = normalized_summary
+    active_session["open_questions"] = _append_unique(
+        active_session.get("open_questions", []),
+        normalized_questions,
+    )[:20]
+    active_session["pending_actions"] = _append_unique(
+        active_session.get("pending_actions", []),
+        normalized_pending_actions,
+    )[:20]
+    active_session["current_hypotheses"] = _append_unique(
+        active_session.get("current_hypotheses", []),
+        normalized_decisions or normalized_facts,
+    )[:20]
+    active_session["last_checkpoint_at"] = ts
+    active_session["updated_at"] = ts
 
-    checkpoint_record = make_record(
-        branch_name,
-        normalized_stage,
-        "memory.checkpoint",
-        normalized_summary,
-        status="validated",
-        evidence=normalized_evidence,
-        scope="project",
-        record_type="checkpoint",
-        metadata={
-            "questions": normalized_questions,
-            "pendingActions": normalized_pending_actions,
-        },
-        ts=ts,
-    )
+    note_records = []
+    if normalized_summary or normalized_questions or normalized_pending_actions:
+        note_records.append(
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                normalized_summary or f"Captured stage update for {normalized_stage}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                record_type="stage_note",
+                metadata={
+                    "questions": normalized_questions,
+                    "pendingActions": normalized_pending_actions,
+                },
+                ts=ts,
+            )
+        )
+
     fact_records = [
         make_record(
             branch_name,
             normalized_stage,
-            "memory.checkpoint",
+            "memory.capture",
             item,
-            status="validated",
+            status=normalized_status,
             evidence=normalized_evidence,
             scope="project",
             semantic_kind="fact",
@@ -171,9 +181,9 @@ def checkpoint_stage_memory(
         make_record(
             branch_name,
             normalized_stage,
-            "memory.checkpoint",
+            "memory.capture",
             item,
-            status="validated",
+            status=normalized_status,
             evidence=normalized_evidence,
             scope="project",
             semantic_kind="decision",
@@ -186,9 +196,9 @@ def checkpoint_stage_memory(
         make_record(
             branch_name,
             normalized_stage,
-            "memory.checkpoint",
+            "memory.capture",
             item,
-            status="validated",
+            status=normalized_status,
             evidence=normalized_evidence,
             scope="project",
             semantic_kind="contract",
@@ -200,7 +210,7 @@ def checkpoint_stage_memory(
 
     try:
         write_json(paths.active_session, active_session)
-        append_jsonl(paths.decision_log, [checkpoint_record])
+        append_jsonl(paths.decision_log, note_records)
         append_jsonl(paths.facts, fact_records)
         append_jsonl(paths.decisions, decision_records)
         append_jsonl(paths.contracts, contract_records)
@@ -208,7 +218,6 @@ def checkpoint_stage_memory(
         validation_errors = validate_branch_memory(project_path, branch_name)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
-
         generated = consolidate_branch_memory(project_path, branch_name)
     except Exception as exc:
         for path, content in snapshots.items():
@@ -224,15 +233,14 @@ def checkpoint_stage_memory(
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
-        "summary": normalized_summary,
-        "used_existing_stage_memory": has_existing_stage_memory and not any(
-            [normalized_facts, normalized_decisions, normalized_contracts]
-        ),
+        "status": normalized_status,
         "written": {
-            "decision_log": 1,
+            "notes": len(note_records),
             "facts": len(fact_records),
             "decisions": len(decision_records),
             "contracts": len(contract_records),
+            "questions": len(normalized_questions),
+            "pending_actions": len(normalized_pending_actions),
         },
         "generated_views": [str(path.relative_to(project_path)) for path in generated],
     }

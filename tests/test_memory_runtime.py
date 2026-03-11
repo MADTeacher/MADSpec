@@ -6,6 +6,7 @@ from pathlib import Path
 from madspec_cli.memory import (
     checkpoint_stage_memory,
     append_jsonl,
+    capture_stage_memory,
     consolidate_branch_memory,
     determine_next_step,
     ensure_memory_layout,
@@ -17,6 +18,11 @@ from madspec_cli.memory import (
     retrieve_memory_context,
     validate_branch_memory,
     write_json,
+)
+from madspec_cli.memory.implementation import (
+    checkpoint_implementation_step,
+    complete_implementation_step,
+    start_implementation_step,
 )
 
 
@@ -521,6 +527,95 @@ def test_register_planned_step_reports_known_labels_for_unknown_cover(tmp_path: 
     assert "User authentication" in payload["errors"][0]
 
 
+def test_implementation_lifecycle_updates_memory_incrementally(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _write_mvp_concept(paths["branch_dir"])
+
+    register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-01-authentication",
+        covers=["User authentication"],
+        step_kind="code",
+    )
+    register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.plan",
+        step_id="step-02-session-persistence",
+        covers=["Session persistence"],
+        step_kind="code",
+        depends_on=["step-01-authentication"],
+    )
+
+    started = start_implementation_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.implement",
+    )
+    red = checkpoint_implementation_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.implement",
+        step_id="step-01-authentication",
+        summary="Focused auth test is red",
+        tdd_phase="red",
+        red_evidence=["uv run pytest tests/test_auth.py -q"],
+    )
+    green = checkpoint_implementation_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.implement",
+        step_id="step-01-authentication",
+        summary="Auth test is green",
+        tdd_phase="green",
+        green_evidence=["uv run pytest tests/test_auth.py -q"],
+        refactor_note="No refactor needed.",
+    )
+    completed = complete_implementation_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.implement",
+        step_id="step-01-authentication",
+        summary="Authentication flow implemented and validated",
+        facts=["Authentication now persists session cookies"],
+        decisions=["Keep session middleware in the HTTP layer"],
+        evidence=["tests/test_auth.py"],
+    )
+
+    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
+    active_session = json.loads(paths["active_session"].read_text(encoding="utf-8"))
+    retrieved = retrieve_memory_context(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.implement",
+        step_id="step-01-authentication",
+    )
+
+    assert started["accepted"] is True
+    assert started["step_id"] == "step-01-authentication"
+    assert red["accepted"] is True
+    assert green["accepted"] is True
+    assert completed["accepted"] is True
+    assert completed["next_step"] == "step-02-session-persistence"
+    assert progress["completedSteps"] == ["step-01-authentication"]
+    assert progress["currentImplementStep"] == "step-02-session-persistence"
+    assert progress["stepStatus"]["step-01-authentication"]["status"] == "completed"
+    assert progress["stepStatus"]["step-01-authentication"]["tddPhase"] == "completed"
+    assert progress["stepStatus"]["step-01-authentication"]["redEvidence"] == [
+        "uv run pytest tests/test_auth.py -q"
+    ]
+    assert progress["stepStatus"]["step-01-authentication"]["greenEvidence"] == [
+        "uv run pytest tests/test_auth.py -q"
+    ]
+    assert active_session["current_step"] == "step-02-session-persistence"
+    assert retrieved["step"]["status"]["status"] == "completed"
+    assert retrieved["semantic"]["facts"][0]["summary"] == "Authentication now persists session cookies"
+    assert retrieved["semantic"]["decisions"][0]["summary"] == "Keep session middleware in the HTTP layer"
+    assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
+
+
 def test_ensure_memory_layout_normalizes_legacy_tdd_fields(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _write_mvp_concept(paths["branch_dir"])
@@ -733,6 +828,81 @@ def test_checkpoint_stage_memory_updates_active_session_and_project_context(tmp_
     assert retrieved["semantic"]["facts"][0]["summary"] == "Need web delivery and fast iteration"
     assert retrieved["semantic"]["decisions"][0]["summary"] == "Use FastAPI for backend and HTMX for frontend"
     assert retrieved["semantic"]["contracts"][0]["summary"] == "Python version must remain 3.13"
+
+
+def test_capture_stage_memory_accumulates_context_before_checkpoint(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    captured = capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        summary="Captured audience and pain points during discovery",
+        facts=["Primary audience: freelancers"],
+        decisions=["Prioritize booking workflow before analytics"],
+        questions=["Do we need team scheduling in MVP?"],
+        pending_actions=["Clarify notification constraints"],
+        evidence=[".madspec/main/concept.md"],
+        status="validated",
+    )
+    retrieved_before = retrieve_memory_context(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+    )
+    checkpointed = checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        "Concept ratified after incremental discovery",
+        evidence=[".madspec/main/concept.md"],
+    )
+    retrieved_after = retrieve_memory_context(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+    )
+
+    assert captured["accepted"] is True
+    assert retrieved_before["stage_memory"]["facts"][0]["summary"] == "Primary audience: freelancers"
+    assert retrieved_before["stage_memory"]["decisions"][0]["summary"] == "Prioritize booking workflow before analytics"
+    assert retrieved_before["active_session"]["open_questions"] == ["Do we need team scheduling in MVP?"]
+    assert checkpointed["accepted"] is True
+    assert checkpointed["used_existing_stage_memory"] is True
+    assert retrieved_after["semantic"]["facts"][0]["summary"] == "Primary audience: freelancers"
+    assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
+
+
+def test_security_checkpoint_generates_security_audit_view(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    captured = capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "security",
+        summary="Captured initial OWASP findings",
+        facts=["Missing rate limiting on login endpoint"],
+        decisions=["Add per-IP throttling before public release"],
+        contracts=["Password reset tokens must expire within 15 minutes"],
+        evidence=["src/api/auth.py"],
+        status="validated",
+    )
+    checkpointed = checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "security",
+        "Security audit ratified from accumulated findings",
+        evidence=[".madspec/main/security-audit.md"],
+    )
+
+    security_audit = (paths["branch_dir"] / "security-audit.md").read_text(encoding="utf-8")
+    retrieved = retrieve_memory_context(paths["branch_dir"].parents[1], "main", "security")
+
+    assert captured["accepted"] is True
+    assert checkpointed["accepted"] is True
+    assert "Missing rate limiting on login endpoint" in security_audit
+    assert "Add per-IP throttling before public release" in security_audit
+    assert retrieved["stage_memory"]["contracts"][0]["summary"] == "Password reset tokens must expire within 15 minutes"
 
 
 def test_checkpoint_stage_memory_is_atomic_on_invalid_payload(tmp_path: Path) -> None:

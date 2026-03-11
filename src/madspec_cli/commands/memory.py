@@ -4,6 +4,13 @@ from pathlib import Path
 
 import typer
 
+from ..memory.implementation import (
+    IMPLEMENTATION_STAGES,
+    checkpoint_implementation_step,
+    complete_implementation_step,
+    start_implementation_step,
+)
+from ..memory.stage_capture import CAPTURE_STAGES, capture_stage_memory
 from ..memory import (
     CHECKPOINT_STAGES,
     checkpoint_stage_memory,
@@ -23,7 +30,7 @@ from ..ui import console, show_banner
 
 
 def memory_checkpoint(
-    stage: str = typer.Option(..., "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, or mvp.architecture"),
+    stage: str = typer.Option(..., "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, mvp.architecture, review, or security"),
     summary: str = typer.Option(..., "--summary", help="Stage checkpoint summary"),
     fact: list[str] = typer.Option(None, "--fact", help="Validated fact; repeat for multiple values"),
     decision: list[str] = typer.Option(None, "--decision", help="Validated decision; repeat for multiple values"),
@@ -74,6 +81,68 @@ def memory_checkpoint(
     console.print(
         "[red]Checkpoint rejected.[/red] "
         f"Allowed stages: {', '.join(sorted(CHECKPOINT_STAGES))}"
+    )
+    for error in payload.get("errors", []):
+        console.print(f"[red]- {error}[/red]")
+    raise typer.Exit(1)
+
+
+def memory_capture(
+    stage: str = typer.Option(..., "--stage", help="Stage to capture: mvp.concept, mvp.design, mvp.tech, mvp.architecture, review, or security"),
+    summary: str = typer.Option(None, "--summary", help="Optional stage note summary"),
+    fact: list[str] = typer.Option(None, "--fact", help="Fact to capture; repeat for multiple values"),
+    decision: list[str] = typer.Option(None, "--decision", help="Decision to capture; repeat for multiple values"),
+    contract: list[str] = typer.Option(None, "--contract", help="Contract/constraint to capture; repeat for multiple values"),
+    evidence: list[str] = typer.Option(None, "--evidence", help="Supporting evidence path or note; repeat for multiple values"),
+    question: list[str] = typer.Option(None, "--question", help="Open question to add to active session; repeat for multiple values"),
+    pending_action: list[str] = typer.Option(None, "--pending-action", help="Pending action to add to active session; repeat for multiple values"),
+    status: str = typer.Option("validated", "--status", help="Memory record status: proposed, validated, conflicted, or obsolete"),
+    branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
+    json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+) -> None:
+    """Capture incremental non-iterative stage memory before final checkpoint."""
+    project_path = Path.cwd()
+    target_branch = resolve_branch_name(project_path, branch_name)
+    payload = capture_stage_memory(
+        project_path,
+        target_branch,
+        stage,
+        summary=summary,
+        facts=fact or [],
+        decisions=decision or [],
+        contracts=contract or [],
+        evidence=evidence or [],
+        questions=question or [],
+        pending_actions=pending_action or [],
+        status=status,
+    )
+
+    if json_output:
+        emit_json(payload)
+        if not payload.get("accepted"):
+            raise typer.Exit(1)
+        return
+
+    show_banner()
+    console.print(f"[cyan]Branch:[/cyan] {target_branch}")
+    console.print(f"[cyan]Stage:[/cyan] {stage}")
+    if payload.get("accepted"):
+        written = payload["written"]
+        console.print(f"[green]Captured stage memory:[/green] {stage}")
+        console.print(
+            "[cyan]Records:[/cyan] "
+            f"notes={written['notes']} "
+            f"facts={written['facts']} "
+            f"decisions={written['decisions']} "
+            f"contracts={written['contracts']} "
+            f"questions={written['questions']} "
+            f"pending_actions={written['pending_actions']}"
+        )
+        return
+
+    console.print(
+        "[red]Capture rejected.[/red] "
+        f"Allowed stages: {', '.join(sorted(CAPTURE_STAGES))}"
     )
     for error in payload.get("errors", []):
         console.print(f"[red]- {error}[/red]")
@@ -218,6 +287,149 @@ def memory_retrieve(
     console.print(f"[cyan]Decisions:[/cyan] {len(payload['semantic']['decisions'])}")
     console.print(f"[cyan]Contracts:[/cyan] {len(payload['semantic']['contracts'])}")
     console.print(f"[cyan]Episodes:[/cyan] {len(payload['episodes'])}")
+
+
+def memory_start_step(
+    stage: str = typer.Option(..., "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
+    step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to next executable step"),
+    summary: str = typer.Option(None, "--summary", help="Optional active goal override"),
+    evidence: list[str] = typer.Option(None, "--evidence", help="Supporting evidence path or note; repeat for multiple values"),
+    json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+) -> None:
+    """Select and start an implementation step in structured memory."""
+    project_path = Path.cwd()
+    target_branch = resolve_branch_name(project_path, branch_name)
+    ensure_memory_layout(project_path, target_branch)
+    payload = start_implementation_step(
+        project_path,
+        target_branch,
+        stage,
+        step_id=step_id,
+        summary=summary,
+        evidence=evidence or [],
+    )
+
+    if json_output:
+        emit_json(payload)
+        if not payload.get("accepted"):
+            raise typer.Exit(1)
+        return
+
+    show_banner()
+    console.print(f"[cyan]Branch:[/cyan] {target_branch}")
+    console.print(f"[cyan]Stage:[/cyan] {stage}")
+    if payload.get("accepted"):
+        console.print(f"[green]Started step:[/green] {payload['step_id']}")
+        return
+
+    console.print(
+        "[red]Failed to start step.[/red] "
+        f"Allowed stages: {', '.join(sorted(IMPLEMENTATION_STAGES))}"
+    )
+    for error in payload.get("errors", []):
+        console.print(f"[red]- {error}[/red]")
+    raise typer.Exit(1)
+
+
+def memory_checkpoint_step(
+    stage: str = typer.Option(..., "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
+    step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to current implementation step"),
+    summary: str = typer.Option(None, "--summary", help="Optional checkpoint summary"),
+    tdd_phase: str = typer.Option(None, "--tdd-phase", help="TDD phase checkpoint: not_started, red, green, refactor, or waived"),
+    red_evidence: list[str] = typer.Option(None, "--red-evidence", help="Red-phase evidence; repeat for multiple values"),
+    green_evidence: list[str] = typer.Option(None, "--green-evidence", help="Green-phase evidence; repeat for multiple values"),
+    refactor_note: str = typer.Option(None, "--refactor-note", help="Refactor note for the current step"),
+    evidence: list[str] = typer.Option(None, "--evidence", help="Supporting evidence path or note; repeat for multiple values"),
+    json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+) -> None:
+    """Persist an in-progress implementation checkpoint into structured memory."""
+    project_path = Path.cwd()
+    target_branch = resolve_branch_name(project_path, branch_name)
+    ensure_memory_layout(project_path, target_branch)
+    payload = checkpoint_implementation_step(
+        project_path,
+        target_branch,
+        stage,
+        step_id=step_id,
+        summary=summary,
+        tdd_phase=tdd_phase,
+        red_evidence=red_evidence or [],
+        green_evidence=green_evidence or [],
+        refactor_note=refactor_note,
+        evidence=evidence or [],
+    )
+
+    if json_output:
+        emit_json(payload)
+        if not payload.get("accepted"):
+            raise typer.Exit(1)
+        return
+
+    show_banner()
+    console.print(f"[cyan]Branch:[/cyan] {target_branch}")
+    console.print(f"[cyan]Stage:[/cyan] {stage}")
+    if payload.get("accepted"):
+        console.print(f"[green]Checkpointed step:[/green] {payload['step_id']}")
+        console.print(f"[cyan]TDD phase:[/cyan] {payload['tdd_phase']}")
+        return
+
+    for error in payload.get("errors", []):
+        console.print(f"[red]- {error}[/red]")
+    raise typer.Exit(1)
+
+
+def memory_complete_step(
+    stage: str = typer.Option(..., "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    summary: str = typer.Option(..., "--summary", help="Completion summary for the implementation step"),
+    branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
+    step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to current implementation step"),
+    red_evidence: list[str] = typer.Option(None, "--red-evidence", help="Red-phase evidence; repeat for multiple values"),
+    green_evidence: list[str] = typer.Option(None, "--green-evidence", help="Green-phase evidence; repeat for multiple values"),
+    refactor_note: str = typer.Option(None, "--refactor-note", help="Refactor note for the current step"),
+    evidence: list[str] = typer.Option(None, "--evidence", help="Supporting evidence path or note; repeat for multiple values"),
+    fact: list[str] = typer.Option(None, "--fact", help="Validated fact to store for the completed step; repeat for multiple values"),
+    decision: list[str] = typer.Option(None, "--decision", help="Validated decision to store for the completed step; repeat for multiple values"),
+    contract: list[str] = typer.Option(None, "--contract", help="Validated contract to store for the completed step; repeat for multiple values"),
+    json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+) -> None:
+    """Mark an implementation step complete and advance structured memory state."""
+    project_path = Path.cwd()
+    target_branch = resolve_branch_name(project_path, branch_name)
+    ensure_memory_layout(project_path, target_branch)
+    payload = complete_implementation_step(
+        project_path,
+        target_branch,
+        stage,
+        step_id=step_id,
+        summary=summary,
+        red_evidence=red_evidence or [],
+        green_evidence=green_evidence or [],
+        refactor_note=refactor_note,
+        evidence=evidence or [],
+        facts=fact or [],
+        decisions=decision or [],
+        contracts=contract or [],
+    )
+
+    if json_output:
+        emit_json(payload)
+        if not payload.get("accepted"):
+            raise typer.Exit(1)
+        return
+
+    show_banner()
+    console.print(f"[cyan]Branch:[/cyan] {target_branch}")
+    console.print(f"[cyan]Stage:[/cyan] {stage}")
+    if payload.get("accepted"):
+        console.print(f"[green]Completed step:[/green] {payload['step_id']}")
+        console.print(f"[cyan]Next step:[/cyan] {payload.get('next_step') or 'none'}")
+        return
+
+    for error in payload.get("errors", []):
+        console.print(f"[red]- {error}[/red]")
+    raise typer.Exit(1)
 
 
 def memory_next_step(
@@ -380,8 +592,12 @@ def register(memory_app: typer.Typer) -> None:
     memory_app.command("status")(memory_status)
     memory_app.command("consolidate")(memory_consolidate)
     memory_app.command("validate")(memory_validate)
+    memory_app.command("capture")(memory_capture)
     memory_app.command("checkpoint")(memory_checkpoint)
     memory_app.command("retrieve")(memory_retrieve)
+    memory_app.command("start-step")(memory_start_step)
+    memory_app.command("checkpoint-step")(memory_checkpoint_step)
+    memory_app.command("complete-step")(memory_complete_step)
     memory_app.command("next-step")(memory_next_step)
     memory_app.command("register-step")(memory_register_step)
     memory_app.command("promote")(memory_promote)

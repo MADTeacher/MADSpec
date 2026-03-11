@@ -22,7 +22,10 @@ $ARGUMENTS
 
 - Review findings сначала фиксируй в structured memory.
 - `review.md`, `improvements.md` и `project-context.md` считаются generated views.
-- После обновления review-артефактов через память запускай `madspec memory consolidate`, `madspec memory validate` и при необходимости `madspec memory learn`.
+- Перед началом анализа используй `madspec memory retrieve --stage review --json-output`.
+- После каждого подтвержденного finding/recommendation/improvement используй `madspec memory capture --stage review ...`.
+- После завершения анализа ратифицируй этап через `madspec memory checkpoint --stage review --summary ...`.
+- `madspec memory capture` и `madspec memory checkpoint` сами запускают `madspec memory consolidate` и `madspec memory validate`.
 
 ## Описание
 
@@ -60,6 +63,7 @@ $ARGUMENTS
    - Сохрани имя ветки для использования в дальнейших шагах
 
 1. **Загрузка контекста**:
+   - Сначала выполни `madspec memory retrieve --stage review --json-output`
    - Прочитай все созданные артефакты:
      - `.madspec/<BRANCH>/concept.md` (где `<BRANCH>` - имя ветки, определенное в шаге 0)
      - `.madspec/<BRANCH>/ui-design.md`
@@ -113,14 +117,9 @@ $ARGUMENTS
    - Укажи на паттерны, которые можно применить
 
 6. **Создание отчета с рекомендациями**:
-   - Загрузи шаблон `.madspec/templates/review-template.md`
-   - Заполни разделы:
-     - **Сильные стороны**: Что сделано хорошо
-     - **Области для улучшения**: Что можно улучшить
-     - **Конкретные рекомендации**: Пошаговые предложения
-     - **Рефакторинг**: Что нужно переделать и почему
-     - **Дополнительные возможности**: Что можно добавить
-   - Сохрани в `.madspec/<BRANCH>/review.md`
+   - Не пиши `.madspec/<BRANCH>/review.md` вручную: это generated view
+   - Для каждой сильной стороны, проблемы и рекомендации сразу сохраняй записи через `madspec memory capture --stage review`
+   - Для findings используй `--decision` и/или `--fact`, для улучшений и open questions добавляй `--question` и `--pending-action`
 
 7. **Создание плана улучшений**:
     - На основе анализа создай приоритизированный список улучшений
@@ -128,14 +127,13 @@ $ARGUMENTS
       - Критичные (нужно исправить)
       - Важные (желательно исправить)
       - Опциональные (можно улучшить позже)
-    - Сохрани в `.madspec/<BRANCH>/improvements.md`
+    - Сохраняй их в structured memory через `madspec memory capture --stage review --decision ... --pending-action ...`
+    - `.madspec/<BRANCH>/improvements.md` пересоберется как generated view
 
-8. **Обновление контекста**:
-    - Обнови `.madspec/project-context.md`:
-      - Установи текущий этап: "review"
-      - Обнови статус этапа review: "Завершен"
-      - Добавь ссылку на список улучшений `.madspec/<BRANCH>/improvements.md`
-      - Добавь ссылку на отчет `.madspec/<BRANCH>/review.md`
+8. **Финализация review в памяти**:
+    - После завершения анализа выполни `madspec memory checkpoint --stage review --summary "<итог review>"`
+    - При необходимости добавь недостающие `--fact`, `--decision`, `--question`, `--pending-action`, если они не были сохранены через `memory capture`
+    - Убедись, что `.madspec/<BRANCH>/review.md`, `.madspec/<BRANCH>/improvements.md` и `.madspec/<BRANCH>/project-context.md` пересобраны как generated views
 
 9. **Отчет**:
     - Выведи пути к созданным файлам
@@ -151,9 +149,10 @@ $ARGUMENTS
 
 ## Выходные артефакты
 
-- `.madspec/<BRANCH>/review.md` - детальный отчет с анализом и рекомендациями (где `<BRANCH>` - имя текущей ветки)
-- `.madspec/<BRANCH>/improvements.md` - приоритизированный список улучшений
-- `.madspec/project-context.md` - обновленный контекст (только навигация и ссылки)
+- `.madspec/<BRANCH>/memory/` - canonical memory с review findings, recommendations и improvement candidates
+- `.madspec/<BRANCH>/review.md` - generated view отчета review (где `<BRANCH>` - имя текущей ветки)
+- `.madspec/<BRANCH>/improvements.md` - generated view приоритизированного списка улучшений
+- `.madspec/<BRANCH>/project-context.md` - generated view навигации и статуса
 
 ## Следующие шаги
 

@@ -22,8 +22,10 @@ $ARGUMENTS
 
 - `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
 - `implementation-context.md` и `project-context.md` являются generated views.
-- После успешного checkpoint обновляй structured memory, затем выполняй `madspec memory consolidate` и `madspec memory validate`.
-- Для выбора следующего шага реализации сначала используй `madspec memory next-step --stage mvp.implement`.
+- Перед началом шага сначала получай контекст через `madspec memory retrieve --stage mvp.implement --json-output`.
+- Для старта шага используй `madspec memory start-step --stage mvp.implement`, а не ручную установку `currentImplementStep`.
+- Для промежуточных TDD checkpoint используй `madspec memory checkpoint-step --stage mvp.implement`.
+- Для завершения шага и продвижения workflow используй `madspec memory complete-step --stage mvp.implement`.
 
 ## Описание
 
@@ -59,8 +61,9 @@ $ARGUMENTS
    - Сохрани имя ветки для использования в дальнейших шагах
 
 1. **Загрузка контекста**:
+   - **Сначала выполни** `madspec memory retrieve --stage mvp.implement --json-output`
+   - Используй JSON-ответ как основной источник workflow state: `currentImplementStep`, `nextExecutableStep`, `step.status`, `step.metadata`, `step.dependencies`, `semantic.*`
    - Прочитай `.madspec/<BRANCH>/implementation-plan.md` (где `<BRANCH>` - имя ветки, определенное в шаге 0)
-   - Прочитай `.madspec/<BRANCH>/memory/progress.json`
    - Прочитай все предыдущие артефакты (concept, design, tech, architecture) из `.madspec/<BRANCH>/`
    - **ОБЯЗАТЕЛЬНО**: Прочитай контексты планирования и реализации предыдущих шагов (если есть):
      - `.madspec/<BRANCH>/steps/step-[NN-1]-[prev-name]/planning-context.md` (контекст планирования предыдущего шага)
@@ -72,9 +75,9 @@ $ARGUMENTS
      - Убедись, что реализованный интерфейс соответствует прототипу
 
 2. **Определение начального шага**:
-   - Если `.madspec/<BRANCH>/memory/progress.json` указывает на `currentImplementStep`, начните с него
-   - Если `currentImplementStep` равен `null`, начните с первого шага
-   - Если пользователь указал конкретный шаг в `$ARGUMENTS`, используй его
+   - Если пользователь явно указал конкретный шаг в `$ARGUMENTS`, проверь его зависимости и запусти `madspec memory start-step --stage mvp.implement --step-id <step-id>`
+   - Иначе запусти `madspec memory start-step --stage mvp.implement --json-output` и используй выбранный шаг из ответа
+   - После `start-step` считай именно structured memory источником текущего шага, а не локальные догадки по имени директории
 
 3. **Проверка зависимостей**:
    - Для текущего шага проверь, что все зависимости завершены
@@ -114,13 +117,13 @@ $ARGUMENTS
    - Отмечай выполненные задачи в `tasks.md` (чекбоксы `[x]`)
    - **Для `code` шага TDD обязателен и порядок нельзя менять:**
      1. Подготовь или создай focused test из секции `Red`
-     2. Запусти его и зафиксируй `red` в `stepStatus.tddPhase=red` и `stepStatus.redEvidence`
+     2. Запусти его и сразу сохрани checkpoint: `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase red --red-evidence "<command>"`
      3. Сделай минимальную реализацию только для перехода в green
-     4. Повтори прогон и зафиксируй `green` в `stepStatus.tddPhase=green` и `stepStatus.greenEvidence`
-     5. Выполни refactor без изменения поведения и запиши результат в `stepStatus.refactorNote`
+     4. Повтори прогон и сохрани checkpoint: `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase green --green-evidence "<command>"`
+     5. Выполни refactor без изменения поведения и сохрани `refactorNote` через `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase refactor --refactor-note "<note>"`
      6. Повтори focused test и `Relevant Suite`
-     7. Только после этого переводи `tddPhase` в `completed`
-   - **Для `non-code` шага** зафиксируй `stepStatus.tddPhase=waived`, сохрани причину из `stepMetadata.waiverReason` и выполняй обычный checklist шага.
+     7. Только после этого завершай шаг через `madspec memory complete-step --stage mvp.implement ...`
+   - **Для `non-code` шага** не редактируй `progress.json` вручную: заверши шаг через `madspec memory complete-step`, а `tddPhase=waived` будет валидирован на основе `stepMetadata`.
    - **Примечание**: Файл `tasks.md` находится в `.madspec/<BRANCH>/steps/` и может быть частью репозитория. Если файл недоступен для редактирования, веди учет выполненных задач в отдельном файле или комментариях.
 
 5.1. **⚠️ КРИТИЧЕСКИ ВАЖНО: Использование официальных команд создания проектов**:
@@ -196,16 +199,16 @@ $ARGUMENTS
      - **Если тесты нет, но они требуются в рамках текущего шага**: исправь проблемы и повтори проверки
      - **Если тестов нет и они не требуются на текущем шаге проекта**: пропусти этот пункт
 
-   - [ ] **TDD-артефакты заполнены для code-step**
-     - Проверь `stepMetadata["step-[NN]-[name]"]` в `.madspec/<BRANCH>/memory/progress.json`
-     - Для `code + required` убедись, что:
-       - `stepStatus.tddPhase = completed`
-       - `stepStatus.redEvidence` заполнен
-       - `stepStatus.greenEvidence` заполнен
-       - `stepStatus.refactorNote` заполнен или содержит `No refactor needed`
+   - [ ] **TDD-артефакты зафиксированы через structured memory**
+     - Проверь ответ `madspec memory retrieve --stage mvp.implement --step-id <step-id> --json-output`
+     - Для `code + required` убедись, что после `complete-step`:
+       - `step.status.tddPhase = completed`
+       - `step.status.redEvidence` заполнен
+       - `step.status.greenEvidence` заполнен
+       - `step.status.refactorNote` заполнен или содержит `No refactor needed`
      - Для `non-code` шага убедись, что:
-       - `stepStatus.tddPhase = waived`
-       - `stepMetadata.waiverReason` заполнен при `tddPolicy=waived`
+       - `step.status.tddPhase = waived`
+       - `step.metadata.waiverReason` заполнен при `tddPolicy=waived`
 
    - [ ] **Ручные тесты описаны**
      - Проверь файл `.madspec/<BRANCH>/steps/step-[NN]-[name]/tests.md` на наличие ручных тестов/чек-листов
@@ -244,99 +247,39 @@ $ARGUMENTS
 
 6. **Обновление прогресса**:
    
-   **ВАЖНО**: После успешной валидации шага обнови файл `.madspec/<BRANCH>/memory/progress.json` вручную:
+   **ВАЖНО**: После успешной валидации шага **не редактируй** `.madspec/<BRANCH>/memory/progress.json` вручную.
    
-   - Прочитай текущий файл `.madspec/<BRANCH>/memory/progress.json`
-   - Выполни следующие обновления:
-     
-     a. **Добавь текущий шаг в `completedSteps`**:
-        - Если шаг еще не присутствует в массиве `completedSteps`, добавь его
-        - Формат: `"step-[NN]-[name]"` (например, `"step-01-setup"`)
-     
-     b. **Обнови `stepStatus` для текущего шага**:
-        - Установи `stepStatus["step-[NN]-[name]"]` как объект с полями:
-          - `status`: `"completed"`
-          - `completedAt`: `"YYYY-MM-DD"` (дата завершения в формате ISO)
-          - `tddPhase`: `"completed"` для `code` шага или `"waived"` для `non-code`
-          - `redEvidence`: список прогонов / артефактов red
-          - `greenEvidence`: список прогонов / артефактов green
-          - `refactorNote`: что было отрефакторено или `No refactor needed`
-     
-     c. **Определи следующий шаг**:
-        - Найди следующий незавершенный шаг из `plannedSteps` в `.madspec/<BRANCH>/memory/progress.json` (если поле существует)
-        - Или найди следующий шаг из `implementation-plan.md`, который еще не завершен
-        - Учитывай зависимости: следующий шаг должен иметь все зависимости в `completedSteps`
-        - Если зависимости указаны в `planningMetadata.stepDependencies`, проверь их там
-        - Если следующий шаг найден и все его зависимости завершены, установи `currentImplementStep = "step-[NN]-[name]"`
-        - Если все шаги завершены, установи `currentImplementStep = null`
-     
-     d. **Сохрани обновленный `.madspec/<BRANCH>/memory/progress.json`**:
-        - Убедись, что JSON валиден (правильный синтаксис, запятые, кавычки)
-        - Сохрани файл
+   Вместо этого выполни:
    
-   **Пример обновления `.madspec/<BRANCH>/memory/progress.json`**:
-   
-   До обновления:
-   ```json
-   {
-     "currentImplementStep": "step-01-setup",
-     "completedSteps": [],
-     "plannedSteps": ["step-01-setup", "step-02-user-model", "step-03-auth"],
-     "stepStatus": {},
-     "stepMetadata": {
-       "step-01-setup": {
-         "kind": "code",
-         "tddPolicy": "required",
-         "waiverReason": null
-       }
-     },
-      "planningMetadata": {
-        "stepDependencies": {
-          "step-02-user-model": ["step-01-setup"],
-         "step-03-auth": ["step-02-user-model"]
-       }
-     }
-   }
+   ```bash
+   madspec memory complete-step \
+     --stage mvp.implement \
+     --step-id <step-id> \
+     --summary "<что завершено>" \
+     --red-evidence "<focused red command>" \
+     --green-evidence "<focused green command>" \
+     --refactor-note "<что было отрефакторено>"
    ```
    
-   После обновления (после завершения step-01-setup):
-   ```json
-   {
-     "currentImplementStep": "step-02-user-model",
-     "completedSteps": ["step-01-setup"],
-     "plannedSteps": ["step-01-setup", "step-02-user-model", "step-03-auth"],
-     "stepStatus": {
-       "step-01-setup": {
-         "status": "completed",
-         "completedAt": "2024-01-15",
-         "tddPhase": "completed",
-         "redEvidence": ["uv run pytest tests/test_setup.py -q"],
-         "greenEvidence": ["uv run pytest tests/test_setup.py -q"],
-         "refactorNote": "No refactor needed"
-       }
-     },
-     "stepMetadata": {
-       "step-01-setup": {
-         "kind": "code",
-         "tddPolicy": "required",
-         "waiverReason": null
-       }
-     },
-      "planningMetadata": {
-        "stepDependencies": {
-          "step-02-user-model": ["step-01-setup"],
-         "step-03-auth": ["step-02-user-model"]
-       }
-     }
-   }
+   Если в ходе шага появились устойчивые знания, сразу сохрани их в memory:
+   
+   ```bash
+   madspec memory complete-step \
+     --stage mvp.implement \
+     --step-id <step-id> \
+     --summary "<что завершено>" \
+     --fact "<validated fact>" \
+     --decision "<validated decision>" \
+     --contract "<validated constraint>"
    ```
    
-   **Примечание**: Поле `plannedSteps`, `stepMetadata` и `planningMetadata` обычно не изменяются на этапе реализации, они создаются на этапе планирования. Обновляй `currentImplementStep`, `completedSteps` и `stepStatus`, не разрушая TDD metadata.
-   
-   **ВАЖНО**: 
-   - Обновляй `.madspec/<BRANCH>/memory/progress.json` только после успешной валидации шага
-   - Проверяй валидность JSON после каждого обновления
-   - Не удаляй существующие данные из `.madspec/<BRANCH>/memory/progress.json`, только добавляй новые
+   Команда сама:
+   - обновит `completedSteps`
+   - выставит `stepStatus`
+   - переведет `tddPhase` в `completed` или `waived`
+   - выберет следующий executable step и обновит `currentImplementStep`
+   - запишет step-level records в episodic/semantic memory
+   - пересоберет generated views и провалится, если state невалиден
 
 6.5. **Создание контекста реализации**:
    

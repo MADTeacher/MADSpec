@@ -22,8 +22,10 @@ $ARGUMENTS
 
 - `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
 - `implementation-context.md` и `project-context.md` являются generated views.
-- После validation checkpoint обновляй structured memory, затем выполняй `madspec memory consolidate` и `madspec memory validate`.
-- Для выбора следующего шага реализации сначала используй `madspec memory next-step --stage feature.implement`.
+- Перед началом шага сначала получай контекст через `madspec memory retrieve --stage feature.implement --json-output`.
+- Для старта шага используй `madspec memory start-step --stage feature.implement`.
+- Для промежуточных TDD checkpoint используй `madspec memory checkpoint-step --stage feature.implement`.
+- Для завершения шага и продвижения workflow используй `madspec memory complete-step --stage feature.implement`.
 
 ## Описание
 
@@ -73,6 +75,8 @@ $ARGUMENTS
 
 1. **Загрузка контекста:**
 
+   Сначала выполни `madspec memory retrieve --stage feature.implement --json-output` и используй ответ как канонический workflow state.
+
    Прочитай:
    - `.madspec/feature/<feature-branch>/project-analysis.md` — **ключевой**:
      - Функции P1/P2/P3 которые реализуем
@@ -81,7 +85,7 @@ $ARGUMENTS
      - Как интегрироваться с существующим кодом
    - `.madspec/feature/<feature-branch>/architecture.md` — как вписываемся
    - `.madspec/feature/<feature-branch>/tech-stack.md` — технологии
-   - `.madspec/feature/<feature-branch>/memory/progress.json` — текущий шаг
+   - `.madspec/feature/<feature-branch>/memory/progress.json` — полное состояние workflow, если нужно сверить детали
    - `.madspec/feature/<feature-branch>/concept.md` — опционально, контекст
    - Текущий шаг:
      - `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/description.md`
@@ -95,10 +99,8 @@ $ARGUMENTS
 
 2. **Определение начального шага:**
 
-   Из `progress.json`:
-   - Если `currentImplementStep` указан → этот шаг
-   - Если `currentImplementStep` null → первый шаг из `plannedSteps`
-   - Если пользователь указал в `$ARGUMENTS` → этот шаг
+   - Если пользователь указал шаг в `$ARGUMENTS`, проверь его зависимости и запусти `madspec memory start-step --stage feature.implement --step-id <step-id>`
+   - Иначе запусти `madspec memory start-step --stage feature.implement --json-output` и используй выбранный шаг из ответа
 
 3. **Выполнение шага:**
 
@@ -131,16 +133,16 @@ $ARGUMENTS
 
    **3.5. TDD цикл для code-step:**
    - Сначала подготовь focused test из секции `Red`
-   - Зафиксируй failing run в `stepStatus.tddPhase=red` и `stepStatus.redEvidence`
+   - Зафиксируй failing run через `madspec memory checkpoint-step --stage feature.implement --step-id <step-id> --tdd-phase red --red-evidence "<command>"`
    - Сделай минимальную реализацию для green
-   - Зафиксируй passing run в `stepStatus.tddPhase=green` и `stepStatus.greenEvidence`
-   - Выполни refactor и запиши итог в `stepStatus.refactorNote`
+   - Зафиксируй passing run через `madspec memory checkpoint-step --stage feature.implement --step-id <step-id> --tdd-phase green --green-evidence "<command>"`
+   - Выполни refactor и сохрани итог через `madspec memory checkpoint-step --stage feature.implement --step-id <step-id> --tdd-phase refactor --refactor-note "<note>"`
    - Повтори focused test и `Relevant Suite`
-   - Только после этого переводи `tddPhase` в `completed`
+   - Только после этого завершай шаг через `madspec memory complete-step --stage feature.implement ...`
 
    **3.6. Non-code waiver path:**
-   - Для `non-code` шага сохрани `stepStatus.tddPhase=waived`
-   - Проверь, что `stepMetadata.waiverReason` заполнен при `tddPolicy=waived`
+   - Для `non-code` шага не редактируй `progress.json` вручную
+   - Проверь, что `stepMetadata.waiverReason` заполнен при `tddPolicy=waived`, затем заверши шаг через `madspec memory complete-step`
 
 4. **Валидация шага:**
 
@@ -169,7 +171,8 @@ $ARGUMENTS
      - Если тесты требуются — они должны быть
      - Автоматические тесты проходят
 
-   - [ ] **TDD состояние зафиксировано в progress.json**
+   - [ ] **TDD состояние зафиксировано в structured memory**
+     - Проверь ответ `madspec memory retrieve --stage feature.implement --step-id <step-id> --json-output`
      - Для `code + required`: `tddPhase=completed`, заполнены `redEvidence`, `greenEvidence`, `refactorNote`
      - Для `non-code`: `tddPhase=waived`, а при `tddPolicy=waived` есть причина
 
@@ -180,33 +183,33 @@ $ARGUMENTS
 
 5. **Обновление progress.json:**
 
-   После успешной валидации:
+   После успешной валидации не редактируй `progress.json` вручную.
+
+   Используй:
    
-   ```json
-   {
-     "currentImplementStep": "step-[NN]-[name]",
-     "completedSteps": [..., "step-[NN]-[name]"],
-     "plannedSteps": [...],
-     "stepStatus": {
-       "step-[NN]-[name]": {
-         "status": "completed",
-         "completedAt": "YYYY-MM-DD",
-         "tddPhase": "completed",
-         "redEvidence": ["<command or evidence>"],
-         "greenEvidence": ["<command or evidence>"],
-         "refactorNote": "No refactor needed"
-       }
-     },
-     "stepMetadata": {
-       "step-[NN]-[name]": {
-         "kind": "code",
-         "tddPolicy": "required",
-         "waiverReason": null
-       }
-     },
-     "planningMetadata": {...}
-   }
+   ```bash
+   madspec memory complete-step \
+     --stage feature.implement \
+     --step-id <step-id> \
+     --summary "<что завершено>" \
+     --red-evidence "<focused red command>" \
+     --green-evidence "<focused green command>" \
+     --refactor-note "<что было отрефакторено>"
    ```
+
+   Если по шагу появились факты/решения/контракты, сохраняй их сразу:
+
+   ```bash
+   madspec memory complete-step \
+     --stage feature.implement \
+     --step-id <step-id> \
+     --summary "<что завершено>" \
+     --fact "<validated fact>" \
+     --decision "<validated decision>" \
+     --contract "<validated constraint>"
+   ```
+
+   Команда сама обновляет `completedSteps`, `stepStatus`, `currentImplementStep`, step-level records и generated views.
 
 6. **Создание implementation-context.md:**
 

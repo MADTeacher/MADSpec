@@ -26,11 +26,12 @@ $ARGUMENTS
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - Все markdown-контексты считаются generated views.
+- Перед началом и после каждого утвержденного блока по экрану, потоку или платформенному ограничению используй `madspec memory retrieve --stage mvp.design --json-output` и `madspec memory capture --stage mvp.design ...`.
+- В `memory capture` фиксируй подтвержденные screen coverage, navigation patterns, open questions и platform constraints по мере появления.
 - Для этапа design **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.design ...`.
 - Минимальный payload checkpoint:
   - `--summary` — итоговое решение по UI/UX
-  - `--fact` — покрытие экранов и пользовательских потоков
-  - `--decision` — выбранные UI-паттерны и ограничения платформ
+  - `--fact/--decision` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`
   - `--evidence` — ссылки на `.madspec/<BRANCH>/ui-design.md` и `.madspec/<BRANCH>/ui-prototype/index.html`
 - `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 
@@ -115,6 +116,7 @@ $ARGUMENTS
       - Определи последовательность экранов для каждого сценария
       - Выяви точки взаимодействия с системой
       - Убедись, что навигация между экранами работает в прототипе
+      - После утверждения каждого потока фиксируй его в `madspec memory capture --stage mvp.design --fact ... --decision ...`
 
    d. **Определение данных**:
       - Какие данные отображаются на каждом экране
@@ -182,12 +184,11 @@ $ARGUMENTS
 
 4. **Checkpoint в structured memory**:
    - После утверждения дизайна **обязательно** выполни `madspec memory checkpoint --stage mvp.design`
-   - Передай минимум:
+   - Если design-memory уже накоплена инкрементально, достаточно:
      - `--summary` с итогом UI/UX решения
-     - `--fact` о покрытии всех функций экранами и пользовательскими потоками
-     - `--decision` о выбранных паттернах навигации и платформенных ограничениях
      - `--evidence .madspec/<BRANCH>/ui-design.md`
      - `--evidence .madspec/<BRANCH>/ui-prototype/index.html`
+   - Если по ходу работы не были зафиксированы подтвержденные facts/decisions, добавь их прямо в checkpoint
    - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 5. **Создание файлов дизайна**:

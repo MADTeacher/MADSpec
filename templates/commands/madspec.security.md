@@ -13,8 +13,11 @@ $ARGUMENTS
 ## Structured Memory First (обязательно)
 
 - Security findings сначала записывай в structured memory как semantic/episodic records.
-- `project-context.md` и итоговые markdown-отчеты считай generated views.
-- После checkpoint выполняй `madspec memory consolidate` и `madspec memory validate`.
+- `project-context.md` и `security-audit.md` считай generated views.
+- Перед началом аудита используй `madspec memory retrieve --stage security --json-output`.
+- После каждого подтвержденного security finding, remediation decision или compliance constraint используй `madspec memory capture --stage security ...`.
+- После завершения аудита ратифицируй этап через `madspec memory checkpoint --stage security --summary ...`.
+- `madspec memory capture` и `madspec memory checkpoint` сами запускают `madspec memory consolidate` и `madspec memory validate`.
 
 ## Правила диалога (обязательно)
 
@@ -112,6 +115,8 @@ $ARGUMENTS
 - Если не указан: обязательная проверка наличия артефактов, прерывание если их нет
 
 2. **Определение контекста проекта**
+
+**Перед анализом:** выполни `madspec memory retrieve --stage security --json-output` и используй stage memory для уже найденных ограничений, прошлых findings и открытых вопросов.
 
 **Проверка существования кода:**
 - Проверь наличие файлов кода в проекте (не только `.madspec/`)
@@ -361,7 +366,8 @@ $ARGUMENTS
 4. **Генерация отчета**
 
 **Загрузка шаблона:**
-- Загрузи шаблон `.madspec/templates/security-audit-template.md`
+- Загрузи шаблон `.madspec/templates/security-audit-template.md` как структуру мышления
+- Не записывай итоговый markdown вручную: `.madspec/<BRANCH>/security-audit.md` является generated view из structured memory
 - Если шаблон не существует, используй структуру из плана
 
 **Заполнение отчета:**
@@ -437,22 +443,23 @@ $ARGUMENTS
      - Best practices для повышения уровня безопасности
      - Оптимизация существующих решений
 
-**Сохранение отчета:**
-- Сохрани отчет в `.madspec/<BRANCH>/security-audit.md`
-- Убедись, что форматирование Markdown корректно
+**Фиксация результатов в memory:**
+- По ходу аудита сохраняй findings и решения через `madspec memory capture --stage security`
+- Для обнаруженных проблем используй `--fact`
+- Для remediation decisions и compensating controls используй `--decision`
+- Для обязательных compliance/security constraints используй `--contract`
+- Для спорных мест и незакрытых рисков используй `--question` и `--pending-action`
 
-5. **Обновление контекста проекта**
+5. **Финализация security в памяти**
 
-**Обновление project-context.md**:
-   - Обнови `.madspec/project-context.md`:
-     - Установи текущий этап: "security"
-     - Обнови статус этапа security audit: "Завершен"
-     - Добавь ссылку на отчет `.madspec/<BRANCH>/security-audit.md`
+- После завершения аудита выполни `madspec memory checkpoint --stage security --summary "<итог security audit>"`
+- Если какие-то findings, constraints или remediation decisions не были сохранены по ходу анализа, добавь их прямо в checkpoint через `--fact`, `--decision`, `--contract`, `--question`, `--pending-action`
+- Убедись, что `.madspec/<BRANCH>/security-audit.md` и `.madspec/<BRANCH>/project-context.md` пересобраны как generated views
 
 6. **Вывод результатов**
 
 Выведи пользователю:
-- Путь к отчету: `.madspec/<BRANCH>/security-audit.md`
+- Путь к generated view отчету: `.madspec/<BRANCH>/security-audit.md`
 - Общий Security Score и оценку
 - Количество найденных проблем по категориям
 - Топ-3 критичные проблемы (если есть)
@@ -468,8 +475,9 @@ $ARGUMENTS
 
 ## Выходные артефакты
 
-- `.madspec/<BRANCH>/security-audit.md` - детальный отчет по безопасности с Security Score (где `<BRANCH>` - имя текущей ветки)
-- `.madspec/project-context.md` - обновленный контекст проекта (только навигация и ссылки)
+- `.madspec/<BRANCH>/memory/` - canonical memory с security findings, constraints и remediation decisions
+- `.madspec/<BRANCH>/security-audit.md` - generated view детального отчета по безопасности с Security Score (где `<BRANCH>` - имя текущей ветки)
+- `.madspec/<BRANCH>/project-context.md` - generated view навигации и ссылок
 
 ## Следующие шаги
 
