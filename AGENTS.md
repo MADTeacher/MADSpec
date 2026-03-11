@@ -14,6 +14,8 @@ The framework supports multiple AI agents, allowing teams to use their preferred
 
 - Any changes to `__init__.py` for MADSpec CLI require updating the version in `pyproject.toml`
 - All command changes require testing with each supported agent
+- Any change to the content or workflow of any `madspec.*` framework command must update that command's documentation in the same change
+- Any CLI change that affects commands, arguments, workflow, generated project structure, or agent-facing troubleshooting must update `skills/madspec-cli-operator/SKILL.md` in the same change
 
 ## Adding New Agent Support
 

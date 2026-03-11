@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .concept_state import load_concept_state, render_concept_markdown
+from .concept_state import concept_completeness_errors, load_concept_state, render_concept_markdown
 from .records import make_record
 from .storage import (
     _default_active_session,
@@ -49,6 +49,64 @@ def _select_next_executable_step(progress: dict[str, Any]) -> str | None:
         if all(dependency in completed_steps for dependency in step_dependencies.get(step_id, [])):
             return step_id
     return None
+
+
+def _concept_missing_required_fields(concept_state: dict[str, Any]) -> list[str]:
+    error_map = {
+        "concept state must include a system overview before checkpoint": "systemOverview",
+        "concept state must include at least one audience before checkpoint": "audiences",
+        "concept state must include at least one scenario before checkpoint": "scenarios",
+        "concept state must include at least one pain point before checkpoint": "painPoints",
+        "concept state must include at least one P1 feature before checkpoint": "features.p1",
+    }
+    missing: list[str] = []
+    for error in concept_completeness_errors(concept_state):
+        field_name = error_map.get(error)
+        if field_name and field_name not in missing:
+            missing.append(field_name)
+    return missing
+
+
+def _concept_filled_fields(concept_state: dict[str, Any]) -> list[str]:
+    field_checks = (
+        ("projectName", bool(concept_state.get("projectName"))),
+        ("systemOverview", bool(concept_state.get("systemOverview"))),
+        ("audiences", bool(concept_state.get("audiences"))),
+        ("scenarios", bool(concept_state.get("scenarios"))),
+        ("painPoints", bool(concept_state.get("painPoints"))),
+        ("features.p1", bool(concept_state.get("features", {}).get("p1"))),
+        ("features.p2", bool(concept_state.get("features", {}).get("p2"))),
+        ("features.p3", bool(concept_state.get("features", {}).get("p3"))),
+        ("constraints", bool(concept_state.get("constraints"))),
+        ("assumptions", bool(concept_state.get("assumptions"))),
+        ("nextActions", bool(concept_state.get("nextActions"))),
+        ("checkpointSummary", bool(concept_state.get("checkpointSummary"))),
+    )
+    return [field_name for field_name, is_filled in field_checks if is_filled]
+
+
+def _build_concept_status(concept_state: dict[str, Any]) -> dict[str, Any]:
+    missing_required_fields = _concept_missing_required_fields(concept_state)
+    return {
+        "is_complete": not missing_required_fields,
+        "missing_required_fields": missing_required_fields,
+        "filled_fields": _concept_filled_fields(concept_state),
+        "counts": {
+            "audiences": len(concept_state.get("audiences", [])),
+            "scenarios": len(concept_state.get("scenarios", [])),
+            "pain_points": len(concept_state.get("painPoints", [])),
+            "p1_features": len(concept_state.get("features", {}).get("p1", [])),
+            "p2_features": len(concept_state.get("features", {}).get("p2", [])),
+            "p3_features": len(concept_state.get("features", {}).get("p3", [])),
+            "constraints": len(concept_state.get("constraints", [])),
+            "assumptions": len(concept_state.get("assumptions", [])),
+            "next_actions": len(concept_state.get("nextActions", [])),
+        },
+        "last_checkpoint_summary": concept_state.get("checkpointSummary") or None,
+        "revision": concept_state.get("revision", 0),
+        "ratified_at": concept_state.get("ratifiedAt"),
+        "updated_at": concept_state.get("updatedAt"),
+    }
 
 
 def _render_project_context(
@@ -338,9 +396,11 @@ def retrieve_memory_context(
     stage: str,
     *,
     step_id: str | None = None,
-    limit: int = 5,
+    limit: int | None = None,
     include_obsolete: bool = False,
     include_conflicted: bool = False,
+    full_artifact: bool = False,
+    include_history: bool = False,
 ) -> dict[str, Any]:
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
@@ -364,6 +424,14 @@ def retrieve_memory_context(
         include_conflicted=include_conflicted,
     )
     stage_lower = stage.lower()
+    is_concept_stage = stage_lower == "mvp.concept"
+    concept_state = load_concept_state(paths.concept_state) if is_concept_stage else None
+    if limit is None:
+        resolved_limit = 3 if is_concept_stage else 5
+    elif limit <= 0:
+        resolved_limit = 3 if is_concept_stage else 5
+    else:
+        resolved_limit = limit
     resolved_step_id = step_id or active_session.get("current_step") or progress.get("currentImplementStep")
     if not resolved_step_id and "implement" in stage_lower:
         resolved_step_id = _select_next_executable_step(progress)
@@ -443,7 +511,10 @@ def retrieve_memory_context(
             records,
             key=lambda item: (item.get("ts", ""), item.get("id", "")),
             reverse=True,
-        )[:limit]
+        )[:resolved_limit]
+
+    trimmed_events = _trim(scoped_events)
+    trimmed_decisions = _trim(scoped_decisions)
 
     return {
         "branch": branch_name,
@@ -453,13 +524,13 @@ def retrieve_memory_context(
             "active_goal": active_session.get("active_goal"),
             "stage": active_session.get("stage"),
             "current_step": active_session.get("current_step"),
-            "open_questions": active_session.get("open_questions", [])[:limit],
-            "current_hypotheses": active_session.get("current_hypotheses", [])[:limit],
+            "open_questions": active_session.get("open_questions", [])[:resolved_limit],
+            "current_hypotheses": active_session.get("current_hypotheses", [])[:resolved_limit],
         },
         "workflow": {
             "currentImplementStep": progress.get("currentImplementStep"),
-            "plannedSteps": progress.get("plannedSteps", [])[:limit],
-            "completedSteps": progress.get("completedSteps", [])[:limit],
+            "plannedSteps": progress.get("plannedSteps", [])[:resolved_limit],
+            "completedSteps": progress.get("completedSteps", [])[:resolved_limit],
             "stepDependencies": progress.get("planningMetadata", {}).get("stepDependencies", {}),
             "nextExecutableStep": _select_next_executable_step(progress) if "implement" in stage_lower else None,
         },
@@ -483,9 +554,10 @@ def retrieve_memory_context(
             "decisions": _trim(relevant_decisions),
             "contracts": _trim(relevant_contracts),
         },
-        "episodes": _trim(scoped_events),
-        "decision_log": _trim(scoped_decisions),
+        "concept_status": _build_concept_status(concept_state) if is_concept_stage else None,
+        "episodes": trimmed_events if (include_history or not is_concept_stage) else [],
+        "decision_log": trimmed_decisions if (include_history or not is_concept_stage) else [],
         "artifact_state": {
-            "concept": load_concept_state(paths.concept_state) if stage_lower == "mvp.concept" else None,
+            "concept": concept_state if (is_concept_stage and full_artifact) else None,
         },
     }

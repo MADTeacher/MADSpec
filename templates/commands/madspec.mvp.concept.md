@@ -25,10 +25,10 @@ $ARGUMENTS
 ## Structured Memory First (обязательно)
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
-- Для `mvp.concept` source of truth хранится в `.madspec/<BRANCH>/memory/stages/mvp.concept.json`.
+- Для `mvp.concept` реальные данные этапа хранятся в `.madspec/<BRANCH>/memory/stages/mvp.concept.json`.
 - `.madspec/<BRANCH>/concept.md` является generated artifact, а не файлом для ручного редактирования.
-- Файлы `project-context.md`, `planning-context-cache.md`, `planning-context.md`, `implementation-context.md`, `review.md`, `improvements.md` считаются **generated views**, а не source of truth.
-- Перед началом и после каждого подтвержденного смыслового блока используй `madspec memory retrieve --stage mvp.concept --json-output` и `madspec memory capture --stage mvp.concept ...`.
+- Файлы `project-context.md`, `planning-context-cache.md`, `planning-context.md`, `implementation-context.md`, `review.md`, `improvements.md` считаются **generated views**, а не основными файлами данных.
+- Перед началом и после каждого подтвержденного смыслового блока используй краткий `madspec memory retrieve --stage mvp.concept --json-output` и `madspec memory capture --stage mvp.concept ...`.
 - В `memory capture` фиксируй не только финальные выводы, но и подтвержденные по ходу диалога facts/decisions/questions/pending-actions.
 - Для полей концепции используй stage-specific flags:
   - `--project-name`
@@ -46,8 +46,9 @@ $ARGUMENTS
   - `--fact/--decision` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`
   - `--evidence` — ссылки на `.madspec/<BRANCH>/concept.md` и другие опорные артефакты
 - `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
-- Перед любым промежуточным или финальным ответом повторно выполняй `madspec memory retrieve --stage mvp.concept --json-output` и опирайся на `artifact_state.concept`.
-- Если нужного поля нет в `artifact_state.concept`, задай следующий вопрос пользователю и не синтезируй значение из "живого" контекста чата.
+- В обычных ходах диалога опирайся на `concept_status`: какие обязательные поля еще пусты, какие уже заполнены и сколько элементов накоплено по каждому разделу.
+- Полный `artifact_state.concept` запрашивай только перед финальной валидацией, итоговым обзором для пользователя и `checkpoint`, используя `madspec memory retrieve --stage mvp.concept --json-output --full-artifact`.
+- Если нужного поля нет в кратком контексте или в полном `artifact_state.concept`, задай следующий вопрос пользователю и не синтезируй значение из "живого" контекста чата.
 
 ## Описание
 
@@ -209,7 +210,7 @@ $ARGUMENTS
 
 - `.gitignore` - файл исключений для GIT репозитория
 - `.madspec/<BRANCH>/concept.md` - полная концепция проекта (где `<BRANCH>` - имя текущей ветки)
-- `.madspec/<BRANCH>/memory/` - canonical memory с checkpoint этапа concept
+- `.madspec/<BRANCH>/memory/` - основные memory-файлы с checkpoint этапа concept
 - `.madspec/<BRANCH>/project-context.md` - generated view контекста проекта
 
 ## Следующий этап

@@ -875,23 +875,78 @@ def test_capture_stage_memory_accumulates_context_before_checkpoint(tmp_path: Pa
         "main",
         "mvp.concept",
     )
+    retrieved_full_after = retrieve_memory_context(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        full_artifact=True,
+        include_history=True,
+    )
 
     assert captured["accepted"] is True
     assert retrieved_before["active_session"]["open_questions"] == ["Do we need team scheduling in MVP?"]
-    assert retrieved_before["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
-    assert retrieved_before["artifact_state"]["concept"]["systemOverview"] == "System helps freelancers manage bookings and reminders from one interface."
-    assert retrieved_before["artifact_state"]["concept"]["audiences"] == ["Freelancers scheduling appointments"]
-    assert retrieved_before["artifact_state"]["concept"]["features"]["p1"] == [
-        {"name": "Booking workflow", "description": "Create bookings and send reminders"}
-    ]
+    assert retrieved_before["artifact_state"]["concept"] is None
+    assert retrieved_before["concept_status"]["is_complete"] is True
+    assert retrieved_before["concept_status"]["missing_required_fields"] == []
+    assert retrieved_before["concept_status"]["counts"]["p1_features"] == 1
+    assert retrieved_before["decision_log"] == []
     assert checkpointed["accepted"] is True
     assert checkpointed["used_existing_stage_memory"] is True
-    assert retrieved_after["artifact_state"]["concept"]["checkpointSummary"] == "Concept ratified after incremental discovery"
-    assert retrieved_after["artifact_state"]["concept"]["revision"] == 1
+    assert retrieved_after["artifact_state"]["concept"] is None
+    assert retrieved_after["concept_status"]["last_checkpoint_summary"] == "Concept ratified after incremental discovery"
+    assert retrieved_after["concept_status"]["revision"] == 1
+    assert retrieved_full_after["artifact_state"]["concept"]["checkpointSummary"] == "Concept ratified after incremental discovery"
+    assert retrieved_full_after["artifact_state"]["concept"]["revision"] == 1
+    assert retrieved_full_after["decision_log"] != []
     concept_text = (paths["branch_dir"] / "concept.md").read_text(encoding="utf-8")
     assert "## Общее описание системы" in concept_text
     assert "System helps freelancers manage bookings and reminders from one interface." in concept_text
     assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
+
+
+def test_retrieve_memory_context_returns_concept_status_for_partial_concept(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        project_name="MVP scheduling assistant",
+        audiences=["Freelancers"],
+        questions=["Q1", "Q2", "Q3", "Q4"],
+        status="validated",
+    )
+
+    retrieved = retrieve_memory_context(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+    )
+
+    assert retrieved["artifact_state"]["concept"] is None
+    assert retrieved["concept_status"]["is_complete"] is False
+    assert retrieved["concept_status"]["missing_required_fields"] == [
+        "systemOverview",
+        "scenarios",
+        "painPoints",
+        "features.p1",
+    ]
+    assert retrieved["concept_status"]["filled_fields"] == [
+        "projectName",
+        "audiences",
+    ]
+    assert retrieved["active_session"]["open_questions"] == ["Q1", "Q2", "Q3"]
+    assert retrieved["concept_status"]["counts"] == {
+        "audiences": 1,
+        "scenarios": 0,
+        "pain_points": 0,
+        "p1_features": 0,
+        "p2_features": 0,
+        "p3_features": 0,
+        "constraints": 0,
+        "assumptions": 0,
+        "next_actions": 0,
+    }
 
 
 def test_validate_detects_out_of_sync_generated_concept(tmp_path: Path) -> None:

@@ -278,23 +278,40 @@ def memory_retrieve(
     stage: str = typer.Option(..., "--stage", help="Target stage, e.g. mvp.plan or review"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to inspect"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier"),
-    limit: int = typer.Option(5, "--limit", help="Max records per section"),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        help="Max records per section (defaults to 3 for mvp.concept and 5 for other stages)",
+    ),
     include_obsolete: bool = typer.Option(False, "--include-obsolete", help="Include obsolete semantic records"),
     include_conflicted: bool = typer.Option(False, "--include-conflicted", help="Include conflicted semantic records"),
+    full_artifact: bool = typer.Option(
+        False,
+        "--full-artifact",
+        help="For mvp.concept return the full artifact_state.concept instead of summary-only context",
+    ),
+    include_history: bool = typer.Option(
+        False,
+        "--include-history",
+        help="For mvp.concept include episodes and decision log in the response",
+    ),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Retrieve minimal structured context for a stage."""
     project_path = Path.cwd()
     target_branch = resolve_branch_name(project_path, branch_name)
     ensure_memory_layout(project_path, target_branch)
+    resolved_limit = limit if limit is not None else (3 if stage.strip().lower() == "mvp.concept" else 5)
     payload = retrieve_memory_context(
         project_path,
         target_branch,
         stage,
         step_id=step_id,
-        limit=limit,
+        limit=resolved_limit,
         include_obsolete=include_obsolete,
         include_conflicted=include_conflicted,
+        full_artifact=full_artifact,
+        include_history=include_history,
     )
     if json_output:
         emit_json(payload)

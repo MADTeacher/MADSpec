@@ -346,13 +346,59 @@ def test_memory_checkpoint_updates_memory_and_retrieve_context(tmp_path: Path, m
     assert retrieve_result.exit_code == 0, retrieve_result.stdout
     retrieve_payload = json.loads(retrieve_result.stdout)
     assert retrieve_payload["active_session"]["stage"] == "mvp.concept"
-    assert retrieve_payload["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
-    assert retrieve_payload["artifact_state"]["concept"]["systemOverview"] == "System helps freelancers manage bookings and reminders from one interface."
-    assert retrieve_payload["artifact_state"]["concept"]["checkpointSummary"] == "Concept validated for MVP scheduling assistant"
-    assert retrieve_payload["artifact_state"]["concept"]["features"]["p1"] == [
+    assert retrieve_payload["artifact_state"]["concept"] is None
+    assert retrieve_payload["concept_status"]["is_complete"] is True
+    assert retrieve_payload["concept_status"]["missing_required_fields"] == []
+    assert retrieve_payload["concept_status"]["filled_fields"] == [
+        "projectName",
+        "systemOverview",
+        "audiences",
+        "scenarios",
+        "painPoints",
+        "features.p1",
+        "constraints",
+        "nextActions",
+        "checkpointSummary",
+    ]
+    assert retrieve_payload["concept_status"]["counts"] == {
+        "audiences": 1,
+        "scenarios": 1,
+        "pain_points": 1,
+        "p1_features": 1,
+        "p2_features": 0,
+        "p3_features": 0,
+        "constraints": 1,
+        "assumptions": 0,
+        "next_actions": 1,
+    }
+    assert retrieve_payload["concept_status"]["last_checkpoint_summary"] == "Concept validated for MVP scheduling assistant"
+    assert retrieve_payload["semantic"]["contracts"][0]["summary"] == "Reminder settings must stay editable per booking"
+    assert retrieve_payload["episodes"] == []
+    assert retrieve_payload["decision_log"] == []
+
+    retrieve_full_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "retrieve",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.concept",
+            "--full-artifact",
+            "--include-history",
+            "--json-output",
+        ],
+    )
+    assert retrieve_full_result.exit_code == 0, retrieve_full_result.stdout
+    retrieve_full_payload = json.loads(retrieve_full_result.stdout)
+    assert retrieve_full_payload["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
+    assert retrieve_full_payload["artifact_state"]["concept"]["systemOverview"] == "System helps freelancers manage bookings and reminders from one interface."
+    assert retrieve_full_payload["artifact_state"]["concept"]["checkpointSummary"] == "Concept validated for MVP scheduling assistant"
+    assert retrieve_full_payload["artifact_state"]["concept"]["features"]["p1"] == [
         {"name": "Booking workflow", "description": "Create bookings and send reminders"}
     ]
-    assert retrieve_payload["semantic"]["contracts"][0]["summary"] == "Reminder settings must stay editable per booking"
+    assert retrieve_full_payload["decision_log"] != []
 
     project_context = (project_path / ".madspec" / "main" / "project-context.md").read_text(encoding="utf-8")
     assert "Current stage: `mvp.concept`" in project_context
@@ -413,12 +459,30 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
     assert retrieve_result.exit_code == 0, retrieve_result.stdout
     retrieve_payload = json.loads(retrieve_result.stdout)
     assert retrieve_payload["active_session"]["open_questions"] == ["Do we need team scheduling in MVP?"]
-    assert retrieve_payload["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
-    assert retrieve_payload["artifact_state"]["concept"]["systemOverview"] == "System helps freelancers manage bookings and reminders from one interface."
-    assert retrieve_payload["artifact_state"]["concept"]["audiences"] == ["Freelancers"]
-    assert retrieve_payload["artifact_state"]["concept"]["features"]["p1"] == [
-        {"name": "Booking workflow", "description": "Capture booking details and send reminders"}
+    assert retrieve_payload["artifact_state"]["concept"] is None
+    assert retrieve_payload["concept_status"]["is_complete"] is True
+    assert retrieve_payload["concept_status"]["filled_fields"] == [
+        "projectName",
+        "systemOverview",
+        "audiences",
+        "scenarios",
+        "painPoints",
+        "features.p1",
+        "assumptions",
+        "nextActions",
     ]
+    assert retrieve_payload["concept_status"]["counts"] == {
+        "audiences": 1,
+        "scenarios": 1,
+        "pain_points": 1,
+        "p1_features": 1,
+        "p2_features": 0,
+        "p3_features": 0,
+        "constraints": 0,
+        "assumptions": 1,
+        "next_actions": 1,
+    }
+    assert retrieve_payload["decision_log"] == []
 
     checkpoint_result = runner.invoke(
         cli.app,
@@ -439,6 +503,61 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
     assert checkpoint_result.exit_code == 0, checkpoint_result.stdout
     checkpoint_payload = json.loads(checkpoint_result.stdout)
     assert checkpoint_payload["used_existing_stage_memory"] is True
+
+
+def test_memory_retrieve_preserves_non_concept_behavior_and_limit(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    capture_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.tech",
+            "--fact",
+            "Need web delivery and fast iteration",
+            "--fact",
+            "Need predictable hosting costs",
+            "--decision",
+            "Use FastAPI for backend and HTMX for frontend",
+            "--decision",
+            "Use PostgreSQL for persistence",
+            "--question",
+            "Do we need offline mode?",
+            "--json-output",
+        ],
+    )
+    assert capture_result.exit_code == 0, capture_result.stdout
+
+    retrieve_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "retrieve",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.tech",
+            "--limit",
+            "1",
+            "--json-output",
+        ],
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["concept_status"] is None
+    assert len(retrieve_payload["semantic"]["facts"]) == 1
+    assert len(retrieve_payload["semantic"]["decisions"]) == 1
+    assert len(retrieve_payload["decision_log"]) == 1
 
 
 def test_memory_capture_and_checkpoint_support_review_and_security(tmp_path: Path, monkeypatch) -> None:
