@@ -192,10 +192,10 @@ def start_implementation_step(
             ],
         )
 
+        generated = consolidate_branch_memory(project_path, branch_name)
         validation_errors = validate_branch_memory(project_path, branch_name)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
-        generated = consolidate_branch_memory(project_path, branch_name)
     except Exception as exc:
         for path, content in snapshots.items():
             _restore_file(path, content)
@@ -350,10 +350,10 @@ def checkpoint_implementation_step(
             ],
         )
 
+        generated = consolidate_branch_memory(project_path, branch_name)
         validation_errors = validate_branch_memory(project_path, branch_name)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
-        generated = consolidate_branch_memory(project_path, branch_name)
     except Exception as exc:
         for path, content in snapshots.items():
             _restore_file(path, content)
@@ -593,10 +593,10 @@ def complete_implementation_step(
             ],
         )
 
+        generated = consolidate_branch_memory(project_path, branch_name)
         validation_errors = validate_branch_memory(project_path, branch_name)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
-        generated = consolidate_branch_memory(project_path, branch_name)
     except Exception as exc:
         for path, content in snapshots.items():
             _restore_file(path, content)

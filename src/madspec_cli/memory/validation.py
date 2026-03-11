@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .concept_state import concept_schema_errors, load_concept_state, render_concept_markdown
 from .planning import _compute_progress_metrics, extract_function_catalog
 from .records import MEMORY_STATUSES, SEMANTIC_KINDS
 from .storage import STEP_KINDS, TDD_PHASES, TDD_POLICIES
@@ -255,6 +256,16 @@ def validate_branch_memory(project_path: Path, branch_name: str) -> list[str]:
         for key in ("pending_actions", "open_questions", "current_hypotheses"):
             if key in active_session and not isinstance(active_session[key], list):
                 errors.append(f"active-session.json field '{key}' must be a list")
+
+    concept_state_raw = read_json(paths.concept_state, None)
+    errors.extend(f"{paths.concept_state.name}: {item}" for item in concept_schema_errors(concept_state_raw))
+    concept_state = load_concept_state(paths.concept_state)
+    concept_text = render_concept_markdown(concept_state)
+    concept_path = paths.branch_dir / "concept.md"
+    if not concept_path.exists():
+        errors.append("concept.md is missing; rebuild generated views with `madspec memory consolidate`")
+    elif concept_path.read_text(encoding="utf-8") != concept_text:
+        errors.append("concept.md is out of sync with memory/stages/mvp.concept.json")
 
     for path in (
         paths.decision_log,

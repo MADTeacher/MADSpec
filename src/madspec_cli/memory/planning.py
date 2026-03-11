@@ -13,12 +13,14 @@ from .storage import (
     _default_step_metadata,
     _default_step_status,
     append_jsonl,
+    ensure_memory_layout,
     get_memory_paths,
     normalize_progress_state,
     read_json,
     now_iso,
     write_json,
 )
+from .views import consolidate_branch_memory
 
 
 @dataclass(frozen=True)
@@ -285,6 +287,7 @@ def register_planned_step(
     depends_on: list[str] | None = None,
     summary: str | None = None,
 ) -> dict[str, Any]:
+    ensure_memory_layout(project_path, branch_name)
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
     if isinstance(progress, dict):
@@ -450,6 +453,7 @@ def register_planned_step(
             )
         ],
     )
+    consolidate_branch_memory(project_path, branch_name)
 
     return RegisterStepResult(
         accepted=True,

@@ -277,6 +277,34 @@ def test_memory_checkpoint_updates_memory_and_retrieve_context(tmp_path: Path, m
         encoding="utf-8",
     )
 
+    capture_result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.concept",
+            "--project-name",
+            "MVP scheduling assistant",
+            "--audience",
+            "Freelancers scheduling appointments",
+            "--scenario",
+            "Create and reschedule appointments from one calendar",
+            "--pain",
+            "Manual follow-ups cause missed appointments",
+            "--feature-p1",
+            "Booking workflow::Create bookings and send reminders",
+            "--constraint",
+            "Reminder settings must stay editable per booking",
+            "--next-action",
+            "Proceed to mvp.design",
+            "--json-output",
+        ],
+    )
+    assert capture_result.exit_code == 0, capture_result.stdout
+
     result = runner.invoke(
         cli.app,
         [
@@ -288,12 +316,6 @@ def test_memory_checkpoint_updates_memory_and_retrieve_context(tmp_path: Path, m
             "mvp.concept",
             "--summary",
             "Concept validated for MVP scheduling assistant",
-            "--fact",
-            "Primary audience: freelancers scheduling appointments",
-            "--decision",
-            "P1 focuses on appointment booking and reminders",
-            "--contract",
-            "Booking workflow must keep reminder settings editable",
             "--evidence",
             ".madspec/main/concept.md",
             "--question",
@@ -322,13 +344,17 @@ def test_memory_checkpoint_updates_memory_and_retrieve_context(tmp_path: Path, m
     assert retrieve_result.exit_code == 0, retrieve_result.stdout
     retrieve_payload = json.loads(retrieve_result.stdout)
     assert retrieve_payload["active_session"]["stage"] == "mvp.concept"
-    assert retrieve_payload["semantic"]["facts"][0]["summary"] == "Primary audience: freelancers scheduling appointments"
-    assert retrieve_payload["semantic"]["decisions"][0]["summary"] == "P1 focuses on appointment booking and reminders"
-    assert retrieve_payload["semantic"]["contracts"][0]["summary"] == "Booking workflow must keep reminder settings editable"
+    assert retrieve_payload["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
+    assert retrieve_payload["artifact_state"]["concept"]["checkpointSummary"] == "Concept validated for MVP scheduling assistant"
+    assert retrieve_payload["artifact_state"]["concept"]["features"]["p1"] == [
+        {"name": "Booking workflow", "description": "Create bookings and send reminders"}
+    ]
+    assert retrieve_payload["semantic"]["contracts"][0]["summary"] == "Reminder settings must stay editable per booking"
 
     project_context = (project_path / ".madspec" / "main" / "project-context.md").read_text(encoding="utf-8")
     assert "Current stage: `mvp.concept`" in project_context
     assert "Active goal: `Concept validated for MVP scheduling assistant`" in project_context
+    assert "Concept checkpoint summary: `Concept validated for MVP scheduling assistant`" in project_context
 
 
 def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path, monkeypatch) -> None:
@@ -351,10 +377,20 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
             "mvp.concept",
             "--summary",
             "Captured discovery notes",
-            "--fact",
-            "Primary audience: freelancers",
-            "--decision",
-            "Prioritize appointment booking first",
+            "--project-name",
+            "MVP scheduling assistant",
+            "--audience",
+            "Freelancers",
+            "--scenario",
+            "Book and reschedule client meetings",
+            "--pain",
+            "Appointments are managed manually across chats and notes",
+            "--feature-p1",
+            "Booking workflow::Capture booking details and send reminders",
+            "--assumption",
+            "Users already have repeat clients",
+            "--next-action",
+            "Proceed to mvp.design",
             "--question",
             "Do we need team scheduling in MVP?",
             "--json-output",
@@ -362,7 +398,7 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
     )
     assert capture_result.exit_code == 0, capture_result.stdout
     capture_payload = json.loads(capture_result.stdout)
-    assert capture_payload["written"]["facts"] == 1
+    assert capture_payload["written"]["facts"] == 5
     assert capture_payload["written"]["decisions"] == 1
 
     retrieve_result = runner.invoke(
@@ -371,9 +407,12 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
     )
     assert retrieve_result.exit_code == 0, retrieve_result.stdout
     retrieve_payload = json.loads(retrieve_result.stdout)
-    assert retrieve_payload["stage_memory"]["facts"][0]["summary"] == "Primary audience: freelancers"
-    assert retrieve_payload["stage_memory"]["decisions"][0]["summary"] == "Prioritize appointment booking first"
     assert retrieve_payload["active_session"]["open_questions"] == ["Do we need team scheduling in MVP?"]
+    assert retrieve_payload["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
+    assert retrieve_payload["artifact_state"]["concept"]["audiences"] == ["Freelancers"]
+    assert retrieve_payload["artifact_state"]["concept"]["features"]["p1"] == [
+        {"name": "Booking workflow", "description": "Capture booking details and send reminders"}
+    ]
 
     checkpoint_result = runner.invoke(
         cli.app,

@@ -25,15 +25,28 @@ $ARGUMENTS
 ## Structured Memory First (обязательно)
 
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
+- Для `mvp.concept` source of truth хранится в `.madspec/<BRANCH>/memory/stages/mvp.concept.json`.
+- `.madspec/<BRANCH>/concept.md` является generated artifact, а не файлом для ручного редактирования.
 - Файлы `project-context.md`, `planning-context-cache.md`, `planning-context.md`, `implementation-context.md`, `review.md`, `improvements.md` считаются **generated views**, а не source of truth.
 - Перед началом и после каждого подтвержденного смыслового блока используй `madspec memory retrieve --stage mvp.concept --json-output` и `madspec memory capture --stage mvp.concept ...`.
 - В `memory capture` фиксируй не только финальные выводы, но и подтвержденные по ходу диалога facts/decisions/questions/pending-actions.
+- Для полей концепции используй stage-specific flags:
+  - `--project-name`
+  - `--audience`
+  - `--scenario`
+  - `--pain`
+  - `--feature-p1`, `--feature-p2`, `--feature-p3` в формате `<name>::<description>`
+  - `--constraint`
+  - `--assumption`
+  - `--next-action`
 - Для этапа concept **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.concept ...`.
 - Минимальный payload checkpoint:
   - `--summary` — краткий итог концепции
   - `--fact/--decision` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`
   - `--evidence` — ссылки на `.madspec/<BRANCH>/concept.md` и другие опорные артефакты
 - `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
+- Перед любым промежуточным или финальным ответом повторно выполняй `madspec memory retrieve --stage mvp.concept --json-output` и опирайся на `artifact_state.concept`.
+- Если нужного поля нет в `artifact_state.concept`, задай следующий вопрос пользователю и не синтезируй значение из "живого" контекста чата.
 
 ## Описание
 
@@ -87,7 +100,7 @@ $ARGUMENTS
    - Если пользовательский ввод (диалог) содержит значение, используй его.
    - В противном случае сделай вывод на основе существующего контекста репозитория (README, документации, предыдущей версии концепции, если они имеются в проекте).
    - Для дат принятия решений: ДАТА_РАТИФИКАЦИИ — исходная дата принятия (если неизвестна, спроси или отметь как TODO), ДАТА_ПОСЛЕДНЕГО_ИЗМЕНЕНИЯ — сегодняшняя дата, если были внесены изменения, в противном случае оставь предыдущее значение.
-   - После каждого подтвержденного факта о ЦА, боли, ограничениях или приоритизации функций сразу фиксируй это через `madspec memory capture --stage mvp.concept`.
+   - После каждого подтвержденного факта о ЦА, боли, ограничениях или приоритизации функций сразу фиксируй это через `madspec memory capture --stage mvp.concept` с соответствующими stage-specific flags.
 
 4. **Анализ и приоритизация**:
    - Проанализируй собранные данные и определи приоритеты заполнения разделов концепции
@@ -170,7 +183,7 @@ $ARGUMENTS
    - При наличии незакрытых вопросов добавь `--question`, а для следующих действий — `--pending-action`
 
 8. **Сохранение файлов**:
-   - Сохрани `.madspec/<BRANCH>/concept.md` (где `<BRANCH>` - имя ветки, определенное в шаге 0)
+   - Не записывай `.madspec/<BRANCH>/concept.md` вручную: он должен появиться как generated artifact после `madspec memory checkpoint`
    - Убедись, что `.madspec/<BRANCH>/project-context.md` был пересобран командой `madspec memory checkpoint`
 
 ## Правила

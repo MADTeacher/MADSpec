@@ -838,8 +838,13 @@ def test_capture_stage_memory_accumulates_context_before_checkpoint(tmp_path: Pa
         "main",
         "mvp.concept",
         summary="Captured audience and pain points during discovery",
-        facts=["Primary audience: freelancers"],
-        decisions=["Prioritize booking workflow before analytics"],
+        project_name="MVP scheduling assistant",
+        audiences=["Freelancers scheduling appointments"],
+        scenarios=["Create, move, and confirm appointments from one calendar"],
+        pain_points=["Manual follow-ups lead to missed appointments"],
+        feature_p1=["Booking workflow::Create bookings and send reminders"],
+        assumptions=["Users already coordinate appointments in messengers or spreadsheets"],
+        next_actions=["Proceed to mvp.design"],
         questions=["Do we need team scheduling in MVP?"],
         pending_actions=["Clarify notification constraints"],
         evidence=[".madspec/main/concept.md"],
@@ -864,13 +869,40 @@ def test_capture_stage_memory_accumulates_context_before_checkpoint(tmp_path: Pa
     )
 
     assert captured["accepted"] is True
-    assert retrieved_before["stage_memory"]["facts"][0]["summary"] == "Primary audience: freelancers"
-    assert retrieved_before["stage_memory"]["decisions"][0]["summary"] == "Prioritize booking workflow before analytics"
     assert retrieved_before["active_session"]["open_questions"] == ["Do we need team scheduling in MVP?"]
+    assert retrieved_before["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
+    assert retrieved_before["artifact_state"]["concept"]["audiences"] == ["Freelancers scheduling appointments"]
+    assert retrieved_before["artifact_state"]["concept"]["features"]["p1"] == [
+        {"name": "Booking workflow", "description": "Create bookings and send reminders"}
+    ]
     assert checkpointed["accepted"] is True
     assert checkpointed["used_existing_stage_memory"] is True
-    assert retrieved_after["semantic"]["facts"][0]["summary"] == "Primary audience: freelancers"
+    assert retrieved_after["artifact_state"]["concept"]["checkpointSummary"] == "Concept ratified after incremental discovery"
+    assert retrieved_after["artifact_state"]["concept"]["revision"] == 1
     assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
+
+
+def test_validate_detects_out_of_sync_generated_concept(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.concept",
+        project_name="MVP scheduling assistant",
+        audiences=["Freelancers"],
+        scenarios=["Book and reschedule appointments"],
+        pain_points=["Appointments are tracked manually"],
+        feature_p1=["Booking workflow::Create bookings and reminders"],
+        status="validated",
+    )
+
+    concept_path = paths["branch_dir"] / "concept.md"
+    concept_path.write_text("# manually edited\n", encoding="utf-8")
+
+    errors = validate_branch_memory(paths["branch_dir"].parents[1], "main")
+
+    assert any("concept.md is out of sync" in error for error in errors)
 
 
 def test_security_checkpoint_generates_security_audit_view(tmp_path: Path) -> None:

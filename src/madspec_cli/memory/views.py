@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .concept_state import load_concept_state, render_concept_markdown
 from .records import make_record
 from .storage import (
     _default_active_session,
@@ -54,6 +55,7 @@ def _render_project_context(
     branch_name: str,
     progress: dict[str, Any],
     active_session: dict[str, Any],
+    concept_state: dict[str, Any],
     generated_at: str,
 ) -> str:
     planned_steps = progress.get("plannedSteps", [])
@@ -93,10 +95,15 @@ def _render_project_context(
             "",
             "## Canonical Memory",
             f"- `.madspec/{branch_name}/memory/progress.json`",
+            f"- `.madspec/{branch_name}/memory/stages/mvp.concept.json`",
             f"- `.madspec/{branch_name}/memory/working/active-session.json`",
             f"- `.madspec/{branch_name}/memory/working/decision-log.jsonl`",
             f"- `.madspec/{branch_name}/memory/episodes/events.jsonl`",
             f"- `.madspec/{branch_name}/memory/semantic/*.jsonl`",
+            "",
+            "## Generated Artifacts",
+            f"- `.madspec/{branch_name}/concept.md` (generated from structured memory)",
+            f"- Concept checkpoint summary: `{concept_state.get('checkpointSummary') or 'N/A'}`",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -210,6 +217,7 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
     active_session = read_json(paths.active_session, _default_active_session(branch_name))
+    concept_state = load_concept_state(paths.concept_state)
     generated_at = active_session.get("updated_at") or active_session.get("last_checkpoint_at") or now_iso()
     decision_log = read_jsonl(paths.decision_log)
     events = read_jsonl(paths.events)
@@ -219,9 +227,13 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
 
     generated: list[Path] = []
 
+    concept_path = paths.branch_dir / "concept.md"
+    concept_path.write_text(render_concept_markdown(concept_state), encoding="utf-8")
+    generated.append(concept_path)
+
     project_context_path = paths.branch_dir / "project-context.md"
     project_context_path.write_text(
-        _render_project_context(branch_name, progress, active_session, generated_at),
+        _render_project_context(branch_name, progress, active_session, concept_state, generated_at),
         encoding="utf-8",
     )
     generated.append(project_context_path)
@@ -473,4 +485,7 @@ def retrieve_memory_context(
         },
         "episodes": _trim(scoped_events),
         "decision_log": _trim(scoped_decisions),
+        "artifact_state": {
+            "concept": load_concept_state(paths.concept_state) if stage_lower == "mvp.concept" else None,
+        },
     }

@@ -3,6 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .concept_state import (
+    CONCEPT_STAGE,
+    concept_completeness_errors,
+    load_concept_state,
+    save_concept_state,
+    update_concept_state,
+)
 from .records import make_record
 from .storage import (
     _default_active_session,
@@ -119,6 +126,7 @@ def checkpoint_stage_memory(
         paths.facts: _snapshot_file(paths.facts),
         paths.decisions: _snapshot_file(paths.decisions),
         paths.contracts: _snapshot_file(paths.contracts),
+        paths.concept_state: _snapshot_file(paths.concept_state),
     }
 
     ts = now_iso()
@@ -152,6 +160,19 @@ def checkpoint_stage_memory(
         },
         ts=ts,
     )
+    concept_state = load_concept_state(paths.concept_state)
+    if normalized_stage == CONCEPT_STAGE:
+        concept_state = update_concept_state(
+            concept_state,
+            constraints=normalized_contracts,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(concept_completeness_errors(concept_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+
     fact_records = [
         make_record(
             branch_name,
@@ -199,17 +220,20 @@ def checkpoint_stage_memory(
     ]
 
     try:
+        if normalized_stage == CONCEPT_STAGE:
+            save_concept_state(paths.concept_state, concept_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, [checkpoint_record])
         append_jsonl(paths.facts, fact_records)
         append_jsonl(paths.decisions, decision_records)
         append_jsonl(paths.contracts, contract_records)
 
+        generated = consolidate_branch_memory(project_path, branch_name)
+        ensure_memory_layout(project_path, branch_name)
+        generated = consolidate_branch_memory(project_path, branch_name)
         validation_errors = validate_branch_memory(project_path, branch_name)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
-
-        generated = consolidate_branch_memory(project_path, branch_name)
     except Exception as exc:
         for path, content in snapshots.items():
             _restore_file(path, content)

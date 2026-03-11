@@ -291,7 +291,7 @@ madspec memory init [--branch <name>]
 madspec memory status [--branch <name>] [--json-output]
 madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
-madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
+madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
 madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--json-output]
 madspec memory start-step --stage <mvp.implement|feature.implement> [--step-id <id>] [--summary <text>] [--evidence <path-or-note>] [--json-output]
@@ -308,9 +308,9 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory status` - показывает состояние structured memory
 - `memory consolidate` - пересобирает markdown views из memory
 - `memory validate` - проверяет schema, state transitions и согласованность views
-- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions для `concept/design/tech/architecture/review/security`
+- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.concept` также обновляет canonical concept state через stage-specific flags
 - `memory checkpoint` - канонически фиксирует финал non-iterative stage, обновляет active session и semantic records, затем пересобирает generated views
-- `memory retrieve` - возвращает минимальный контекст для stage/step
+- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept` дополнительно отдает `artifact_state.concept`
 - `memory start-step` - канонически переводит implementation step в `in_progress` и делает его текущим шагом
 - `memory checkpoint-step` - записывает промежуточный implementation checkpoint, включая TDD phase и evidence
 - `memory complete-step` - завершает implementation step, обновляет `completedSteps/currentImplementStep` и сохраняет step-level knowledge в memory
@@ -367,12 +367,15 @@ madspec version
 **Особенности:**
 - Автоматическая инициализация GIT репозитория с детальным `.gitignore` (исключает секреты, зависимости, временные файлы)
 - Автоматическая валидация концепции перед переходом к следующему этапу
+- Каноническое состояние концепции хранится в `.madspec/<BRANCH>/memory/stages/mvp.concept.json`
+- `.madspec/<BRANCH>/concept.md` пересобирается из structured memory и не редактируется вручную
 - Обязательный checkpoint через `madspec memory checkpoint --stage mvp.concept`
 - Первый коммит в GIT после создания концепции
 
 **Выходные артефакты:**
 - `.gitignore` - файл исключений для GIT репозитория
-- `.madspec/<BRANCH>/concept.md` - полная концепция проекта
+- `.madspec/<BRANCH>/memory/stages/mvp.concept.json` - canonical concept state
+- `.madspec/<BRANCH>/concept.md` - generated artifact концепции
 - `.madspec/<BRANCH>/project-context.md` - generated view контекста проекта
 
 ### Этап 1: Дизайн UI (`madspec.mvp.design`)
@@ -603,12 +606,14 @@ madspec version
 
 **Canonical memory:**
 - `memory/progress.json` - состояние workflow
+- `memory/stages/mvp.concept.json` - canonical state этапа `mvp.concept`
 - `memory/working/active-session.json` - текущая рабочая память
 - `memory/working/decision-log.jsonl` - micro-decisions и checkpoints
 - `memory/episodes/events.jsonl` - опыт выполнения
 - `memory/semantic/*.jsonl` - validated knowledge
 
 **Generated views:**
+- `concept.md`
 - `project-context.md`
 - `planning-context-cache.md`
 - `steps/*/planning-context.md`
@@ -625,6 +630,25 @@ madspec version
 Для ранних MVP-этапов canonical update выполняется командой `madspec memory checkpoint`, которая делает все три шага автоматически.
 
 Для non-iterative стадий `concept/design/tech/architecture/review/security` рекомендуется сначала накапливать знания через `madspec memory capture`, а потом завершать стадию кратким `madspec memory checkpoint --summary ...`. Это убирает необходимость сжимать весь диалог в один финальный payload.
+
+Для `mvp.concept` используйте stage-specific поля `memory capture`, чтобы наполнять canonical state напрямую:
+
+```bash
+madspec memory capture \
+  --stage mvp.concept \
+  --project-name "MVP scheduling assistant" \
+  --audience "Freelancers scheduling appointments" \
+  --scenario "Create and reschedule appointments from one calendar" \
+  --pain "Manual follow-ups cause missed appointments" \
+  --feature-p1 "Booking workflow::Create bookings and send reminders" \
+  --constraint "Reminder settings must stay editable per booking" \
+  --next-action "Proceed to mvp.design"
+
+madspec memory checkpoint \
+  --stage mvp.concept \
+  --summary "Concept validated for MVP scheduling assistant" \
+  --evidence .madspec/<BRANCH>/concept.md
+```
 
 Для iterative implementation-этапов canonical update больше не требует ручного редактирования `progress.json`:
 - `madspec memory start-step` - выбрать/запустить текущий шаг

@@ -21,6 +21,8 @@ class MemoryPaths:
     branch_dir: Path
     memory_dir: Path
     progress: Path
+    stages_dir: Path
+    concept_state: Path
     working_dir: Path
     active_session: Path
     decision_log: Path
@@ -42,6 +44,8 @@ class MemoryPaths:
             "branch_dir": self.branch_dir,
             "memory_dir": self.memory_dir,
             "progress": self.progress,
+            "stages_dir": self.stages_dir,
+            "concept_state": self.concept_state,
             "working_dir": self.working_dir,
             "active_session": self.active_session,
             "decision_log": self.decision_log,
@@ -261,6 +265,8 @@ def get_memory_paths(project_path: Path, branch_name: str) -> MemoryPaths:
         branch_dir=branch_dir,
         memory_dir=memory_dir,
         progress=memory_dir / "progress.json",
+        stages_dir=memory_dir / "stages",
+        concept_state=memory_dir / "stages" / "mvp.concept.json",
         working_dir=memory_dir / "working",
         active_session=memory_dir / "working" / "active-session.json",
         decision_log=memory_dir / "working" / "decision-log.jsonl",
@@ -323,11 +329,19 @@ def ensure_procedures_layout(project_path: Path) -> list[Path]:
 
 def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
     from .planning import _compute_progress_metrics, extract_function_catalog
+    from .concept_state import (
+        default_concept_state,
+        is_empty_concept_state,
+        load_concept_state,
+        migrate_legacy_concept_markdown,
+        save_concept_state,
+    )
 
     paths = get_memory_paths(project_path, branch_name)
     created: list[Path] = []
 
     paths.branch_dir.mkdir(parents=True, exist_ok=True)
+    paths.stages_dir.mkdir(parents=True, exist_ok=True)
     paths.working_dir.mkdir(parents=True, exist_ok=True)
     paths.episodes_dir.mkdir(parents=True, exist_ok=True)
     paths.semantic_dir.mkdir(parents=True, exist_ok=True)
@@ -339,6 +353,22 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
     if not paths.active_session.exists():
         write_json(paths.active_session, _default_active_session(branch_name))
         created.append(paths.active_session)
+
+    if not paths.concept_state.exists():
+        legacy_concept_path = paths.branch_dir / "concept.md"
+        concept_state = (
+            migrate_legacy_concept_markdown(legacy_concept_path)
+            if legacy_concept_path.exists()
+            else default_concept_state()
+        )
+        save_concept_state(paths.concept_state, concept_state)
+        created.append(paths.concept_state)
+    else:
+        concept_state = load_concept_state(paths.concept_state)
+        legacy_concept_path = paths.branch_dir / "concept.md"
+        if legacy_concept_path.exists() and is_empty_concept_state(concept_state):
+            concept_state = migrate_legacy_concept_markdown(legacy_concept_path)
+        save_concept_state(paths.concept_state, concept_state)
 
     for path in (
         paths.decision_log,

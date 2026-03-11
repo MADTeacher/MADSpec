@@ -30,7 +30,7 @@ madspec --help
 
 **Последовательность команд:**
 
-1. `madspec.mvp.concept` — что создаем
+1. `madspec.mvp.concept` — что создаем; canonical source of truth будет сохранен в `.madspec/<branch>/memory/stages/mvp.concept.json`, а `concept.md` будет generated artifact
 2. `madspec.mvp.design` — UI прототипы
 3. `madspec.mvp.tech` — выбор технологий
 4. `madspec.mvp.architecture` — архитектура
@@ -70,7 +70,7 @@ madspec.feature.implement
 | `madspec.feature.init "спецификация"` | Добавить новую фичу в проект |
 | `madspec.feature.plan` | Спланировать шаги Feature |
 | `madspec.feature.implement` | Реализовать Feature |
-| `madspec.mvp.concept` | Создать проект с нуля — концепция |
+| `madspec.mvp.concept` | Создать проект с нуля — концепция; заполняет canonical concept state и пересобирает `concept.md` |
 | `madspec.mvp.design` | Создать проект — UI прототипы |
 | `madspec.mvp.tech` | Создать проект — выбор технологий |
 | `madspec.mvp.architecture` | Создать проект — архитектура |
