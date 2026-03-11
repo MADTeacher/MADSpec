@@ -144,6 +144,7 @@ Structured memory:
 
 - Предпочитай чтение generated context для ориентации и memory-файлов для проверки истины
 - Для branch-aware операций используй CLI MADSpec, а не ad-hoc shell-логику
+- Если нужно менять сам MADSpec CLI, используй текущий internal layout: `src/madspec_cli/features/*/cli.py` для entrypoints `init/git/meta`, `src/madspec_cli/memory/cli/` для memory-команд, `application/` для orchestration и `shared/*` для общих адаптеров; legacy-модули допустимы только как compatibility/backend слой
 - Если меняешь или документируешь CLI-поведение, сверяйся с текущим `README.md`, `AGENTS.md` и шаблонами команд
 - Для `mvp.concept` используй краткий `madspec memory retrieve --json-output` в обычных ходах диалога, `--include-history` только при явной необходимости, а `--full-artifact` только перед финальной валидацией, итоговым обзором и `checkpoint`
 - Для `mvp.design` в начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.design --json-output`, затем сверяй `ui-design.md` и файлы в `ui-prototype/`; не считай дизайн завершенным, пока пользователь явно не утвердил текущее состояние

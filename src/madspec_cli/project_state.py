@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .git_ops import get_current_branch
+from .features.git.infrastructure.operations import get_current_branch
 from .ui import console
 
 

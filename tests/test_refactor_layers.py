@@ -12,7 +12,7 @@ from madspec_cli.github_api import (
     _parse_rate_limit_headers,
     fetch_latest_release_asset,
 )
-from madspec_cli.initializer import merge_json_files
+from madspec_cli.features.init.infrastructure.initializer_core import merge_json_files
 from madspec_cli.memory import (
     _compute_progress_metrics,
     consolidate_branch_memory,

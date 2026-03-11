@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import typer
 
-from .commands import git as git_commands
-from .commands import init as init_commands
-from .commands import memory as memory_commands
-from .commands import meta as meta_commands
-from .ui import BannerGroup, maybe_show_root_banner
+from .features import git as git_feature
+from .features import init as init_feature
+from .features import meta as meta_feature
+from .memory import cli as memory_cli
+from .shared.cli.banners import BannerGroup, maybe_show_root_banner
 
 app = typer.Typer(
     name="madspec",
@@ -26,10 +26,10 @@ def callback(ctx: typer.Context) -> None:
         maybe_show_root_banner()
 
 
-init_commands.register(app)
-git_commands.register(app)
-meta_commands.register(app)
-memory_commands.register(memory_app)
+init_feature.cli.register(app)
+git_feature.cli.register(app)
+meta_feature.cli.register(app)
+memory_cli.register(memory_app)
 
 
 def main() -> None:
