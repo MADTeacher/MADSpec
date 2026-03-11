@@ -159,7 +159,7 @@ MADSpec построен на следующих принципах:
 
 Отдельно можно выделить функцию, которая стоит особняком и может применяться практически на любом шаге благодаря отслеживанию прогресса:
 
-1. **Review** (команда `madspec.review`) предназначена для анализа созданных артефактов, выявления сильных и слабых сторон реализации и фиксации направлений улучшения процесса разработки и результата.
+1. **Review** (команда `madspec.review`) предназначена для branch-aware анализа качества после реализации шага, набора шагов или заметного change set: команда сверяет код, progress и generated views с intent ветки и фиксирует findings и улучшения в structured memory.
 
 ---
 
@@ -223,7 +223,7 @@ madspec init <PROJECT_NAME> --ai <agent>
 # Может быть вызвана на любом этапе (до или после реализации)
 
 # Review и улучшения (рекомендуется)
-/madspec review
+/madspec.review
 
 # Проверка безопасности (рекомендуется)
 /madspec.security
@@ -509,43 +509,42 @@ madspec version
 
 ### Этап 6: Review и улучшения (`madspec.review`)
 
-Анализ созданных артефактов, выявление сильных и слабых сторон, сравнение с лучшими практиками и фиксация направлений улучшения.
+Branch-aware quality review после `madspec.mvp.implement`, `madspec.feature.implement` или заметного change set. Команда работает от текущего кода, implementation progress и generated views, а findings и backlog улучшений фиксирует в structured memory.
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/review.md` - generated view отчета review
 - `.madspec/<BRANCH>/improvements.md` - generated view списка улучшений
 
-**Особенность**: Этот этап помогает зафиксировать области для улучшения, подготовить рефакторинг и улучшить качество кода и проектных решений.
+**Особенность**: Review не привязан только к финалу MVP. Его можно запускать после реализации шагов или крупных изменений, даже если часть branch artifacts отсутствует. В этом случае отсутствующие артефакты трактуются как limitation анализа, а не как автоматический стоп-фактор.
 
 ### Команда проверки безопасности (`madspec.security`)
 
-Комплексная проверка безопасности кода проекта на соответствие стандартам OWASP и законодательству по персональным данным.
+Pragmatic security/privacy audit текущего change set, codebase и branch context. Команда анализирует код, зависимости, архитектурные риски, deployment context и обработку персональных данных в контексте 152-ФЗ.
 
 **Особенности:**
 - Настраиваемый scope проверки:
-  - `basic` (по умолчанию) - OWASP Top 10 + законодательство ПД + зависимости + код
-  - `full` - OWASP ASVS + Mobile/API + законодательство ПД + зависимости + код
-  - Выборочные проверки: `owasp-top10`, `asvs`, `mobile`, `api`, `privacy`, `dependencies`, `code`
-- Юрисдикция по умолчанию: 152-ФЗ РФ (настраивается на GDPR или мультиюрисдикцию)
-- Security Score (0-100) с разбивкой по категориям
-- Детальный отчет с примерами кода и рекомендациями
-- Настраиваемая глубина проверки под текущий этап и потребности проекта
+  - `default` (по умолчанию) - code + dependencies + architecture risks + обработка ПД
+  - `release` - расширенная проверка перед релизом
+  - `privacy` - только обработка и защита ПД по 152-ФЗ
+  - `deep` - углубленный аудит по всем доступным направлениям
+- Privacy/compliance контекст ограничен 152-ФЗ
+- Findings рекомендуется классифицировать по severity: `critical`, `high`, `medium`, `low`
+- Команда не заменяет полноценный юридический или внешний security audit
+- Generated report строится из structured memory records, поэтому не стоит ожидать от него сложной scorecard-модели без отдельной доработки renderer-ов
 
 **Примеры использования:**
 ```bash
-/madspec.security                                   # базовая проверка
-/madspec.security --scope full                         # полная проверка
-/madspec.security --scope owasp-top10                 # только OWASP Top 10
-/madspec.security --scope asvs                           # только OWASP ASVS
-/madspec.security --scope privacy                         # только законодательство по ПД
-/madspec.security --jurisdiction gdpr                    # проверка с GDPR
-/madspec.security --scope full --jurisdiction 152fz,gdpr # полная с мультиюрисдикцией
+/madspec.security                  # стандартный security/privacy audit
+/madspec.security --scope release  # расширенная проверка перед релизом
+/madspec.security --scope privacy  # только обработка и защита ПД по 152-ФЗ
+/madspec.security --scope deep     # углубленный аудит
+/madspec.security --skip-artifacts # анализ с доступным контекстом
 ```
 
 **Выходные артефакты:**
-- `.madspec/<BRANCH>/security-audit.md` - generated view детального отчета по безопасности с Security Score
+- `.madspec/<BRANCH>/security-audit.md` - generated view security/privacy audit
 
-**Особенность**: Команда может быть вызвана в любой момент после создания кода проекта. Рекомендуется проводить проверку после каждого значимого изменения кода или перед релизом.
+**Особенность**: Команда может быть вызвана в любой момент после появления кода. Если доступен `deployment.md`, audit должен учитывать secrets, CI/CD, environment separation и observability. Если deployment context отсутствует, это фиксируется как limitation анализа.
 
 ---
 

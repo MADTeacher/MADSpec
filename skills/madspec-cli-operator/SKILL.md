@@ -46,8 +46,8 @@ MADSpec управляет разработкой через агентные к
 
 Сквозные команды:
 
-- `/madspec.review` — review артефактов, сильные/слабые стороны, improvements
-- `/madspec.security` — security/privacy аудит артефактов и кода
+- `/madspec.review` — change-aware quality review после реализации: fit-gap, code quality, architecture impact, improvements
+- `/madspec.security` — pragmatic security/privacy аудит кода, зависимостей, архитектуры и обработки ПД по 152-ФЗ
 
 ### CLI-команды
 
@@ -90,6 +90,12 @@ Structured memory:
 - Для `feature.init` источник истины — `.madspec/<branch>/memory/stages/feature.init.json`; `project-analysis.md`, `feature-context.md`, `tech-stack.md` и `architecture.md` являются generated views
 - Для `feature.plan` источник истины — `.madspec/<branch>/memory/stages/feature.plan.json`; `implementation-plan.md`, `planning-context-cache.md` и `planning-context.md` являются generated views
 - Для `feature.implement` работай так же, как для `mvp.implement`: перед каждой сессией запускай `madspec memory retrieve --stage feature.implement --json-output`, затем `start-step/checkpoint-step/complete-step`
+- Для `review` считай команду кросс-сценарной: она может запускаться после `mvp.implement` или `feature.implement`, должна читать codebase, `memory/progress.json`, `active-session.json`, `implementation-plan.md`, relevant step contexts и branch artifacts по мере наличия; отсутствие части артефактов фиксируй как limitation, а не как автоматический отказ
+- Для `review` сохраняй findings через `madspec memory capture --stage review` с маппингом: observations/problems -> `--fact`, improvement directions/tradeoffs -> `--decision`, open items -> `--question`, concrete follow-ups -> `--pending-action`
+- Для `security` работай memory-first и branch-aware так же: читай codebase, progress/runtime state, `tech-stack.md`, `architecture.md`, `deployment.md` и previous `security` records по мере наличия
+- Для `security` считай privacy/compliance контекстом только 152-ФЗ; не обещай универсальную multi-jurisdiction проверку и не используй `--jurisdiction`
+- Для `security` классифицируй риски через severity buckets (`critical/high/medium/low`), а не через обязательный numeric score: текущие generated views рендерятся из records и не поддерживают надежную scorecard-модель
+- Для `security` если есть `deployment.md`, учитывай secrets, CI/CD, environment separation, observability и rollout risks; если файла нет, фиксируй это как limitation анализа
 - Если деплой влияет на архитектуру, интеграции, секреты, миграции или observability, учитывай `deployment.md` или инициируй `/madspec.deploy`
 - Перед реализацией сверяйся с `implementation-plan.md`, `steps/`, `memory/progress.json` и relevant generated context
 - Если работа идёт через structured memory, сначала обновляй memory, потом пересобирай views, потом валидируй

@@ -23,8 +23,8 @@ madspec --help
 2. `madspec.feature.plan` — планирование шагов через `.madspec/<branch>/memory/stages/feature.plan.json`
 3. `madspec.feature.implement` — реализация шагов через runtime memory workflow (`progress.json`, `active-session.json`, step records)
 4. `madspec.deploy` — подготовка к деплою (опционально)
-5. `madspec.review` — проверка качества (опционально)
-6. `madspec.security` — проверка безопасности (опционально)
+5. `madspec.review` — quality review после изменений (опционально)
+6. `madspec.security` — security/privacy audit по коду и ПД 152-ФЗ (опционально)
 
 ### Создать проект с нуля → MVP режим
 
@@ -37,8 +37,8 @@ madspec --help
 5. `madspec.mvp.plan` — планирование шагов (повторять пока не спланируете все)
 6. `madspec.mvp.implement` — реализация (повторять пока не реализуете все)
 7. `madspec.deploy` — подготовка к деплою (опционально)
-8. `madspec.review` — проверка качества (опционально)
-9. `madspec.security` — проверка безопасности (опционально)
+8. `madspec.review` — quality review после изменений (опционально)
+9. `madspec.security` — security/privacy audit по коду и ПД 152-ФЗ (опционально)
 
 ## Feature Workflow (добавление фичи)
 
@@ -77,8 +77,8 @@ madspec.feature.implement
 | `madspec.mvp.plan` | Создать проект — планирование |
 | `madspec.mvp.implement` | Создать проект — реализация |
 | `madspec.deploy` | Подготовить к деплою |
-| `madspec.review` | Проверить качество кода |
-| `madspec.security` | Проверить безопасность |
+| `madspec.review` | Проверить качество изменений и собрать backlog улучшений |
+| `madspec.security` | Проверить security/privacy риски и обработку ПД по 152-ФЗ |
 
 ## Агентские навыки
 
