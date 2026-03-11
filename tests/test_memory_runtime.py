@@ -742,6 +742,7 @@ def test_implementation_lifecycle_updates_memory_incrementally(tmp_path: Path) -
         "mvp.implement",
         step_id="step-01-authentication",
     )
+    implementation_context = paths["branch_dir"] / "steps" / "step-01-authentication" / "implementation-context.md"
 
     assert started["accepted"] is True
     assert started["step_id"] == "step-01-authentication"
@@ -763,6 +764,11 @@ def test_implementation_lifecycle_updates_memory_incrementally(tmp_path: Path) -
     assert retrieved["step"]["status"]["status"] == "completed"
     assert retrieved["semantic"]["facts"][0]["summary"] == "Authentication now persists session cookies"
     assert retrieved["semantic"]["decisions"][0]["summary"] == "Keep session middleware in the HTTP layer"
+    assert implementation_context.exists()
+    implementation_text = implementation_context.read_text(encoding="utf-8")
+    assert "# Implementation Context: step-01-authentication" in implementation_text
+    assert "Generated from structured memory records." in implementation_text
+    assert "TDD phase: `completed`" in implementation_text
     assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
 
 

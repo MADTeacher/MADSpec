@@ -484,17 +484,21 @@ madspec version
 
 **Особенности:**
 - Последовательное выполнение шагов с учетом зависимостей
-- Для `code` шагов обязателен цикл `red -> green -> refactor` до обновления статуса и коммита
-- Для `non-code` шагов обход TDD допускается только через явный `waiver` в основном состоянии шага
+- Для `code` шагов обязателен цикл `red -> green -> refactor`, который фиксируется через `madspec memory checkpoint-step`
+- Для `non-code` шагов обход TDD допускается только через явный `waiver` или `not-applicable` в metadata шага
 - Использование HTML прототипов из `.madspec/<BRANCH>/ui-prototype/` как визуального гайда при реализации интерфейса
-- Автоматическая валидация каждого шага перед переходом к следующему (чек-лист из 7 пунктов)
+- Автоматическая валидация каждого шага перед переходом к следующему
 - **Обязательные коммиты в GIT после каждого успешно завершенного шага** (только после валидации)
-- Обновление основных memory-файлов и последующая консолидация generated views
-- Возможность возобновления с любого шага (определение начального шага из `.madspec/<BRANCH>/memory/progress.json`)
+- Canonical state обновляется через `madspec memory start-step`, `madspec memory checkpoint-step`, `madspec memory complete-step`
+- `implementation-context.md` и `project-context.md` пересобираются автоматически из structured memory и не редактируются вручную как source of truth
+- `currentImplementStep` не должен изменяться вручную
+- Возможность возобновления с любого шага через structured memory workflow
 
 **Выходные артефакты:**
 - Реализованный код проекта
-- Обновленный `.madspec/<BRANCH>/memory/progress.json` (после каждого шага)
+- Обновленный `.madspec/<BRANCH>/memory/progress.json` через implementation memory workflow
+- Обновленные `.madspec/<BRANCH>/memory/working/decision-log.jsonl`, `.madspec/<BRANCH>/memory/episodes/events.jsonl` и `semantic/*.jsonl`
+- `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md` - generated view контекста реализации шага
 - История коммитов GIT с коммитом для каждого завершенного шага
 
 **КРИТИЧНО!!!** После завершения каждого шага реализации вы обязаны самостоятельно запустить все автоматизированные тесты, проследить, чтобы модель исправила ошибки, не упростив при этом код самой системы, а также выполнить все этапы ручного тестирования.
@@ -746,6 +750,20 @@ madspec memory retrieve \
 - `madspec memory checkpoint-step` - сохранить red/green/refactor progress по ходу шага
 - `madspec memory complete-step` - закрыть шаг, продвинуть workflow и записать step-level facts/decisions/contracts
 
+Рекомендуемый цикл для `mvp.implement`:
+1. `madspec memory retrieve --stage mvp.implement --json-output`
+2. `madspec memory start-step --stage mvp.implement ...`
+3. `madspec memory checkpoint-step --stage mvp.implement ...` по мере прохождения `red -> green -> refactor`
+4. `madspec memory complete-step --stage mvp.implement ...`
+5. При необходимости повторный `madspec memory retrieve --stage mvp.implement --json-output` для проверки итогового состояния
+
+Для `mvp.implement` canonical runtime-state хранится в `.madspec/<BRANCH>/memory/progress.json` и `.madspec/<BRANCH>/memory/working/active-session.json`.
+`implementation-context.md` и `project-context.md` являются generated views и пересобираются автоматически из records.
+`currentImplementStep` не должен меняться вручную.
+Для `code` шага completion валиден только если заполнены `redEvidence`, `greenEvidence`, `refactorNote`, а итоговый `tddPhase` равен `completed`.
+Для `non-code` шага допустим только путь `waived/not-applicable`, согласованный с metadata шага.
+Коммит обязателен после успешной валидации шага и `memory complete-step`, но metadata коммита не является отдельным canonical artifact внутри memory.
+
 ### Новая система контекстов
 
 MADSpec использует модульную систему контекстов:
@@ -757,8 +775,8 @@ MADSpec использует модульную систему контекст�
 
 **Итеративные этапы** (plan, implement):
 - Каждый шаг имеет собственные контексты:
-  - `planning-context.md` - решения, принятые при планировании шага
-  - `implementation-context.md` - решения, проблемы и результаты реализации
+  - `planning-context.md` - generated view решений, принятых при планировании шага
+  - `implementation-context.md` - generated view решений, проблем и результатов реализации
 - Контексты шагов позволяют отслеживать эволюцию проекта пошагово
 
 **Навигационный файл** `project-context.md`:

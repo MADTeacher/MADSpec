@@ -1,5 +1,5 @@
 ---
-description: MVP - Этап 5 - Пошаговая реализация проекта с автоматической валидацией и отслеживанием прогресса
+description: MVP - Этап 5 - Пошаговая реализация проекта с memory-first workflow, TDD и валидацией
 ---
 
 ## Пользовательский ввод
@@ -20,237 +20,160 @@ $ARGUMENTS
 
 ## Structured Memory First (обязательно)
 
-- `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
-- `implementation-context.md` и `project-context.md` являются generated views.
-- Перед началом шага сначала получай контекст через `madspec memory retrieve --stage mvp.implement --json-output`.
+- `progress.json` и `active-session.json` — канонический runtime-state этапа implement.
+- `decision-log.jsonl`, `events.jsonl` и `semantic/*.jsonl` — канонические записи о ходе реализации, знаниях и результатах.
+- `implementation-context.md` и `project-context.md` являются generated views поверх structured memory и **не редактируются вручную как primary source**.
+- Перед началом работы сначала получай контекст через `madspec memory retrieve --stage mvp.implement --json-output`.
 - Для старта шага используй `madspec memory start-step --stage mvp.implement`, а не ручную установку `currentImplementStep`.
 - Для промежуточных TDD checkpoint используй `madspec memory checkpoint-step --stage mvp.implement`.
-- Для завершения шага и продвижения workflow используй `madspec memory complete-step --stage mvp.implement`.
+- Для завершения шага, продвижения workflow и записи step-level knowledge используй `madspec memory complete-step --stage mvp.implement`.
+- Не редактируй `memory/progress.json`, `implementation-context.md` или `project-context.md` вручную, если то же изменение должно быть выражено через memory-команды и step records.
 
 ## Описание
 
-Этот этап **MADSpec (MADSpec Framework)** выполняет пошаговую реализацию **MVP (Minimum Viable Product)** проекта согласно плану. Каждый шаг:
+Этот этап **MADSpec (MADSpec Framework)** выполняет пошаговую реализацию **MVP (Minimum Viable Product)** проекта согласно плану.
 
-**Режим MVP**: Эта команда предназначена для разработки нового проекта с нуля. Все артефакты сохраняются в `.madspec/<BRANCH>/`, где `<BRANCH>` - имя текущей ветки разработки.
-- Выполняется последовательно (с учетом зависимостей)
-- Валидируется через тесты
-- Отмечается как завершенный в `.madspec/<BRANCH>/memory/progress.json` (где `<BRANCH>` определяется через `madspec git current-branch`)
-- Может быть возобновлен с любого шага
+**Режим MVP**: эта команда предназначена для разработки нового проекта с нуля. Все артефакты сохраняются в `.madspec/<BRANCH>/`, где `<BRANCH>` - имя текущей ветки разработки.
+
+Каждый шаг:
+- выполняется последовательно с учетом зависимостей;
+- валидируется через автоматические и ручные тесты;
+- фиксируется в structured memory;
+- может быть возобновлен с любого шага.
 
 ## Предварительные условия
 
-- Должен существовать `.madspec/<BRANCH>/implementation-plan.md` (где `<BRANCH>` определяется через `madspec git current-branch`)
-- Должна существовать директория `.madspec/<BRANCH>/steps/` с описаниями шагов
-- Должен существовать `.madspec/<BRANCH>/memory/progress.json`
-- Если файлы отсутствуют, предложи выполнить `/madspec.mvp.plan`
+- Должен существовать `.madspec/<BRANCH>/implementation-plan.md`.
+- Должна существовать директория `.madspec/<BRANCH>/steps/` с описаниями шагов.
+- Должен существовать `.madspec/<BRANCH>/memory/progress.json`.
+- Если файлы отсутствуют, предложи выполнить `/madspec.mvp.plan`.
 
 ## Цель этапа
 
 Реализовать проект пошагово, обеспечивая:
-- Выполнение каждого шага согласно плану
-- Валидацию через автоматические и ручные тесты
-- Отслеживание прогресса
-- Возможность возобновления с любого шага
+- выполнение каждого шага согласно плану;
+- обязательную валидацию через тесты и checklist шага;
+- детерминированное обновление workflow state через memory-команды;
+- возможность безопасно продолжать работу в новом чате без потери контекста.
 
 0. **Определение текущей ветки**:
-   - **ВАЖНО**: Перед началом работы определи текущую ветку, выполнив `madspec git current-branch` из корня проекта
-   - Команда возвращает имя ветки через stdout
-   - Используй результат выполнения команды (имя ветки) для формирования путей к артефактам
-   - Все пути к артефактам должны быть в формате `.madspec/<BRANCH>/...`, где `<BRANCH>` - это имя ветки, полученное из команды
-   - Если ни команда, ни файл недоступны, используй значение по умолчанию `main`
-   - Сохрани имя ветки для использования в дальнейших шагах
+   - Перед началом работы определи текущую ветку через `madspec git current-branch` из корня проекта.
+   - Все пути к артефактам используй в формате `.madspec/<BRANCH>/...`.
+   - Если ни команда, ни файл недоступны, используй значение по умолчанию `main`.
 
 1. **Загрузка контекста**:
-   - **Сначала выполни** `madspec memory retrieve --stage mvp.implement --json-output`
-   - Используй JSON-ответ как основной источник workflow state: `currentImplementStep`, `nextExecutableStep`, `step.status`, `step.metadata`, `step.dependencies`, `semantic.*`
-   - Прочитай `.madspec/<BRANCH>/implementation-plan.md` (где `<BRANCH>` - имя ветки, определенное в шаге 0)
-   - Прочитай все предыдущие артефакты (concept, design, tech, architecture) из `.madspec/<BRANCH>/`
-   - **ОБЯЗАТЕЛЬНО**: Прочитай контексты планирования и реализации предыдущих шагов (если есть):
-     - `.madspec/<BRANCH>/steps/step-[NN-1]-[prev-name]/planning-context.md` (контекст планирования предыдущего шага)
-     - `.madspec/<BRANCH>/steps/step-[NN-1]-[prev-name]/implementation-context.md` (контекст реализации предыдущего шага)
-     - Это поможет понять решения и проблемы предыдущих шагов
-   - **ВАЖНО**: Используй HTML прототипы из `.madspec/<BRANCH>/ui-prototype/` как референс при реализации:
-     - Открой соответствующий HTML файл для каждого экрана
-     - Используй прототип как визуальный гайд для реализации
-     - Убедись, что реализованный интерфейс соответствует прототипу
+   - **Сначала выполни** `madspec memory retrieve --stage mvp.implement --json-output`.
+   - Используй JSON-ответ как основной источник workflow state: `workflow.currentImplementStep`, `workflow.nextExecutableStep`, `step.status`, `step.metadata`, `step.dependencies`, `semantic.*`, `stage_memory.*`.
+   - Прочитай `.madspec/<BRANCH>/implementation-plan.md` как generated plan overview.
+   - Прочитай предыдущие stage artifacts из `.madspec/<BRANCH>/` для product и architecture context: `concept.md`, `ui-design.md`, `tech-stack.md`, `architecture.md`, `data-model.md`, `contracts/openapi.yaml`.
+   - Прочитай source artifacts текущего шага:
+     - `.madspec/<BRANCH>/steps/<step-id>/description.md`
+     - `.madspec/<BRANCH>/steps/<step-id>/tasks.md`
+     - `.madspec/<BRANCH>/steps/<step-id>/tests.md`
+     - `.madspec/<BRANCH>/steps/<step-id>/validation.md`
+   - Если есть предыдущие шаги, используй `planning-context.md` и `implementation-context.md` только как generated context для ориентации, а не как первичный источник истины.
+   - Если шаг связан с UI, используй HTML-прототипы из `.madspec/<BRANCH>/ui-prototype/` как визуальный референс при реализации.
 
-2. **Определение начального шага**:
-   - Если пользователь явно указал конкретный шаг в `$ARGUMENTS`, проверь его зависимости и запусти `madspec memory start-step --stage mvp.implement --step-id <step-id>`
-   - Иначе запусти `madspec memory start-step --stage mvp.implement --json-output` и используй выбранный шаг из ответа
-   - После `start-step` считай именно structured memory источником текущего шага, а не локальные догадки по имени директории
+2. **Определение и запуск текущего шага**:
+   - Если пользователь явно указал конкретный шаг в `$ARGUMENTS`, проверь его зависимости и запусти `madspec memory start-step --stage mvp.implement --step-id <step-id>`.
+   - Иначе запусти `madspec memory start-step --stage mvp.implement --json-output` и используй выбранный шаг из ответа.
+   - После `start-step` считай structured memory источником текущего шага, а не локальные догадки по имени директории.
+   - Если `start-step` возвращает ошибку о зависимостях или отсутствии executable step, остановись и объясни причину пользователю.
 
-3. **Проверка зависимостей**:
-   - Для текущего шага проверь, что все зависимости завершены
-   - Если зависимости не завершены, сообщи об ошибке и укажи, какие шаги нужно завершить сначала
+3. **Проверка шага перед реализацией**:
+   - Проверь, что шаг присутствует в `plannedSteps` и его зависимости завершены.
+   - Определи `step kind` и `tddPolicy` через `step.metadata`:
+     - `code + required` -> шаг выполняется строго по циклу `red -> green -> refactor`.
+     - `non-code + waived|not-applicable` -> кодовые TDD gates не применяются, но `waiverReason` должен быть сохранен в metadata шага.
+   - Если step source artifacts противоречат structured memory, доверяй memory как workflow state, а source artifacts используй как задающий intent и acceptance criteria.
 
-3.5. **Формат именования шагов**:
-   - Формат имени шага: `step-[NN]-[name]`, где:
-     - `[NN]` — номер шага в формате двух цифр с ведущим нулем (01, 02, 03, ..., 10, 11, ...)
-     - `[name]` — краткое название шага на английском языке (например: `setup`, `user-model`, `auth`)
-   - Источники информации о шагах:
-     - **Номер шага `[NN]`** берется из:
-       - `.madspec/<BRANCH>/implementation-plan.md` (где шаги перечислены с номерами)
-       - `.madspec/<BRANCH>/memory/progress.json` (поле `plannedSteps` содержит список шагов в формате `step-[NN]-[name]`)
-       - Названий директорий в `.madspec/<BRANCH>/steps/` (если директории уже существуют)
-     - **Название шага `[name]`** берется из:
-       - `.madspec/<BRANCH>/implementation-plan.md` (название шага в плане)
-       - Названия директории в `.madspec/<BRANCH>/steps/` (если директория уже существует)
-       - `.madspec/<BRANCH>/memory/progress.json` (поле `plannedSteps` или `currentImplementStep`)
-   - Примеры: `step-01-setup`, `step-02-user-model`, `step-03-auth`, `step-10-api-integration`
-   - **ВАЖНО**: При определении текущего шага используй точное имя из `.madspec/<BRANCH>/memory/progress.json` или `implementation-plan.md`, не придумывай формат самостоятельно
+4. **Выполнение шага**:
+   - Следуй `description.md`, `tasks.md`, `tests.md` и `validation.md`.
+   - Создавай или изменяй код и другие source files согласно задачам шага.
+   - Отмечай выполненные задачи в `tasks.md`, если файл доступен для редактирования.
+   - Для UI-шагов проверяй соответствие `.madspec/<BRANCH>/ui-prototype/` и `ui-design.md`.
 
-4. **Загрузка описания шага**:
-   - Прочитай `.madspec/<BRANCH>/steps/step-[NN]-[name]/description.md`
-   - Прочитай `.madspec/<BRANCH>/steps/step-[NN]-[name]/tasks.md`
-   - Прочитай `.madspec/<BRANCH>/steps/step-[NN]-[name]/tests.md`
-   - Прочитай `.madspec/<BRANCH>/steps/step-[NN]-[name]/validation.md`
-   - Прочитай `.madspec/<BRANCH>/memory/progress.json` и найди `stepMetadata["step-[NN]-[name]"]`
-   - Определи `step kind` и `tddPolicy`:
-     - `code + required` -> шаг выполняется строго по циклу `red -> green -> refactor`
-     - `non-code + waived|not-applicable` -> кодовые TDD gates не применяются, но причина waiver должна быть сохранена в артефактах и `progress.json`
-   - **Примечание**: `[NN]` и `[name]` определяются из текущего шага (см. раздел 2.5)
+5. **TDD и checkpoint discipline**:
 
-5. **Выполнение шага**:
-   - Выполни все задачи из `tasks.md`
-   - Следуй описанию из `description.md`
-   - Создавай/модифицируй файлы согласно задачам
-   - Отмечай выполненные задачи в `tasks.md` (чекбоксы `[x]`)
-   - **Для `code` шага TDD обязателен и порядок нельзя менять:**
-     1. Подготовь или создай focused test из секции `Red`
-     2. Запусти его и сразу сохрани checkpoint: `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase red --red-evidence "<command>"`
-     3. Сделай минимальную реализацию только для перехода в green
-     4. Повтори прогон и сохрани checkpoint: `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase green --green-evidence "<command>"`
-     5. Выполни refactor без изменения поведения и сохрани `refactorNote` через `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase refactor --refactor-note "<note>"`
-     6. Повтори focused test и `Relevant Suite`
-     7. Только после этого завершай шаг через `madspec memory complete-step --stage mvp.implement ...`
-   - **Для `non-code` шага** не редактируй `progress.json` вручную: заверши шаг через `madspec memory complete-step`, а `tddPhase=waived` будет валидирован на основе `stepMetadata`.
-   - **Примечание**: Файл `tasks.md` находится в `.madspec/<BRANCH>/steps/` и может быть частью репозитория. Если файл недоступен для редактирования, веди учет выполненных задач в отдельном файле или комментариях.
+   **Для `code` шага порядок обязателен:**
+   1. Подготовь focused test из секции `Red`.
+   2. Запусти failing test и сразу сохрани checkpoint:
+      `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase red --red-evidence "<command>"`
+   3. Сделай минимальную реализацию только для перехода в green.
+   4. Повтори прогон и сохрани checkpoint:
+      `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase green --green-evidence "<command>"`
+   5. Выполни refactor без изменения поведения и сохрани итог:
+      `madspec memory checkpoint-step --stage mvp.implement --step-id <step-id> --tdd-phase refactor --refactor-note "<note>"`
+   6. Повтори focused test и `Relevant Suite`.
+   7. Только после этого завершай шаг через `madspec memory complete-step --stage mvp.implement ...`.
 
-5.1. **⚠️ КРИТИЧЕСКИ ВАЖНО: Использование официальных команд создания проектов**:
+   **Для `non-code` шага:**
+   - Не редактируй `progress.json` вручную.
+   - Убедись, что `step.metadata.tddPolicy` и `step.metadata.waiverReason` согласованы с типом шага.
+   - Завершай шаг только через `madspec memory complete-step`; `tddPhase=waived` будет валидирован на основе metadata.
 
-   **ЗАПРЕЩЕНО** создавать проекты вручную, добавляя файлы и директории самостоятельно. **ОБЯЗАТЕЛЬНО** используй официальные команды создания проектов для соответствующих технологий:
+6. **⚠️ КРИТИЧЕСКИ ВАЖНО: Использование официальных команд создания проектов**:
 
-   - **Flutter**: Используй `flutter create <project_name>` вместо ручного создания файлов и директорий
-   - **React**: Используй `npx create-react-app <project_name>` или `npm create vite@latest <project_name>` вместо ручного создания файлов
-   - **Next.js**: Используй `npx create-next-app@latest <project_name>` вместо ручного создания файлов
-   - **Vue.js**: Используй `npm create vue@latest <project_name>` или `vue create <project_name>` вместо ручного создания файлов
-   - **Angular**: Используй `ng new <project_name>` вместо ручного создания файлов
-   - **Go**: Используй `go mod init <module_name>` для инициализации модуля вместо ручного создания `go.mod`
-   - **Python (uv)**: 
-     - **Для новых проектов**: Используй `uv init <project_name>` для создания нового проекта в новой директории или `uv init` для инициализации в текущей директории
-     - **Для библиотек**: Используй `uv init --lib <project_name>` для создания библиотеки
-     - **Для упакованных приложений**: Используй `uv init --package <project_name>` для создания проекта с правильной структурой пакета (исходный код в `src/`)
-     - **Для виртуальных окружений**: Используй `uv venv` для создания виртуального окружения (создается автоматически при первом запуске `uv run`, `uv sync` или `uv lock`)
-     - **Для установки зависимостей**: Используй `uv add <package>` для добавления зависимостей в проект
-     - **Для синхронизации**: Используй `uv sync` для синхронизации зависимостей из `uv.lock`
-     - **Для создания lockfile**: Используй `uv lock` для создания/обновления `uv.lock`
-     - **Для запуска скриптов**: Используй `uv run <script>` для запуска скриптов в изолированном окружении
-     - **НЕ СОЗДАВАЙ** файлы `pyproject.toml`, `.python-version`, `uv.lock` вручную - они создаются командами uv
-   - **Python (традиционные инструменты)**: 
-     - Используй `python -m venv <venv_name>` для создания виртуального окружения (если uv не используется)
-     - Используй `pip install` для установки зависимостей (если uv не используется)
-     - Используй соответствующие команды для создания проектов (например, `django-admin startproject <project_name>` для Django)
-   - **Node.js**: Используй `npm init` или `npm init -y` для создания `package.json` вместо ручного создания файла
-   - **Rust**: Используй `cargo new <project_name>` вместо ручного создания файлов и директорий
-   - **Java**: Используй соответствующие команды Maven/Gradle для создания проекта (например, `mvn archetype:generate` или `gradle init`)
-   - **C#/.NET**: Используй `dotnet new <template>` для создания проектов вместо ручного создания файлов
-   - **Ruby**: Используй `rails new <project_name>` для Rails проектов вместо ручного создания файлов
-   - **PHP**: Используй `composer create-project` для создания проектов вместо ручного создания файлов
+   **ЗАПРЕЩЕНО** создавать проекты вручную, добавляя файлы и директории самостоятельно. **ОБЯЗАТЕЛЬНО** используй официальные команды создания проектов для соответствующих технологий.
 
-   **Правила использования команд**:
-   - Перед созданием проекта проверь, установлен ли необходимый инструмент (flutter, npm, go, python, uv и т.д.)
-   - Если инструмент не установлен, сообщи пользователю о необходимости его установки
-   - Выполняй команды создания проектов из корневой директории проекта (или указанной в `tasks.md` директории)
-   - После выполнения команды создания проекта проверь, что все необходимые файлы и директории были созданы
-   - Если команда создания проекта требует дополнительных параметров (например, выбор шаблона, типа проекта), используй параметры по умолчанию или следуй инструкциям из `tasks.md` или `description.md`
-   - **НЕ СОЗДАВАЙ** файлы конфигурации (например, `package.json`, `go.mod`, `pubspec.yaml`, `Cargo.toml`, `pyproject.toml`, `.python-version`, `uv.lock`) вручную - они должны быть созданы соответствующими командами
-   - **НЕ СОЗДАВАЙ** структуру директорий проекта вручную - она должна быть создана соответствующими командами
+   - **Flutter**: `flutter create <project_name>`
+   - **React**: `npx create-react-app <project_name>` или `npm create vite@latest <project_name>`
+   - **Next.js**: `npx create-next-app@latest <project_name>`
+   - **Vue.js**: `npm create vue@latest <project_name>` или `vue create <project_name>`
+   - **Angular**: `ng new <project_name>`
+   - **Go**: `go mod init <module_name>`
+   - **Python (uv)**: `uv init`, `uv init --lib`, `uv init --package`, `uv add`, `uv sync`, `uv lock`, `uv run`
+   - **Python (традиционные инструменты)**: `python -m venv`, `pip install`, framework-specific init commands
+   - **Node.js**: `npm init` или `npm init -y`
+   - **Rust**: `cargo new <project_name>`
+   - **Java**: соответствующие команды Maven/Gradle
+   - **C#/.NET**: `dotnet new <template>`
+   - **Ruby**: `rails new <project_name>`
+   - **PHP**: `composer create-project`
 
-   **Примеры правильного использования**:
-   - ✅ `flutter create my_app` - правильно
-   - ❌ Создание файлов `pubspec.yaml`, `lib/main.dart` и директорий вручную - неправильно
-   - ✅ `npx create-react-app my-app` - правильно
-   - ❌ Создание файлов `package.json`, `src/App.js` и директорий вручную - неправильно
-   - ✅ `go mod init example.com/myproject` - правильно
-   - ❌ Создание файла `go.mod` вручную - неправильно
-   - ✅ `uv init my_project` - правильно для создания нового Python проекта с uv
-   - ✅ `uv init --lib my_library` - правильно для создания библиотеки с uv
-   - ✅ `uv init --package my_app` - правильно для создания упакованного приложения с uv
-   - ✅ `uv add requests` - правильно для добавления зависимости в проект uv
-   - ✅ `uv venv` - правильно для создания виртуального окружения с uv
-   - ❌ Создание файлов `pyproject.toml`, `.python-version`, `uv.lock` и директорий вручную - неправильно
-   - ❌ Создание директории `.venv` и файлов вручную - неправильно
+   Правила:
+   - Сначала проверь, установлен ли нужный инструмент.
+   - Если инструмент не установлен, сообщи пользователю о необходимости его установки.
+   - Выполняй команды создания проекта из корневой директории проекта или директории, указанной в `tasks.md`.
+   - После выполнения команды проверь, что все нужные файлы и директории действительно были созданы.
+   - **НЕ СОЗДАВАЙ** вручную `package.json`, `go.mod`, `pubspec.yaml`, `Cargo.toml`, `pyproject.toml`, `.python-version`, `uv.lock` и аналогичные bootstrap files.
+   - **НЕ СОЗДАВАЙ** вручную структуру директорий проекта, если для стека есть официальный initializer.
 
+7. **Валидация шага**:
 
-6. **Валидация шага**:
-   
-   **ВАЖНО**: Перед переходом к следующему шагу выполни полную валидацию текущего шага по следующему чек-листу:
-   
-   - [ ] **Все задачи из `tasks.md` выполнены**
-     - Проверь файл `.madspec/<BRANCH>/steps/step-[NN]-[name]/tasks.md`
-     - Все задачи должны быть отмечены как выполненные (чекбоксы `[x]`)
-     - Все файлы, указанные в задачах, должны быть созданы или изменены
-     - **Если не выполнено**: выполни недостающие задачи
-   
-   - [ ] **Автоматические тесты описаны**
-     - Проверь файл `.madspec/<BRANCH>/steps/step-[NN]-[name]/tests.md` на наличие описания автоматических тестов
-     - Если тесты указаны, проверь их наличие в кодовой базе проекта
-     - Все тесты должны проходить успешно
-     - **Если тесты нет, но они требуются в рамках текущего шага**: исправь проблемы и повтори проверки
-     - **Если тестов нет и они не требуются на текущем шаге проекта**: пропусти этот пункт
+   Перед завершением шага выполни полный checklist:
 
-   - [ ] **TDD-артефакты зафиксированы через structured memory**
-     - Проверь ответ `madspec memory retrieve --stage mvp.implement --step-id <step-id> --json-output`
-     - Для `code + required` убедись, что после `complete-step`:
-       - `step.status.tddPhase = completed`
-       - `step.status.redEvidence` заполнен
-       - `step.status.greenEvidence` заполнен
-       - `step.status.refactorNote` заполнен или содержит `No refactor needed`
-     - Для `non-code` шага убедись, что:
-       - `step.status.tddPhase = waived`
-       - `step.metadata.waiverReason` заполнен при `tddPolicy=waived`
+   - [ ] Все задачи из `tasks.md` выполнены.
+   - [ ] Файлы, указанные в шаге, созданы или изменены.
+   - [ ] Автоматические тесты из `tests.md` существуют и проходят, если они требуются для шага.
+   - [ ] Ручные тесты/чек-листы из `tests.md` выполнены, если они требуются для шага.
+   - [ ] Критерии завершения из `validation.md` выполнены.
+   - [ ] Реализация соответствует `description.md`.
+   - [ ] Код соответствует `architecture.md`, `data-model.md` и контрактам проекта.
+   - [ ] UI-реализация соответствует HTML-прототипам, если шаг касается интерфейса.
 
-   - [ ] **Ручные тесты описаны**
-     - Проверь файл `.madspec/<BRANCH>/steps/step-[NN]-[name]/tests.md` на наличие ручных тестов/чек-листов
-     - **Если ручных тестов нет, но они требуются на данном шаге**: исправь проблемы и повтори проверки
-   
-   - [ ] **Критерии завершения из `validation.md` выполнены**
-     - Прочитай файл `.madspec/<BRANCH>/steps/step-[NN]-[name]/validation.md`
-     - Проверь каждый критерий успешного завершения
-     - Убедись, что реализация соответствует всем критериям
-     - **Если критерии не выполнены**: доработай реализацию до соответствия критериям
-   
-   - [ ] **Реализация соответствует описанию шага**
-     - Сравни реализованный код с описанием из `description.md`
-     - Убедись, что реализация соответствует целям шага
-     - **Если не соответствует**: пересмотри реализацию
-   
-   - [ ] **Код соответствует архитектуре проекта**
-     - Проверь, что созданные файлы находятся в правильных директориях согласно архитектуре
-     - Убедись, что код следует принципам из `.madspec/<BRANCH>/architecture.md`
-     - **Если не соответствует**: приведи код в соответствие с архитектурой
-   
-   - [ ] **HTML прототипы учтены (если шаг касается UI)**
-     - Если шаг связан с реализацией интерфейса (создание компонентов, страниц, форм, стилей), проверь соответствие HTML прототипам из `.madspec/ui-prototype/`
-     - Реализованный интерфейс должен визуально соответствовать прототипу
-     - **Если не соответствует**: приведи интерфейс в соответствие с прототипом
-   
-   **Если валидация не пройдена:**
-   - Укажи конкретные пункты, которые не выполнены
-   - Предложи конкретные исправления
-   - **НЕ ПРОДОЛЖАЙ** к следующему шагу до прохождения валидации
-   - **НЕ СОЗДАВАЙ** коммит в GIT до успешной валидации
-   
-   **Если валидация пройдена:**
-   - Подтверди успешную валидацию шага
-   - Переходи к обновлению прогресса (раздел 6)
+   **Отдельно проверь structured memory:**
+   - Выполни `madspec memory retrieve --stage mvp.implement --step-id <step-id> --json-output`.
+   - Для `code + required` после `complete-step` должны быть выполнены условия:
+     - `step.status.tddPhase = completed`
+     - `step.status.redEvidence` заполнен
+     - `step.status.greenEvidence` заполнен
+     - `step.status.refactorNote` заполнен или содержит `No refactor needed`
+   - Для `non-code` шага:
+     - `step.status.tddPhase = waived`
+     - при `tddPolicy=waived` заполнен `step.metadata.waiverReason`
 
-6. **Обновление прогресса**:
-   
-   **ВАЖНО**: После успешной валидации шага **не редактируй** `.madspec/<BRANCH>/memory/progress.json` вручную.
-   
+   Если валидация не пройдена:
+   - укажи конкретные невыполненные пункты;
+   - предложи конкретные исправления;
+   - **не переходи** к завершению шага и **не создавай коммит** до успешной валидации.
+
+8. **Завершение шага через structured memory**:
+
+   После успешной валидации **не редактируй** `.madspec/<BRANCH>/memory/progress.json` вручную.
+
    Вместо этого выполни:
-   
+
    ```bash
    madspec memory complete-step \
      --stage mvp.implement \
@@ -260,9 +183,9 @@ $ARGUMENTS
      --green-evidence "<focused green command>" \
      --refactor-note "<что было отрефакторено>"
    ```
-   
+
    Если в ходе шага появились устойчивые знания, сразу сохрани их в memory:
-   
+
    ```bash
    madspec memory complete-step \
      --stage mvp.implement \
@@ -272,111 +195,60 @@ $ARGUMENTS
      --decision "<validated decision>" \
      --contract "<validated constraint>"
    ```
-   
+
    Команда сама:
-   - обновит `completedSteps`
-   - выставит `stepStatus`
-   - переведет `tddPhase` в `completed` или `waived`
-   - выберет следующий executable step и обновит `currentImplementStep`
-   - запишет step-level records в episodic/semantic memory
-   - пересоберет generated views и провалится, если state невалиден
+   - обновит `completedSteps`, `stepStatus` и `currentImplementStep`;
+   - переведет `tddPhase` в `completed` или `waived`;
+   - запишет step-level records в episodic и semantic memory;
+   - пересоберет generated views и завершится ошибкой, если state невалиден.
 
-6.5. **Создание контекста реализации**:
-   
-   После успешной валидации шага создай `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md`:
-     - Используй шаблон `.madspec/templates/implementation-context-template.md` (шаблоны хранятся в корне `.madspec/templates/`)
-   - Заполни все разделы шаблона:
-     - **Краткое резюме реализации**: что было сделано на этом шаге
-     - **Отклонения от плана**: если были (или укажи "Отклонений от плана не было")
-     - **Ключевые решения при реализации**: решения, принятые во время реализации с альтернативами
-     - **Проблемы и их решения**: проблемы, с которыми столкнулись (или укажи "Значительных проблем не возникло")
-     - **Изменения в архитектуре**: если были (или укажи "Изменений в архитектуре не требовалось")
-     - **Созданные/измененные файлы**: полный список с описаниями
-     - **Результаты тестирования**: статус автоматических и ручных тестов, результат валидации
-     - **Информация о коммите**: оставь пустым - будет заполнено после создания коммита
-     - Сохрани в `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md`
-   
-   **Примечание**: Информация о коммите будет добавлена после создания коммита в разделе 7
+9. **Проверка результата после completion**:
+   - Повтори `madspec memory retrieve --stage mvp.implement --step-id <step-id> --json-output` и проверь итоговый статус шага.
+   - Используй generated `implementation-context.md` и `project-context.md` как read-only подтверждение того, что consolidated views обновились.
+   - Если generated views расходятся с фактами, исправляй memory/records и повторяй `madspec memory consolidate` + `madspec memory validate`, а не редактируй markdown вручную.
 
-7. **Коммит изменений в GIT**:
-   - **ОБЯЗАТЕЛЬНО**: После успешной валидации шага и обновления `.madspec/<BRANCH>/memory/progress.json` создай коммит в GIT
-   - Создай коммит с описанием шага: `madspec git commit --message "..."`
-   - Формат: `madspec git commit --message "feat(step-NN): реализован шаг [название шага]"`
-   - Пример: `madspec git commit --message "feat(step-01): реализована настройка проекта"`
-   - **Примечание**: Все изменения шага (код, тесты, документация, обновленный `.madspec/<BRANCH>/memory/progress.json`, `implementation-context.md`) должны быть включены в один коммит. Если тесты добавляются позже, создай отдельный коммит: `madspec git commit --message "test(step-NN): добавлены тесты для шага [название]"`
-   - **ВАЖНО**: Коммит создается только после успешной валидации шага
-   - Если валидация не пройдена, НЕ создавай коммит до исправления ошибок
-   
-   - **После создания коммита**: Обнови `implementation-context.md`:
-     - Получи хеш коммита: `git log -1 --format=%H`
-     - Получи сообщение коммита: `git log -1 --format=%s`
-     - Добавь эту информацию в раздел "Информация о коммите" в `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md`:
-       - Хеш коммита
-       - Сообщение коммита
-       - Дата коммита
-       - Краткое описание всех включенных изменений
+10. **Коммит изменений в GIT**:
+   - После успешной валидации и успешного `complete-step` создай коммит в GIT:
+     `madspec git commit --message "feat(step-NN): реализован шаг [название шага]"`
+   - Коммит создается только после успешной валидации шага.
+   - Не обещай ручное обновление generated views после коммита: commit metadata не является отдельным canonical artifact для этого этапа.
+   - Все изменения шага должны быть включены в коммит: код, тесты, source artifacts шага и обновленный structured memory state.
 
-8. **Обновление project-context.md**:
-   - Обнови `.madspec/<BRANCH>/project-context.md`:
-     - Установи текущий этап: "implement"
-     - Обнови текущий шаг реализации
-     - Обнови прогресс реализации ([X/Y шагов завершено])
-     - Добавь/обнови информацию о завершенном шаге в раздел "Шаги реализации":
-       - Номер и название шага
-       - Ссылка на `implementation-context.md` в директории шага
-       - Статус: "Завершен"
-
-9. **Отчет о прогрессе**:
-   - Выведи статус выполнения:
-     - Текущий шаг завершен
-     - Следующий шаг
-     - Общий прогресс (X из Y шагов)
-
-10. **Переход к следующему шагу**:
-   - Если есть следующий шаг, спроси: "Перейти к следующему шагу? (да/нет/начать тестирование)"
-   - Если "да", попроси открыть новый чат и снова запустить текущую команду
-   - Если "нет" или "остановиться", сохрани прогресс и заверши работу
-   - Если "начать тестирование", выполни автоматизированное тестирование текущего шага и опиши какие шаги необходимо выполнить для ручной проверки работоспособности системы на данном шаге разработки
-
-11. **Завершение**:
-    - Когда все шаги завершены, выведи финальный отчет
-    - Предложи финальную валидацию проекта
-    - Поздравь с завершением!
+11. **Отчет о прогрессе**:
+   - Сообщи:
+     - какой шаг завершен;
+     - какой следующий executable step выбран memory workflow;
+     - каков общий прогресс (`completedSteps` из `plannedSteps`).
+   - Если все шаги завершены, предложи переход к финальной проверке проекта.
 
 ## Правила выполнения
 
-- **СЛЕДУЙ** плану - не пропускай шаги
-- **ВАЛИДИРУЙ** каждый шаг перед переходом к следующему (используй чек-лист из раздела 5)
-- **ОБНОВЛЯЙ** `.madspec/<BRANCH>/memory/progress.json` вручную после каждого успешно завершенного шага (см. раздел 6)
-- **КОММИТЬ** изменения в GIT после каждого успешно завершенного шага (только после валидации)
-- **НЕ ПРОДОЛЖАЙ** если валидация не пройдена
-- **НЕ КОММИТЬ** изменения до успешной валидации шага
-- **НЕ ОБНОВЛЯЙ** `.madspec/<BRANCH>/memory/progress.json` до успешной валидации шага
-- **ДОКУМЕНТИРУЙ** любые отклонения от плана
+- **СЛЕДУЙ** плану и не пропускай шаги без явного основания.
+- **ВАЛИДИРУЙ** каждый шаг перед `complete-step` и коммитом.
+- **НЕ ОБНОВЛЯЙ** `currentImplementStep` и `progress.json` вручную.
+- **ИСПОЛЬЗУЙ** `madspec memory retrieve/start-step/checkpoint-step/complete-step` как обязательный API этапа.
+- **КОММИТЬ** изменения только после успешной валидации и `complete-step`.
+- **НЕ РЕДАКТИРУЙ** `implementation-context.md` и `project-context.md` вручную как source of truth.
+- **ДОКУМЕНТИРУЙ** устойчивые факты, решения и контракты через `memory complete-step`.
 
 ## Обработка ошибок
 
-- Если шаг не может быть выполнен, остановись и сообщи о проблеме
-- Предложи варианты решения
-- Если нужно изменить план, задокументируйте изменения
-
-## Подсказки и помощь
-
-### Контекстные подсказки
-При возникновении ошибок валидации система автоматически предложит подсказки для решения проблем в реализации.
+- Если шаг не может быть выполнен, остановись и сообщи о проблеме.
+- Предложи варианты решения.
+- Если workflow state или generated views расходятся, сначала исправляй canonical memory и step records.
 
 ## Выходные артефакты
 
-- Реализованный код проекта
-- Обновленный `.madspec/<BRANCH>/memory/progress.json` (где `<BRANCH>` - имя текущей ветки)
-- `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md` - контекст реализации каждого шага с решениями
-- Документация изменений (если были отклонения от плана)
-- История коммитов GIT с коммитом для каждого завершенного шага
-- Обновленный `.madspec/<BRANCH>/project-context.md` (навигация и ссылки)
+- Реализованный код проекта.
+- Обновленный `.madspec/<BRANCH>/memory/progress.json` через memory workflow.
+- Обновленные `decision-log`, `events` и semantic records по шагу.
+- `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md` — generated view контекста реализации.
+- `.madspec/<BRANCH>/project-context.md` — regenerated navigation/context view.
+- История коммитов GIT с коммитом для каждого завершенного шага.
 
 ## Завершение
 
-После завершения всех шагов проект готов! Предложи:
-- Финальную проверку всех функций
-- Демонстрацию проекта
-- Рефлексию над процессом разработки
+После завершения всех шагов предложи:
+- финальную проверку всех функций;
+- демонстрацию проекта;
+- review или security-проверку, если это уместно.

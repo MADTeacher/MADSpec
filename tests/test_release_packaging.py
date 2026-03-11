@@ -60,3 +60,18 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
                 assert "architecture_status" in stage_body
                 assert "--full-artifact" in stage_body
                 assert "generated artifacts/views" in stage_body or "generated artifact" in stage_body
+
+        implement_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.mvp.implement.md") or name.endswith("madspec.mvp.implement.agent.md")
+        )
+        implement_body = zf.read(implement_command).decode("utf-8")
+        assert "madspec memory retrieve --stage mvp.implement" in implement_body
+        assert "madspec memory start-step --stage mvp.implement" in implement_body
+        assert "madspec memory checkpoint-step --stage mvp.implement" in implement_body
+        assert "madspec memory complete-step --stage mvp.implement" in implement_body
+        assert "Не редактируй `progress.json` вручную." in implement_body or "не редактируй `.madspec/<BRANCH>/memory/progress.json` вручную" in implement_body
+        assert "implementation-context.md` и `project-context.md` являются generated views" in implement_body
+        assert "После успешной валидации шага создай `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md`" not in implement_body
+        assert "После создания коммита**: Обнови `implementation-context.md`" not in implement_body
