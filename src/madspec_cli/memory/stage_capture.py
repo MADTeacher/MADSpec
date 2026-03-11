@@ -75,6 +75,7 @@ def capture_stage_memory(
     questions: list[str] | None = None,
     pending_actions: list[str] | None = None,
     project_name: str | None = None,
+    system_overview: str | None = None,
     audiences: list[str] | None = None,
     scenarios: list[str] | None = None,
     pain_points: list[str] | None = None,
@@ -118,6 +119,7 @@ def capture_stage_memory(
     normalized_assumptions = _normalize_text_list(assumptions)
     normalized_next_actions = _normalize_text_list(next_actions)
     normalized_project_name = (project_name or "").strip()
+    normalized_system_overview = (system_overview or "").strip()
     concept_feature_updates: dict[str, list[dict[str, str]]] = {"p1": [], "p2": [], "p3": []}
     concept_feature_errors: list[str] = []
     for priority, values in {
@@ -137,6 +139,7 @@ def capture_stage_memory(
     used_concept_fields = any(
         [
             normalized_project_name,
+            normalized_system_overview,
             normalized_audiences,
             normalized_scenarios,
             normalized_pain_points,
@@ -165,6 +168,7 @@ def capture_stage_memory(
     normalized_pending_actions = _append_unique(normalized_pending_actions, normalized_next_actions)
     concept_fact_summaries = (
         ([f"Project name: {normalized_project_name}"] if normalized_project_name else [])
+        + ([f"System overview: {normalized_system_overview}"] if normalized_system_overview else [])
         + normalized_audiences
         + normalized_scenarios
         + normalized_pain_points
@@ -253,6 +257,7 @@ def capture_stage_memory(
         concept_state = update_concept_state(
             concept_state,
             project_name=normalized_project_name or None,
+            system_overview=normalized_system_overview or None,
             audiences=normalized_audiences,
             scenarios=normalized_scenarios,
             pain_points=normalized_pain_points,
@@ -277,6 +282,25 @@ def capture_stage_memory(
         )
         for item in normalized_facts
     ]
+    fact_records.extend(
+        [
+            make_record(
+                branch_name,
+                normalized_stage,
+                "memory.capture",
+                f"System overview: {normalized_system_overview}",
+                status=normalized_status,
+                evidence=normalized_evidence,
+                scope="project",
+                semantic_kind="fact",
+                record_type="fact",
+                metadata={"slot": "systemOverview"},
+                ts=ts,
+            )
+        ]
+        if normalized_system_overview and normalized_stage == CONCEPT_STAGE
+        else []
+    )
     fact_records.extend(
         [
             make_record(

@@ -68,7 +68,14 @@ def _bootstrap_project(tmp_path: Path, branch: str = "main") -> dict[str, Path]:
 
 def _write_mvp_concept(branch_dir: Path) -> None:
     (branch_dir / "concept.md").write_text(
-        """# Concept
+        """# Концепция проекта: Auth Demo
+
+**Дата создания**: 2026-03-11
+
+## Общее описание системы
+Система помогает управлять аутентификацией пользователей и настройками их сессий.
+
+## Основные функции разрабатываемого проекта
 
 ### Приоритет 1
 - User authentication: sign in users
@@ -839,6 +846,7 @@ def test_capture_stage_memory_accumulates_context_before_checkpoint(tmp_path: Pa
         "mvp.concept",
         summary="Captured audience and pain points during discovery",
         project_name="MVP scheduling assistant",
+        system_overview="System helps freelancers manage bookings and reminders from one interface.",
         audiences=["Freelancers scheduling appointments"],
         scenarios=["Create, move, and confirm appointments from one calendar"],
         pain_points=["Manual follow-ups lead to missed appointments"],
@@ -871,6 +879,7 @@ def test_capture_stage_memory_accumulates_context_before_checkpoint(tmp_path: Pa
     assert captured["accepted"] is True
     assert retrieved_before["active_session"]["open_questions"] == ["Do we need team scheduling in MVP?"]
     assert retrieved_before["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
+    assert retrieved_before["artifact_state"]["concept"]["systemOverview"] == "System helps freelancers manage bookings and reminders from one interface."
     assert retrieved_before["artifact_state"]["concept"]["audiences"] == ["Freelancers scheduling appointments"]
     assert retrieved_before["artifact_state"]["concept"]["features"]["p1"] == [
         {"name": "Booking workflow", "description": "Create bookings and send reminders"}
@@ -879,6 +888,9 @@ def test_capture_stage_memory_accumulates_context_before_checkpoint(tmp_path: Pa
     assert checkpointed["used_existing_stage_memory"] is True
     assert retrieved_after["artifact_state"]["concept"]["checkpointSummary"] == "Concept ratified after incremental discovery"
     assert retrieved_after["artifact_state"]["concept"]["revision"] == 1
+    concept_text = (paths["branch_dir"] / "concept.md").read_text(encoding="utf-8")
+    assert "## Общее описание системы" in concept_text
+    assert "System helps freelancers manage bookings and reminders from one interface." in concept_text
     assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
 
 
@@ -890,6 +902,7 @@ def test_validate_detects_out_of_sync_generated_concept(tmp_path: Path) -> None:
         "main",
         "mvp.concept",
         project_name="MVP scheduling assistant",
+        system_overview="System helps freelancers manage bookings and reminders from one interface.",
         audiences=["Freelancers"],
         scenarios=["Book and reschedule appointments"],
         pain_points=["Appointments are tracked manually"],

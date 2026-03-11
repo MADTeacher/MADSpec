@@ -291,7 +291,7 @@ madspec memory init [--branch <name>]
 madspec memory status [--branch <name>] [--json-output]
 madspec memory consolidate [--branch <name>]
 madspec memory validate [--branch <name>] [--json-output]
-madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
+madspec memory capture --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> [--summary <text>] [--fact <text>] [--decision <text>] [--contract <text>] [--question <text>] [--pending-action <text>] [--project-name <text>] [--system-overview <text>] [--audience <text>] [--scenario <text>] [--pain <text>] [--feature-p1 <name::description>] [--feature-p2 <name::description>] [--feature-p3 <name::description>] [--constraint <text>] [--assumption <text>] [--next-action <text>] [--status <proposed|validated|conflicted|obsolete>] [--evidence <path-or-note>] [--json-output]
 madspec memory checkpoint --stage <mvp.concept|mvp.design|mvp.tech|mvp.architecture|review|security> --summary <text> [--fact <text>] [--decision <text>] [--contract <text>] [--evidence <path-or-note>] [--question <text>] [--pending-action <text>] [--json-output]
 madspec memory retrieve --stage <stage> [--step-id <id>] [--json-output]
 madspec memory start-step --stage <mvp.implement|feature.implement> [--step-id <id>] [--summary <text>] [--evidence <path-or-note>] [--json-output]
@@ -369,6 +369,7 @@ madspec version
 - Автоматическая валидация концепции перед переходом к следующему этапу
 - Каноническое состояние концепции хранится в `.madspec/<BRANCH>/memory/stages/mvp.concept.json`
 - `.madspec/<BRANCH>/concept.md` пересобирается из structured memory и не редактируется вручную
+- Общее описание системы хранится в canonical поле `systemOverview` и обязательно для checkpoint
 - Обязательный checkpoint через `madspec memory checkpoint --stage mvp.concept`
 - Первый коммит в GIT после создания концепции
 
@@ -637,6 +638,7 @@ madspec version
 madspec memory capture \
   --stage mvp.concept \
   --project-name "MVP scheduling assistant" \
+  --system-overview "Система помогает фрилансерам готовить, планировать и публиковать посты в одном рабочем интерфейсе" \
   --audience "Freelancers scheduling appointments" \
   --scenario "Create and reschedule appointments from one calendar" \
   --pain "Manual follow-ups cause missed appointments" \

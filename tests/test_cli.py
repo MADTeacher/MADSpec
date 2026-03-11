@@ -288,6 +288,8 @@ def test_memory_checkpoint_updates_memory_and_retrieve_context(tmp_path: Path, m
             "mvp.concept",
             "--project-name",
             "MVP scheduling assistant",
+            "--system-overview",
+            "System helps freelancers manage bookings and reminders from one interface.",
             "--audience",
             "Freelancers scheduling appointments",
             "--scenario",
@@ -345,6 +347,7 @@ def test_memory_checkpoint_updates_memory_and_retrieve_context(tmp_path: Path, m
     retrieve_payload = json.loads(retrieve_result.stdout)
     assert retrieve_payload["active_session"]["stage"] == "mvp.concept"
     assert retrieve_payload["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
+    assert retrieve_payload["artifact_state"]["concept"]["systemOverview"] == "System helps freelancers manage bookings and reminders from one interface."
     assert retrieve_payload["artifact_state"]["concept"]["checkpointSummary"] == "Concept validated for MVP scheduling assistant"
     assert retrieve_payload["artifact_state"]["concept"]["features"]["p1"] == [
         {"name": "Booking workflow", "description": "Create bookings and send reminders"}
@@ -379,6 +382,8 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
             "Captured discovery notes",
             "--project-name",
             "MVP scheduling assistant",
+            "--system-overview",
+            "System helps freelancers manage bookings and reminders from one interface.",
             "--audience",
             "Freelancers",
             "--scenario",
@@ -398,7 +403,7 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
     )
     assert capture_result.exit_code == 0, capture_result.stdout
     capture_payload = json.loads(capture_result.stdout)
-    assert capture_payload["written"]["facts"] == 5
+    assert capture_payload["written"]["facts"] == 6
     assert capture_payload["written"]["decisions"] == 1
 
     retrieve_result = runner.invoke(
@@ -409,6 +414,7 @@ def test_memory_capture_supports_incremental_non_iterative_stages(tmp_path: Path
     retrieve_payload = json.loads(retrieve_result.stdout)
     assert retrieve_payload["active_session"]["open_questions"] == ["Do we need team scheduling in MVP?"]
     assert retrieve_payload["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
+    assert retrieve_payload["artifact_state"]["concept"]["systemOverview"] == "System helps freelancers manage bookings and reminders from one interface."
     assert retrieve_payload["artifact_state"]["concept"]["audiences"] == ["Freelancers"]
     assert retrieve_payload["artifact_state"]["concept"]["features"]["p1"] == [
         {"name": "Booking workflow", "description": "Capture booking details and send reminders"}

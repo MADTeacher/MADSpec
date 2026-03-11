@@ -16,6 +16,7 @@ def default_concept_state() -> dict[str, Any]:
     return {
         "schemaVersion": CONCEPT_SCHEMA_VERSION,
         "projectName": "",
+        "systemOverview": "",
         "createdAt": ts,
         "ratifiedAt": None,
         "updatedAt": ts,
@@ -76,7 +77,7 @@ def normalize_concept_state(state: Any) -> tuple[dict[str, Any], bool]:
     if state.get("schemaVersion") != CONCEPT_SCHEMA_VERSION:
         changed = True
 
-    for key in ("projectName", "createdAt", "checkpointSummary"):
+    for key in ("projectName", "systemOverview", "createdAt", "checkpointSummary"):
         value = state.get(key, default_state[key])
         if not isinstance(value, str):
             value = default_state[key]
@@ -170,6 +171,7 @@ def is_empty_concept_state(state: dict[str, Any]) -> bool:
     return not any(
         [
             normalized["projectName"],
+            normalized["systemOverview"],
             normalized["audiences"],
             normalized["scenarios"],
             normalized["painPoints"],
@@ -190,6 +192,7 @@ def update_concept_state(
     state: dict[str, Any],
     *,
     project_name: str | None = None,
+    system_overview: str | None = None,
     audiences: list[str] | None = None,
     scenarios: list[str] | None = None,
     pain_points: list[str] | None = None,
@@ -203,6 +206,8 @@ def update_concept_state(
     normalized, _ = normalize_concept_state(state)
     if project_name and project_name.strip():
         normalized["projectName"] = re.sub(r"\s+", " ", project_name).strip()
+    if system_overview and system_overview.strip():
+        normalized["systemOverview"] = re.sub(r"\s+", " ", system_overview).strip()
     normalized["audiences"] = append_unique_strings(normalized["audiences"], audiences or [])
     normalized["scenarios"] = append_unique_strings(normalized["scenarios"], scenarios or [])
     normalized["painPoints"] = append_unique_strings(normalized["painPoints"], pain_points or [])
@@ -260,6 +265,9 @@ def render_concept_markdown(state: dict[str, Any]) -> str:
         "",
         f"**Дата создания**: {render_date(normalized.get('createdAt'))}",
         "",
+        "## Общее описание системы",
+        normalized["systemOverview"] or "Пока не зафиксировано.",
+        "",
         "## Целевая аудитория",
         "",
         "### Основные пользователи",
@@ -314,6 +322,8 @@ def render_concept_markdown(state: dict[str, Any]) -> str:
 def concept_completeness_errors(state: dict[str, Any]) -> list[str]:
     normalized, _ = normalize_concept_state(state)
     errors: list[str] = []
+    if not normalized["systemOverview"]:
+        errors.append("concept state must include a system overview before checkpoint")
     if not normalized["audiences"]:
         errors.append("concept state must include at least one audience before checkpoint")
     if not normalized["scenarios"]:
@@ -332,7 +342,7 @@ def concept_schema_errors(state: Any) -> list[str]:
     errors: list[str] = []
     if normalized["schemaVersion"] != CONCEPT_SCHEMA_VERSION:
         errors.append(f"concept state schemaVersion must equal {CONCEPT_SCHEMA_VERSION}")
-    for key in ("projectName", "createdAt", "checkpointSummary"):
+    for key in ("projectName", "systemOverview", "createdAt", "checkpointSummary"):
         if not isinstance(normalized[key], str):
             errors.append(f"concept state field '{key}' must be a string")
     for key in ("ratifiedAt", "updatedAt"):
@@ -357,6 +367,15 @@ def migrate_legacy_concept_markdown(path: Path) -> dict[str, Any]:
     project_name_match = re.search(r"^# Концепция проекта:\s*(.+)$", text, re.MULTILINE)
     if project_name_match:
         state["projectName"] = project_name_match.group(1).strip()
+    overview_match = re.search(
+        r"^## Общее описание системы\s+(.+?)(?=^## |\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if overview_match:
+        overview = " ".join(line.strip() for line in overview_match.group(1).splitlines() if line.strip())
+        if overview and overview != "Пока не зафиксировано.":
+            state["systemOverview"] = overview
     created_match = re.search(r"^\*\*Дата создания\*\*:\s*(.+)$", text, re.MULTILINE)
     if created_match:
         state["createdAt"] = created_match.group(1).strip()
