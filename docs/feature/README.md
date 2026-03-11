@@ -1,0 +1,21 @@
+# Feature Workflow
+
+Раздел описывает workflow разработки новой функциональности в уже существующем проекте. Здесь framework не переизобретает продукт с нуля, а строит planning и implementation вокруг анализа текущего codebase.
+
+## Рекомендуемый порядок
+
+1. [`feature.init`](madspec.feature.init.md)
+2. [`feature.plan`](madspec.feature.plan.md)
+3. [`feature.implement`](madspec.feature.implement.md)
+
+## Общие stage-state и артефакты
+
+- `feature.init` — `.madspec/<BRANCH>/memory/stages/feature.init.json`, generated `project-analysis.md`, `feature-context.md`, feature-derived `tech-stack.md`, `architecture.md`
+- `feature.plan` — `.madspec/<BRANCH>/memory/stages/feature.plan.json` + `progress.json`, generated `implementation-plan.md`, `planning-context-cache.md`
+- `feature.implement` — runtime-state в `progress.json` и `working/active-session.json`, generated step contexts и branch context
+
+## Особенности режима
+
+- feature IDs и integration file mappings становятся основой для planning coverage
+- `project-analysis.md` и `feature-context.md` — generated references поверх `feature.init.json`
+- implementation работает теми же step-командами, что и MVP, но с feature-specific branch intent

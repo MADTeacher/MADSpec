@@ -1,6 +1,13 @@
 # Быстрый старт с MADSpec
 
-MADSpec — фреймворк для быстрой разработки MVP и добавления новых фич в проект. Формирует артефакты, которые делают разработку более осознанной.
+MADSpec — фреймворк для быстрой разработки MVP и добавления новых фич в проект. Основа workflow: branch-aware structured memory в `.madspec/<branch>/memory/` и generated artifacts, которые пересобираются из canonical state.
+
+Подробная workflow-документация:
+
+- [`docs/README.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/README.md)
+- [`docs/mvp/README.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/mvp/README.md)
+- [`docs/feature/README.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/feature/README.md)
+- [`docs/other/README.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/other/README.md)
 
 ## Установка
 
@@ -22,9 +29,8 @@ madspec --help
 1. `madspec.feature.init "что добавить"` — анализ проекта и запись canonical state в `.madspec/<branch>/memory/stages/feature.init.json`
 2. `madspec.feature.plan` — планирование шагов через `.madspec/<branch>/memory/stages/feature.plan.json`
 3. `madspec.feature.implement` — реализация шагов через runtime memory workflow (`progress.json`, `active-session.json`, step records)
-4. `madspec.deploy` — подготовка к деплою (опционально)
-5. `madspec.review` — quality review после изменений (опционально)
-6. `madspec.security` — security/privacy audit по коду и ПД 152-ФЗ (опционально)
+4. `madspec.review` — quality review после изменений (опционально)
+5. `madspec.security` — security/privacy audit по коду и ПД 152-ФЗ (опционально)
 
 ### Создать проект с нуля → MVP режим
 
@@ -36,9 +42,8 @@ madspec --help
 4. `madspec.mvp.architecture` — архитектура
 5. `madspec.mvp.plan` — планирование шагов (повторять пока не спланируете все)
 6. `madspec.mvp.implement` — реализация (повторять пока не реализуете все)
-7. `madspec.deploy` — подготовка к деплою (опционально)
-8. `madspec.review` — quality review после изменений (опционально)
-9. `madspec.security` — security/privacy audit по коду и ПД 152-ФЗ (опционально)
+7. `madspec.review` — quality review после изменений (опционально)
+8. `madspec.security` — security/privacy audit по коду и ПД 152-ФЗ (опционально)
 
 ## Feature Workflow (добавление фичи)
 
@@ -63,6 +68,12 @@ madspec.feature.implement
 ```
 Повторяйте через `memory retrieve/start-step/checkpoint-step/complete-step`, пока не реализуете всю функциональность.
 
+Основные reference docs:
+
+- [`docs/feature/madspec.feature.init.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/feature/madspec.feature.init.md)
+- [`docs/feature/madspec.feature.plan.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/feature/madspec.feature.plan.md)
+- [`docs/feature/madspec.feature.implement.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/feature/madspec.feature.implement.md)
+
 ## Все команды
 
 | Команда | Когда использовать |
@@ -76,9 +87,16 @@ madspec.feature.implement
 | `madspec.mvp.architecture` | Создать проект — архитектура |
 | `madspec.mvp.plan` | Создать проект — планирование |
 | `madspec.mvp.implement` | Создать проект — реализация |
-| `madspec.deploy` | Подготовить к деплою |
 | `madspec.review` | Проверить качество изменений и собрать backlog улучшений |
 | `madspec.security` | Проверить security/privacy риски и обработку ПД по 152-ФЗ |
+
+## Что почитать после quickstart
+
+- [`docs/mvp/madspec.mvp.concept.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/mvp/madspec.mvp.concept.md)
+- [`docs/mvp/madspec.mvp.plan.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/mvp/madspec.mvp.plan.md)
+- [`docs/feature/madspec.feature.init.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/feature/madspec.feature.init.md)
+- [`docs/other/madspec.review.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/other/madspec.review.md)
+- [`docs/other/madspec.security.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/other/madspec.security.md)
 
 ## Агентские навыки
 
