@@ -308,14 +308,14 @@ madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-ou
 - `memory status` - показывает состояние structured memory
 - `memory consolidate` - пересобирает markdown views из memory
 - `memory validate` - проверяет schema, state transitions и согласованность views
-- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.concept`, `mvp.design`, `mvp.tech`, `mvp.architecture` и `mvp.plan` также обновляет основной файл данных этапа через stage-specific flags
+- `memory capture` - инкрементально сохраняет подтвержденные stage-level facts/decisions/contracts/questions; для `mvp.*`, `feature.init` и `feature.plan` также обновляет canonical stage-state через stage-specific flags
 - `memory checkpoint` - фиксирует финал non-iterative stage, обновляет active session и semantic records, затем пересобирает generated views
-- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept` по умолчанию отдает краткий `concept_status`, для `mvp.design` - `design_status`, для `mvp.tech` - `tech_status`, для `mvp.architecture` - `architecture_status`, для `mvp.plan` - `plan_status`, а полный stage artifact state возвращает только по `--full-artifact`
+- `memory retrieve` - возвращает минимальный контекст для stage/step; для `mvp.concept/design/tech/architecture/plan`, `feature.init` и `feature.plan` по умолчанию отдает краткий status payload, а полный stage artifact state возвращает только по `--full-artifact`
 - `memory start-step` - переводит implementation step в `in_progress` и делает его текущим шагом
 - `memory checkpoint-step` - записывает промежуточный implementation checkpoint, включая TDD phase и evidence
 - `memory complete-step` - завершает implementation step, обновляет `completedSteps/currentImplementStep` и сохраняет step-level knowledge в memory
 - `memory next-step` - детерминированно выбирает следующий исполнимый шаг или валидирует нового кандидата для planning
-- `memory register-step` - регистрирует новый planned step, его TDD metadata и автоматически обновляет coverage metadata в `progress.json` и `memory/stages/mvp.plan.json`; `--covers` обязателен для `code` шагов и опционален для `non-code`
+- `memory register-step` - регистрирует новый planned step, его TDD metadata и автоматически обновляет coverage metadata в `progress.json` и `memory/stages/<mvp.plan|feature.plan>.json`; `--covers` обязателен для `code` шагов и опционален для `non-code`
 - `memory promote` - переносит validated records в semantic memory
 - `memory learn` - превращает test/review outcomes в learning records
 
@@ -470,6 +470,10 @@ madspec version
 - `madspec memory retrieve --stage mvp.plan` по умолчанию возвращает краткий `plan_status`, а полный `artifact_state.plan` следует запрашивать только через `--full-artifact`
 - Повторный `madspec memory checkpoint --stage mvp.plan` допустим: он ратифицирует новую версию плана без изменения `currentImplementStep`
 
+Для `feature.init` действует такой же memory-first принцип: цель фичи, проблема, expected outcome, function catalog и анализ точек интеграции сначала пишутся в `.madspec/<BRANCH>/memory/stages/feature.init.json`, а `project-analysis.md`, `feature-context.md`, `tech-stack.md` и `architecture.md` являются generated views.
+
+Для `feature.plan` действует тот же memory-first принцип: стратегия реализации и catalog шагов сначала пишутся в `.madspec/<BRANCH>/memory/stages/feature.plan.json`, а `implementation-plan.md` и `planning-context-cache.md` являются generated views. `progress.json` остается runtime-state для `plannedSteps/completedSteps/currentImplementStep/TDD`.
+
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/memory/stages/mvp.plan.json` - основной файл данных этапа plan
 - `.madspec/<BRANCH>/implementation-plan.md` - generated artifact плана реализации
@@ -599,7 +603,9 @@ madspec version
 │   │   ├── episodes/
 │   │   │   └── events.jsonl          # История действий и результатов
 │   │   ├── stages/
-│   │   │   └── mvp.plan.json         # Canonical plan artifact state
+│   │   │   ├── mvp.plan.json         # Canonical MVP plan artifact state
+│   │   │   ├── feature.init.json     # Canonical feature init artifact state
+│   │   │   └── feature.plan.json     # Canonical feature plan artifact state
 │   │   └── semantic/
 │   │       ├── facts.jsonl           # Подтвержденные факты
 │   │       ├── decisions.jsonl       # Подтвержденные решения
@@ -638,6 +644,8 @@ madspec version
 - `memory/stages/mvp.tech.json` - основной файл данных этапа `mvp.tech`
 - `memory/stages/mvp.architecture.json` - основной файл данных этапа `mvp.architecture`
 - `memory/stages/mvp.plan.json` - основной файл данных этапа `mvp.plan`
+- `memory/stages/feature.init.json` - основной файл данных этапа `feature.init`
+- `memory/stages/feature.plan.json` - основной файл данных этапа `feature.plan`
 - `memory/working/active-session.json` - текущая рабочая память
 - `memory/working/decision-log.jsonl` - micro-decisions и checkpoints
 - `memory/episodes/events.jsonl` - опыт выполнения
@@ -673,6 +681,11 @@ madspec version
 Для `mvp.architecture` действует тот же memory-first принцип: структура проекта, сущности, поля, связи, endpoint'ы, интеграции и архитектурные принципы сначала пишутся в `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` являются generated views.
 
 Для `mvp.plan` действует тот же memory-first принцип: стратегия реализации, planning principles и catalog шагов сначала пишутся в `.madspec/<BRANCH>/memory/stages/mvp.plan.json`, а `implementation-plan.md` и `planning-context-cache.md` являются generated views. При этом `progress.json` остается runtime-state для `plannedSteps/completedSteps/currentImplementStep/TDD`.
+
+Для feature workflow используй те же инварианты:
+- `feature.init.json` является source of truth для `project-analysis.md` и `feature-context.md`
+- `feature.plan.json` является source of truth для `implementation-plan.md` и `planning-context-cache.md`
+- `feature.implement` использует тот же runtime memory workflow, что и `mvp.implement`
 
 Для `mvp.concept` используйте stage-specific поля `memory capture`, чтобы наполнять основной файл данных этапа напрямую:
 
@@ -821,6 +834,11 @@ MADSpec использует модульную систему контекст�
 - `planOverview` и `planningPrinciples`
 - `stepCatalog` с snapshot planning metadata для generated implementation plan
 - `nextActions`, `checkpointSummary`, `revision`, `ratifiedAt`
+
+Файлы `.madspec/<branch-name>/memory/stages/feature.init.json` и `.madspec/<branch-name>/memory/stages/feature.plan.json` отслеживают:
+- canonical product/integration context feature workflow
+- feature-specific function catalog с explicit IDs
+- strategy и step catalog для feature planning
 
 ### Автоматическая валидация
 

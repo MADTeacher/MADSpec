@@ -40,6 +40,7 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
     snapshot_targets = [
         paths.progress,
         paths.plan_state,
+        paths.feature_plan_state,
         paths.active_session,
         paths.decision_log,
         branch_dir / "concept.md",
@@ -48,6 +49,8 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
         branch_dir / "architecture.md",
         branch_dir / "data-model.md",
         branch_dir / "implementation-plan.md",
+        branch_dir / "project-analysis.md",
+        branch_dir / "feature-context.md",
         branch_dir / "planning-context-cache.md",
         branch_dir / "project-context.md",
         branch_dir / "contracts" / "openapi.yaml",

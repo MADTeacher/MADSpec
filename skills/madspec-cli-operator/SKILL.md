@@ -40,9 +40,9 @@ MADSpec управляет разработкой через агентные к
 
 Для доработки существующего проекта:
 
-- `/madspec.feature.init` — зафиксировать цель и границы фичи
-- `/madspec.feature.plan` — спланировать шаги реализации фичи
-- `/madspec.feature.implement` — реализовать шаги фичи
+- `/madspec.feature.init` — зафиксировать цель фичи, function catalog и точки интеграции в `feature.init.json`
+- `/madspec.feature.plan` — спланировать шаги реализации фичи через `feature.plan.json`
+- `/madspec.feature.implement` — реализовать шаги фичи через implementation memory workflow
 
 Сквозные команды:
 
@@ -87,6 +87,9 @@ Structured memory:
 - Для `mvp.implement` используй implementation memory workflow: перед каждой сессией запускай `madspec memory retrieve --stage mvp.implement --json-output`, стартуй шаг через `madspec memory start-step`, фиксируй `red/green/refactor` через `madspec memory checkpoint-step`, а завершай шаг только через `madspec memory complete-step`
 - Для `mvp.implement` считай `.madspec/<branch>/memory/progress.json` и `.madspec/<branch>/memory/working/active-session.json` каноническим runtime-state; `implementation-context.md` и `project-context.md` — это generated views, которые не редактируются вручную как source of truth
 - Для feature workflow не пропускай `feature.init` перед `feature.plan`
+- Для `feature.init` источник истины — `.madspec/<branch>/memory/stages/feature.init.json`; `project-analysis.md`, `feature-context.md`, `tech-stack.md` и `architecture.md` являются generated views
+- Для `feature.plan` источник истины — `.madspec/<branch>/memory/stages/feature.plan.json`; `implementation-plan.md`, `planning-context-cache.md` и `planning-context.md` являются generated views
+- Для `feature.implement` работай так же, как для `mvp.implement`: перед каждой сессией запускай `madspec memory retrieve --stage feature.implement --json-output`, затем `start-step/checkpoint-step/complete-step`
 - Если деплой влияет на архитектуру, интеграции, секреты, миграции или observability, учитывай `deployment.md` или инициируй `/madspec.deploy`
 - Перед реализацией сверяйся с `implementation-plan.md`, `steps/`, `memory/progress.json` и relevant generated context
 - Если работа идёт через structured memory, сначала обновляй memory, потом пересобирай views, потом валидируй

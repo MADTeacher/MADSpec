@@ -24,6 +24,19 @@ from ..stages.design.state import (
     save_design_state,
     update_design_state,
 )
+from ..stages.feature_init.state import (
+    FEATURE_INIT_STAGE,
+    feature_init_completeness_errors,
+    load_feature_init_state,
+    save_feature_init_state,
+    update_feature_init_state,
+)
+from ..stages.feature_plan.state import (
+    FEATURE_PLAN_STAGE,
+    feature_plan_completeness_errors,
+    load_feature_plan_state,
+    save_feature_plan_state,
+)
 from ..stages.plan.state import (
     PLAN_STAGE,
     load_plan_state,
@@ -58,6 +71,8 @@ CHECKPOINT_STAGES = {
     "mvp.tech",
     "mvp.architecture",
     "mvp.plan",
+    "feature.init",
+    "feature.plan",
     "review",
     "security",
 }
@@ -160,6 +175,8 @@ def checkpoint_stage_memory(
         paths.tech_state: _snapshot_file(paths.tech_state),
         paths.architecture_state: _snapshot_file(paths.architecture_state),
         paths.plan_state: _snapshot_file(paths.plan_state),
+        paths.feature_init_state: _snapshot_file(paths.feature_init_state),
+        paths.feature_plan_state: _snapshot_file(paths.feature_plan_state),
     }
 
     ts = now_iso()
@@ -202,6 +219,8 @@ def checkpoint_stage_memory(
     tech_state = load_tech_state(paths.tech_state)
     architecture_state = load_architecture_state(paths.architecture_state)
     plan_state = load_plan_state(paths.plan_state)
+    feature_init_state = load_feature_init_state(paths.feature_init_state)
+    feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -266,6 +285,26 @@ def checkpoint_stage_memory(
         errors.extend(plan_completeness_errors(plan_state))
         if errors:
             return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == FEATURE_INIT_STAGE:
+        feature_init_state = update_feature_init_state(
+            feature_init_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(feature_init_completeness_errors(feature_init_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == FEATURE_PLAN_STAGE:
+        feature_plan_state = update_plan_state(
+            feature_plan_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(feature_plan_completeness_errors(feature_plan_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
 
     fact_records = [
         make_record(
@@ -324,6 +363,10 @@ def checkpoint_stage_memory(
             save_architecture_state(paths.architecture_state, architecture_state)
         elif normalized_stage == PLAN_STAGE:
             save_plan_state(paths.plan_state, plan_state)
+        elif normalized_stage == FEATURE_INIT_STAGE:
+            save_feature_init_state(paths.feature_init_state, feature_init_state)
+        elif normalized_stage == FEATURE_PLAN_STAGE:
+            save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, [checkpoint_record])
         append_jsonl(paths.facts, fact_records)

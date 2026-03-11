@@ -13,7 +13,7 @@ from ..domain.branch_layout import resolve_target_branch
 
 
 def memory_checkpoint(
-    stage: str = typer.Option(..., "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, review, or security"),
+    stage: str = typer.Option(..., "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
     summary: str = typer.Option(..., "--summary", help="Stage checkpoint summary"),
     fact: list[str] = typer.Option(None, "--fact", help="Validated fact; repeat for multiple values"),
     decision: list[str] = typer.Option(None, "--decision", help="Validated decision; repeat for multiple values"),

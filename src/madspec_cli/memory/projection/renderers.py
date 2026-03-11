@@ -16,6 +16,8 @@ def render_project_context(
     tech_state: dict[str, Any],
     architecture_state: dict[str, Any],
     plan_state: dict[str, Any],
+    feature_init_state: dict[str, Any] | None,
+    feature_plan_state: dict[str, Any] | None,
     generated_at: str,
 ) -> str:
     planned_steps = progress.get("plannedSteps", [])
@@ -50,6 +52,7 @@ def render_project_context(
     )
     if not planned_steps:
         lines.append("- No planned steps yet")
+    feature_mode = bool(feature_init_state and any(feature_init_state.get("features", {}).get(priority) for priority in ("p1", "p2", "p3")))
     lines.extend(
         [
             "",
@@ -60,6 +63,8 @@ def render_project_context(
             f"- `.madspec/{branch_name}/memory/stages/mvp.tech.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.architecture.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.plan.json`",
+            f"- `.madspec/{branch_name}/memory/stages/feature.init.json`",
+            f"- `.madspec/{branch_name}/memory/stages/feature.plan.json`",
             f"- `.madspec/{branch_name}/memory/working/active-session.json`",
             f"- `.madspec/{branch_name}/memory/working/decision-log.jsonl`",
             f"- `.madspec/{branch_name}/memory/episodes/events.jsonl`",
@@ -73,6 +78,8 @@ def render_project_context(
             f"- `.madspec/{branch_name}/data-model.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/contracts/openapi.yaml` (generated from structured memory)",
             f"- `.madspec/{branch_name}/implementation-plan.md` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/project-analysis.md` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/feature-context.md` (generated from structured memory)",
             f"- Concept checkpoint summary: `{concept_state.get('checkpointSummary') or 'N/A'}`",
             f"- Design checkpoint summary: `{design_state.get('checkpointSummary') or 'N/A'}`",
             f"- Tech checkpoint summary: `{tech_state.get('checkpointSummary') or 'N/A'}`",
@@ -102,6 +109,13 @@ def render_project_context(
             ),
         ]
     )
+    if feature_mode:
+        lines.extend(
+            [
+                f"- Feature init checkpoint summary: `{(feature_init_state or {}).get('checkpointSummary') or 'N/A'}`",
+                f"- Feature plan checkpoint summary: `{(feature_plan_state or {}).get('checkpointSummary') or 'N/A'}`",
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 

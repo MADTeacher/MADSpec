@@ -75,3 +75,38 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "implementation-context.md` и `project-context.md` являются generated views" in implement_body
         assert "После успешной валидации шага создай `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md`" not in implement_body
         assert "После создания коммита**: Обнови `implementation-context.md`" not in implement_body
+
+        feature_init_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.feature.init.md") or name.endswith("madspec.feature.init.agent.md")
+        )
+        feature_init_body = zf.read(feature_init_command).decode("utf-8")
+        assert "madspec memory retrieve --stage feature.init" in feature_init_body
+        assert "madspec memory capture --stage feature.init" in feature_init_body
+        assert "madspec memory checkpoint --stage feature.init" in feature_init_body
+        assert ".madspec/<BRANCH>/memory/stages/feature.init.json" in feature_init_body
+        assert ".madspec/feature/" not in feature_init_body
+
+        feature_plan_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.feature.plan.md") or name.endswith("madspec.feature.plan.agent.md")
+        )
+        feature_plan_body = zf.read(feature_plan_command).decode("utf-8")
+        assert "madspec memory retrieve --stage feature.plan" in feature_plan_body
+        assert "madspec memory register-step --stage feature.plan" in feature_plan_body
+        assert ".madspec/<BRANCH>/memory/stages/feature.plan.json" in feature_plan_body
+        assert "generated views" in feature_plan_body
+
+        feature_implement_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.feature.implement.md") or name.endswith("madspec.feature.implement.agent.md")
+        )
+        feature_implement_body = zf.read(feature_implement_command).decode("utf-8")
+        assert "madspec memory retrieve --stage feature.implement" in feature_implement_body
+        assert "madspec memory start-step --stage feature.implement" in feature_implement_body
+        assert "madspec memory checkpoint-step --stage feature.implement" in feature_implement_body
+        assert "madspec memory complete-step --stage feature.implement" in feature_implement_body
+        assert "implementation-context.md` и `project-context.md` являются generated views" in feature_implement_body

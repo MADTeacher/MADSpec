@@ -27,6 +27,8 @@ class MemoryPaths:
     tech_state: Path
     architecture_state: Path
     plan_state: Path
+    feature_init_state: Path
+    feature_plan_state: Path
     working_dir: Path
     active_session: Path
     decision_log: Path
@@ -54,6 +56,8 @@ class MemoryPaths:
             "tech_state": self.tech_state,
             "architecture_state": self.architecture_state,
             "plan_state": self.plan_state,
+            "feature_init_state": self.feature_init_state,
+            "feature_plan_state": self.feature_plan_state,
             "working_dir": self.working_dir,
             "active_session": self.active_session,
             "decision_log": self.decision_log,
@@ -279,6 +283,8 @@ def get_memory_paths(project_path: Path, branch_name: str) -> MemoryPaths:
         tech_state=memory_dir / "stages" / "mvp.tech.json",
         architecture_state=memory_dir / "stages" / "mvp.architecture.json",
         plan_state=memory_dir / "stages" / "mvp.plan.json",
+        feature_init_state=memory_dir / "stages" / "feature.init.json",
+        feature_plan_state=memory_dir / "stages" / "feature.plan.json",
         working_dir=memory_dir / "working",
         active_session=memory_dir / "working" / "active-session.json",
         decision_log=memory_dir / "working" / "decision-log.jsonl",
@@ -361,6 +367,16 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
         migrate_legacy_plan_state,
         save_plan_state,
     )
+    from ..stages.feature_init.state import (
+        default_feature_init_state,
+        load_feature_init_state,
+        migrate_legacy_project_analysis_markdown,
+        save_feature_init_state,
+    )
+    from ..stages.feature_plan.state import (
+        load_feature_plan_state,
+        save_feature_plan_state,
+    )
 
     paths = get_memory_paths(project_path, branch_name)
     created: list[Path] = []
@@ -432,6 +448,36 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
     else:
         plan_state = load_plan_state(paths.plan_state)
         save_plan_state(paths.plan_state, plan_state)
+
+    if not paths.feature_init_state.exists():
+        legacy_analysis_path = paths.branch_dir / "project-analysis.md"
+        feature_init_state = (
+            migrate_legacy_project_analysis_markdown(legacy_analysis_path)
+            if legacy_analysis_path.exists()
+            else default_feature_init_state()
+        )
+        save_feature_init_state(paths.feature_init_state, feature_init_state)
+        created.append(paths.feature_init_state)
+    else:
+        feature_init_state = load_feature_init_state(paths.feature_init_state)
+        save_feature_init_state(paths.feature_init_state, feature_init_state)
+
+    if not paths.feature_plan_state.exists():
+        progress = read_json(paths.progress, _default_progress_state())
+        if isinstance(progress, dict):
+            progress, _ = normalize_progress_state(progress)
+        else:
+            progress = _default_progress_state()
+        feature_plan_state = migrate_legacy_plan_state(
+            progress=progress,
+            implementation_plan_path=paths.branch_dir / "implementation-plan.md",
+            steps_dir=paths.branch_dir / "steps",
+        )
+        save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
+        created.append(paths.feature_plan_state)
+    else:
+        feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
+        save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
 
     for path in (
         paths.decision_log,

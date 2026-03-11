@@ -20,6 +20,18 @@ from ..stages.design.state import (
     render_ui_design_markdown,
     uncovered_design_features,
 )
+from ..stages.feature_init.state import (
+    load_feature_init_state,
+    render_feature_architecture_markdown,
+    render_feature_context_markdown,
+    render_feature_tech_stack_markdown,
+    render_project_analysis_markdown,
+)
+from ..stages.feature_plan.state import (
+    feature_plan_reference_errors,
+    load_feature_plan_state,
+    render_feature_implementation_plan_markdown,
+)
 from ..stages.tech.state import load_tech_state, render_tech_stack_markdown, tech_schema_errors
 from ..stages.plan.state import (
     is_empty_plan_state,
@@ -37,6 +49,11 @@ def validate_generated_stage_views(paths, *, project_path: Path, branch_name: st
     concept_state_raw = read_json(paths.concept_state, None)
     errors.extend(f"{paths.concept_state.name}: {item}" for item in concept_schema_errors(concept_state_raw))
     concept_state = load_concept_state(paths.concept_state)
+    feature_init_state = load_feature_init_state(paths.feature_init_state)
+    feature_mode = not (
+        not feature_init_state.get("featureGoal")
+        and not any(feature_init_state.get("features", {}).get(priority, []) for priority in ("p1", "p2", "p3"))
+    )
     concept_text = render_concept_markdown(concept_state)
     concept_path = paths.branch_dir / "concept.md"
     if not concept_path.exists():
@@ -74,10 +91,14 @@ def validate_generated_stage_views(paths, *, project_path: Path, branch_name: st
     tech_state_raw = read_json(paths.tech_state, None)
     errors.extend(f"{paths.tech_state.name}: {item}" for item in tech_schema_errors(tech_state_raw))
     tech_state = load_tech_state(paths.tech_state)
-    tech_text = render_tech_stack_markdown(
-        tech_state,
-        branch_name=branch_name,
-        project_name=concept_state.get("projectName", ""),
+    tech_text = (
+        render_feature_tech_stack_markdown(feature_init_state, branch_name=branch_name)
+        if feature_mode
+        else render_tech_stack_markdown(
+            tech_state,
+            branch_name=branch_name,
+            project_name=concept_state.get("projectName", ""),
+        )
     )
     tech_path = paths.branch_dir / "tech-stack.md"
     if not tech_path.exists():
@@ -91,10 +112,14 @@ def validate_generated_stage_views(paths, *, project_path: Path, branch_name: st
         for item in architecture_schema_errors(architecture_state_raw)
     )
     architecture_state = load_architecture_state(paths.architecture_state)
-    architecture_text = render_architecture_markdown(
-        architecture_state,
-        branch_name=branch_name,
-        project_name=concept_state.get("projectName", ""),
+    architecture_text = (
+        render_feature_architecture_markdown(feature_init_state, branch_name=branch_name)
+        if feature_mode
+        else render_architecture_markdown(
+            architecture_state,
+            branch_name=branch_name,
+            project_name=concept_state.get("projectName", ""),
+        )
     )
     architecture_path = paths.branch_dir / "architecture.md"
     if not architecture_path.exists():
@@ -122,15 +147,38 @@ def validate_generated_stage_views(paths, *, project_path: Path, branch_name: st
     if not is_empty_architecture_state(architecture_state):
         errors.extend(architecture_reference_errors(architecture_state, design_state=design_state))
 
+    feature_analysis_path = paths.branch_dir / "project-analysis.md"
+    feature_analysis_text = render_project_analysis_markdown(feature_init_state)
+    if not feature_analysis_path.exists():
+        errors.append("project-analysis.md is missing; rebuild generated views with `madspec memory consolidate`")
+    elif feature_analysis_path.read_text(encoding="utf-8") != feature_analysis_text:
+        errors.append("project-analysis.md is out of sync with memory/stages/feature.init.json")
+
+    feature_context_path = paths.branch_dir / "feature-context.md"
+    feature_context_text = render_feature_context_markdown(feature_init_state)
+    if not feature_context_path.exists():
+        errors.append("feature-context.md is missing; rebuild generated views with `madspec memory consolidate`")
+    elif feature_context_path.read_text(encoding="utf-8") != feature_context_text:
+        errors.append("feature-context.md is out of sync with memory/stages/feature.init.json")
+
+
     plan_state_raw = read_json(paths.plan_state, None)
     errors.extend(f"{paths.plan_state.name}: {item}" for item in plan_schema_errors(plan_state_raw))
     plan_state = load_plan_state(paths.plan_state)
+    feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
     implementation_plan_text = render_implementation_plan_markdown(
         plan_state,
         branch_name=branch_name,
         progress=read_json(paths.progress, {}),
         project_name=concept_state.get("projectName", ""),
     )
+    if feature_mode:
+        implementation_plan_text = render_feature_implementation_plan_markdown(
+            feature_plan_state,
+            branch_name=branch_name,
+            progress=read_json(paths.progress, {}),
+            feature_goal=feature_init_state.get("featureGoal", ""),
+        )
     implementation_plan_path = paths.branch_dir / "implementation-plan.md"
     if not implementation_plan_path.exists():
         errors.append("implementation-plan.md is missing; rebuild generated views with `madspec memory consolidate`")
@@ -140,6 +188,15 @@ def validate_generated_stage_views(paths, *, project_path: Path, branch_name: st
         errors.extend(
             plan_reference_errors(
                 plan_state,
+                project_path=project_path,
+                branch_name=branch_name,
+                progress=read_json(paths.progress, {}),
+            )
+        )
+    if feature_mode:
+        errors.extend(
+            feature_plan_reference_errors(
+                feature_plan_state,
                 project_path=project_path,
                 branch_name=branch_name,
                 progress=read_json(paths.progress, {}),

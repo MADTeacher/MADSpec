@@ -570,7 +570,7 @@ def test_register_planned_step_reports_known_labels_for_unknown_cover(tmp_path: 
     )
 
     assert payload["accepted"] is False
-    assert "concept.md" in payload["errors"][0]
+    assert "mvp.concept.json" in payload["errors"][0]
     assert "User authentication" in payload["errors"][0]
 
 
@@ -1877,3 +1877,90 @@ def test_checkpoint_stage_memory_is_atomic_on_invalid_payload(tmp_path: Path) ->
     assert payload["accepted"] is False
     assert paths["active_session"].read_text(encoding="utf-8") == original_active_session
     assert paths["decision_log"].read_text(encoding="utf-8") == original_decision_log
+
+
+def test_feature_init_retrieve_returns_feature_status_and_generated_views(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    captured = capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "feature.init",
+        summary="Analyze Stripe payments integration",
+        feature_goal="Add Stripe checkout flow",
+        problem="Users cannot pay online",
+        expected_outcome="Users can create a payment session and complete checkout",
+        project_type="web",
+        framework="FastAPI + React",
+        structure_notes=["Monorepo with api and web packages"],
+        feature_p1=["F01::Checkout session::Create and open Stripe checkout session"],
+        existing_modules=["payments service::src/payments/service.py::Existing payment orchestration"],
+        modified_files=["src/payments/api.py::Add checkout endpoint::F01"],
+        new_files=["src/payments/stripe_client.py::Stripe gateway adapter::F01"],
+        interface_contracts=["POST /api/payments/checkout returns checkout url"],
+        dependencies=["external::stripe::Hosted checkout provider"],
+        risks=["Webhook signature validation must be enforced"],
+        recommendations=["Reuse existing billing service abstractions"],
+        tech_notes=["Frontend already uses React Query"],
+        architecture_notes=["Add provider adapter layer instead of inline SDK calls"],
+        next_actions=["Proceed to feature.plan"],
+        status="validated",
+    )
+    checkpointed = checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "feature.init",
+        "Feature init ratified for Stripe checkout",
+    )
+    retrieved = retrieve_memory_context(paths["branch_dir"].parents[1], "main", "feature.init", full_artifact=True)
+
+    assert captured["accepted"] is True
+    assert checkpointed["accepted"] is True
+    assert retrieved["feature_init_status"]["is_complete"] is True
+    assert retrieved["feature_init_status"]["functions_by_priority"]["p1"] == ["F01"]
+    assert retrieved["artifact_state"]["feature_init"]["featureGoal"] == "Add Stripe checkout flow"
+    assert (paths["branch_dir"] / "project-analysis.md").exists()
+    assert (paths["branch_dir"] / "feature-context.md").exists()
+
+
+def test_register_step_updates_feature_plan_state(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "feature.init",
+        summary="Analyze profile settings feature",
+        feature_goal="Add profile settings",
+        problem="Users cannot edit profile settings",
+        expected_outcome="Users can update profile fields safely",
+        project_type="web",
+        framework="Django",
+        feature_p1=["F01::Profile settings::Update profile fields"],
+        modified_files=["src/profile/views.py::Expose settings endpoint::F01"],
+        new_files=["src/profile/service.py::Settings orchestration::F01"],
+        status="validated",
+    )
+    checkpoint_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "feature.init",
+        "Feature init ratified for profile settings",
+    )
+
+    _create_step_artifacts(paths["branch_dir"], "step-01-profile-settings")
+    payload = register_planned_step(
+        paths["branch_dir"].parents[1],
+        "main",
+        "feature.plan",
+        step_id="step-01-profile-settings",
+        covers=["F01"],
+        step_kind="code",
+        title="Profile settings endpoint",
+        summary="Implement settings endpoint and service",
+    )
+    retrieved = retrieve_memory_context(paths["branch_dir"].parents[1], "main", "feature.plan", full_artifact=True)
+
+    assert payload["accepted"] is True
+    assert retrieved["feature_plan_status"]["planned_steps"] == 1
+    assert retrieved["artifact_state"]["plan"]["stepCatalog"][0]["stepId"] == "step-01-profile-settings"

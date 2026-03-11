@@ -18,10 +18,13 @@ from ..stages.design.state import (
     load_design_state,
     save_design_state,
 )
+from ..stages.feature_init.state import FEATURE_INIT_STAGE, load_feature_init_state, save_feature_init_state, update_feature_init_state
+from ..stages.feature_plan.state import FEATURE_PLAN_STAGE, load_feature_plan_state, save_feature_plan_state
 from ..stages.plan.state import (
     PLAN_STAGE,
     load_plan_state,
     save_plan_state,
+    update_plan_state,
 )
 from ..stages.tech.state import (
     TECH_STAGE,
@@ -32,6 +35,7 @@ from .parsers import (
     parse_architecture_capture,
     parse_concept_capture,
     parse_design_capture,
+    parse_feature_init_capture,
     parse_tech_capture,
     validate_capture_scope,
 )
@@ -65,6 +69,8 @@ CAPTURE_STAGES = {
     "mvp.tech",
     "mvp.architecture",
     "mvp.plan",
+    "feature.init",
+    "feature.plan",
     "review",
     "security",
 }
@@ -127,7 +133,9 @@ def capture_stage_memory(
     screen_data: list[str] | None = None,
     stack_overview: str | None = None,
     project_type: str | None = None,
+    framework: str | None = None,
     requirements: list[str] | None = None,
+    structure_notes: list[str] | None = None,
     preferences: list[str] | None = None,
     tech_constraints: list[str] | None = None,
     stack_components: list[str] | None = None,
@@ -152,6 +160,18 @@ def capture_stage_memory(
     performance_notes: list[str] | None = None,
     plan_overview: str | None = None,
     planning_principles: list[str] | None = None,
+    feature_goal: str | None = None,
+    problem: str | None = None,
+    expected_outcome: str | None = None,
+    existing_modules: list[str] | None = None,
+    modified_files: list[str] | None = None,
+    new_files: list[str] | None = None,
+    interface_contracts: list[str] | None = None,
+    dependencies: list[str] | None = None,
+    risks: list[str] | None = None,
+    recommendations: list[str] | None = None,
+    tech_notes: list[str] | None = None,
+    architecture_notes: list[str] | None = None,
     status: str = "validated",
 ) -> dict[str, Any]:
     normalized_stage = stage.strip().lower()
@@ -192,7 +212,9 @@ def capture_stage_memory(
     normalized_platform_constraints = normalize_text_list(platform_constraints)
     normalized_stack_overview = (stack_overview or "").strip()
     normalized_project_type = (project_type or "").strip()
+    normalized_framework = (framework or "").strip()
     normalized_requirements = normalize_text_list(requirements)
+    normalized_structure_notes = normalize_text_list(structure_notes)
     normalized_preferences = normalize_text_list(preferences)
     normalized_tech_constraints = normalize_text_list(tech_constraints)
     normalized_architecture_overview = (architecture_overview or "").strip()
@@ -201,14 +223,47 @@ def capture_stage_memory(
     normalized_performance_notes = normalize_text_list(performance_notes)
     normalized_plan_overview = (plan_overview or "").strip()
     normalized_planning_principles = normalize_text_list(planning_principles)
+    normalized_feature_goal = (feature_goal or "").strip()
+    normalized_problem = (problem or "").strip()
+    normalized_expected_outcome = (expected_outcome or "").strip()
+    normalized_interface_contracts = normalize_text_list(interface_contracts)
+    normalized_risks = normalize_text_list(risks)
+    normalized_recommendations = normalize_text_list(recommendations)
+    normalized_feature_tech_notes = normalize_text_list(tech_notes)
+    normalized_feature_architecture_notes = normalize_text_list(architecture_notes)
 
-    concept_parse = parse_concept_capture(
-        feature_p1=feature_p1,
-        feature_p2=feature_p2,
-        feature_p3=feature_p3,
-    )
-    concept_feature_updates = concept_parse.feature_updates
-    concept_feature_errors = concept_parse.errors
+    if normalized_stage == FEATURE_INIT_STAGE:
+        concept_feature_updates = {"p1": [], "p2": [], "p3": []}
+        concept_feature_errors = []
+        feature_init_parse = parse_feature_init_capture(
+            feature_p1=feature_p1,
+            feature_p2=feature_p2,
+            feature_p3=feature_p3,
+            existing_modules=existing_modules,
+            modified_files=modified_files,
+            new_files=new_files,
+            dependencies=dependencies,
+        )
+        feature_init_feature_updates = feature_init_parse.feature_updates
+        feature_existing_modules = feature_init_parse.existing_modules
+        feature_modified_files = feature_init_parse.modified_files
+        feature_new_files = feature_init_parse.new_files
+        feature_dependencies = feature_init_parse.dependencies
+        feature_init_errors = feature_init_parse.errors
+    else:
+        concept_parse = parse_concept_capture(
+            feature_p1=feature_p1,
+            feature_p2=feature_p2,
+            feature_p3=feature_p3,
+        )
+        concept_feature_updates = concept_parse.feature_updates
+        concept_feature_errors = concept_parse.errors
+        feature_init_feature_updates = {"p1": [], "p2": [], "p3": []}
+        feature_existing_modules = []
+        feature_modified_files = []
+        feature_new_files = []
+        feature_dependencies = []
+        feature_init_errors = []
 
     design_parse = parse_design_capture(
         zones=zones,
@@ -269,6 +324,31 @@ def capture_stage_memory(
     architecture_integration_updates = architecture_parse.integration_updates
     architecture_pattern_updates = architecture_parse.pattern_updates
     architecture_errors = architecture_parse.errors
+    if normalized_stage == FEATURE_INIT_STAGE:
+        normalized_facts = append_unique(
+            normalized_facts,
+            [item for item in [normalized_feature_goal, normalized_problem, normalized_expected_outcome] if item]
+            + [f"Existing module: {item['name']} ({item['path']})" for item in feature_existing_modules]
+            + [f"Risk: {item}" for item in normalized_risks]
+            + [f"Tech note: {item}" for item in normalized_feature_tech_notes]
+            + [f"Architecture note: {item}" for item in normalized_feature_architecture_notes],
+        )
+        normalized_decisions = append_unique(
+            normalized_decisions,
+            [
+                f"{priority.upper()} feature {item['id']}: {item['title']} - {item['description']}"
+                for priority in ("p1", "p2", "p3")
+                for item in feature_init_feature_updates[priority]
+            ]
+            + [f"Modify file {item['path']}: {item['reason']}" for item in feature_modified_files]
+            + [f"Create file {item['path']}: {item['reason']}" for item in feature_new_files]
+            + [f"Recommendation: {item}" for item in normalized_recommendations],
+        )
+        normalized_contracts = append_unique(
+            normalized_contracts,
+            normalized_interface_contracts
+            + [f"{item['scope']} {item['name']}: {item['description']}" for item in feature_dependencies],
+        )
     scope_errors = validate_capture_scope(
         normalized_stage=normalized_stage,
         normalized_project_name=normalized_project_name,
@@ -318,6 +398,21 @@ def capture_stage_memory(
         normalized_plan_overview=normalized_plan_overview,
         normalized_planning_principles=normalized_planning_principles,
         normalized_next_actions=normalized_next_actions,
+        normalized_feature_goal=normalized_feature_goal,
+        normalized_problem=normalized_problem,
+        normalized_expected_outcome=normalized_expected_outcome,
+        normalized_framework=normalized_framework,
+        normalized_structure_notes=normalized_structure_notes,
+        feature_init_feature_updates=feature_init_feature_updates,
+        feature_existing_modules=feature_existing_modules,
+        feature_modified_files=feature_modified_files,
+        feature_new_files=feature_new_files,
+        normalized_feature_interface_contracts=normalized_interface_contracts,
+        feature_dependencies=feature_dependencies,
+        normalized_feature_risks=normalized_risks,
+        normalized_feature_recommendations=normalized_recommendations,
+        normalized_feature_tech_notes=normalized_feature_tech_notes,
+        normalized_feature_architecture_notes=normalized_feature_architecture_notes,
     )
     if scope_errors:
         return {
@@ -332,6 +427,13 @@ def capture_stage_memory(
             "branch": branch_name,
             "stage": normalized_stage,
             "errors": concept_feature_errors,
+        }
+    if feature_init_errors:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "errors": feature_init_errors,
         }
     if design_errors:
         return {
@@ -432,6 +534,8 @@ def capture_stage_memory(
         paths.tech_state: snapshot_file(paths.tech_state),
         paths.architecture_state: snapshot_file(paths.architecture_state),
         paths.plan_state: snapshot_file(paths.plan_state),
+        paths.feature_init_state: snapshot_file(paths.feature_init_state),
+        paths.feature_plan_state: snapshot_file(paths.feature_plan_state),
     }
 
     ts = now_iso()
@@ -482,6 +586,8 @@ def capture_stage_memory(
     tech_state = load_tech_state(paths.tech_state)
     architecture_state = load_architecture_state(paths.architecture_state)
     plan_state = load_plan_state(paths.plan_state)
+    feature_init_state = load_feature_init_state(paths.feature_init_state)
+    feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
     concept_state, design_state, tech_state, architecture_state, plan_state = apply_stage_state_update(
         normalized_stage=normalized_stage,
         concept_state=concept_state,
@@ -537,6 +643,34 @@ def capture_stage_memory(
         normalized_planning_principles=normalized_planning_principles,
         normalized_next_actions=normalized_next_actions,
     )
+    if normalized_stage == FEATURE_INIT_STAGE:
+        feature_init_state = update_feature_init_state(
+            feature_init_state,
+            feature_goal=normalized_feature_goal or None,
+            problem=normalized_problem or None,
+            expected_outcome=normalized_expected_outcome or None,
+            project_type=normalized_project_type or None,
+            framework=normalized_framework or None,
+            structure_notes=normalized_structure_notes,
+            existing_modules=feature_existing_modules,
+            modified_files=feature_modified_files,
+            new_files=feature_new_files,
+            interface_contracts=normalized_interface_contracts,
+            dependencies=feature_dependencies,
+            risks=normalized_risks,
+            recommendations=normalized_recommendations,
+            tech_notes=normalized_feature_tech_notes,
+            architecture_notes=normalized_feature_architecture_notes,
+            features=feature_init_feature_updates,
+            next_actions=normalized_next_actions,
+        )
+    elif normalized_stage == FEATURE_PLAN_STAGE:
+        feature_plan_state = update_plan_state(
+            feature_plan_state,
+            plan_overview=normalized_plan_overview or None,
+            planning_principles=normalized_planning_principles,
+            next_actions=normalized_next_actions,
+        )
 
     fact_records = build_fact_records(
         branch_name=branch_name,
@@ -620,6 +754,10 @@ def capture_stage_memory(
             save_architecture_state(paths.architecture_state, architecture_state)
         elif normalized_stage == PLAN_STAGE:
             save_plan_state(paths.plan_state, plan_state)
+        elif normalized_stage == FEATURE_INIT_STAGE:
+            save_feature_init_state(paths.feature_init_state, feature_init_state)
+        elif normalized_stage == FEATURE_PLAN_STAGE:
+            save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
         write_json(paths.active_session, active_session)
         append_jsonl(paths.decision_log, note_records)
         append_jsonl(paths.facts, fact_records)

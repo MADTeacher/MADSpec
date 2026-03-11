@@ -30,6 +30,14 @@ from ..stages.design.state import (
     parse_screen_value,
     parse_zone_value,
 )
+from ..stages.feature_init.state import (
+    FEATURE_INIT_STAGE,
+    parse_dependency_value,
+    parse_existing_module_value,
+    parse_feature_init_feature_value,
+    parse_file_change_value,
+)
+from ..stages.feature_plan.state import FEATURE_PLAN_STAGE
 from ..stages.plan.state import PLAN_STAGE
 from ..stages.tech.state import (
     TECH_STAGE,
@@ -83,6 +91,16 @@ class ArchitectureCaptureParse:
     endpoint_error_updates: list[dict[str, Any]]
     integration_updates: list[dict[str, Any]]
     pattern_updates: list[dict[str, str]]
+    errors: list[str]
+
+
+@dataclass(frozen=True)
+class FeatureInitCaptureParse:
+    feature_updates: dict[str, list[dict[str, str]]]
+    existing_modules: list[dict[str, str]]
+    modified_files: list[dict[str, Any]]
+    new_files: list[dict[str, Any]]
+    dependencies: list[dict[str, str]]
     errors: list[str]
 
 
@@ -194,6 +212,73 @@ def parse_design_capture(
         flow_alternative_updates=flow_alternative_updates,
         navigation_updates=navigation_updates,
         screen_data_updates=screen_data_updates,
+        errors=errors,
+    )
+
+
+def parse_feature_init_capture(
+    *,
+    feature_p1: list[str] | None,
+    feature_p2: list[str] | None,
+    feature_p3: list[str] | None,
+    existing_modules: list[str] | None,
+    modified_files: list[str] | None,
+    new_files: list[str] | None,
+    dependencies: list[str] | None,
+) -> FeatureInitCaptureParse:
+    feature_updates: dict[str, list[dict[str, str]]] = {"p1": [], "p2": [], "p3": []}
+    parsed_modules: list[dict[str, str]] = []
+    parsed_modified: list[dict[str, Any]] = []
+    parsed_new: list[dict[str, Any]] = []
+    parsed_dependencies: list[dict[str, str]] = []
+    errors: list[str] = []
+
+    for priority, values in {
+        "p1": normalize_text_list(feature_p1),
+        "p2": normalize_text_list(feature_p2),
+        "p3": normalize_text_list(feature_p3),
+    }.items():
+        for value in values:
+            parsed = parse_feature_init_feature_value(value)
+            if parsed is None:
+                errors.append(f"{priority} feature must use '<id>::<title>::<description>' format: {value}")
+                continue
+            feature_updates[priority].append(parsed)
+
+    for value in normalize_text_list(existing_modules):
+        parsed = parse_existing_module_value(value)
+        if parsed is None:
+            errors.append(f"existing-module must use '<name>::<path>::<description>' format: {value}")
+            continue
+        parsed_modules.append(parsed)
+
+    for value in normalize_text_list(modified_files):
+        parsed = parse_file_change_value(value)
+        if parsed is None:
+            errors.append(f"modified-file must use '<path>::<reason>::<function-id,...>' format: {value}")
+            continue
+        parsed_modified.append(parsed)
+
+    for value in normalize_text_list(new_files):
+        parsed = parse_file_change_value(value)
+        if parsed is None:
+            errors.append(f"new-file must use '<path>::<reason>::<function-id,...>' format: {value}")
+            continue
+        parsed_new.append(parsed)
+
+    for value in normalize_text_list(dependencies):
+        parsed = parse_dependency_value(value)
+        if parsed is None:
+            errors.append(f"dependency must use '<scope>::<name>::<description>' format: {value}")
+            continue
+        parsed_dependencies.append(parsed)
+
+    return FeatureInitCaptureParse(
+        feature_updates=feature_updates,
+        existing_modules=parsed_modules,
+        modified_files=parsed_modified,
+        new_files=parsed_new,
+        dependencies=parsed_dependencies,
         errors=errors,
     )
 
@@ -434,6 +519,21 @@ def validate_capture_scope(
     normalized_plan_overview: str,
     normalized_planning_principles: list[str],
     normalized_next_actions: list[str],
+    normalized_feature_goal: str,
+    normalized_problem: str,
+    normalized_expected_outcome: str,
+    normalized_framework: str,
+    normalized_structure_notes: list[str],
+    feature_init_feature_updates: dict[str, list[dict[str, str]]],
+    feature_existing_modules: list[dict[str, str]],
+    feature_modified_files: list[dict[str, Any]],
+    feature_new_files: list[dict[str, Any]],
+    normalized_feature_interface_contracts: list[str],
+    feature_dependencies: list[dict[str, str]],
+    normalized_feature_risks: list[str],
+    normalized_feature_recommendations: list[str],
+    normalized_feature_tech_notes: list[str],
+    normalized_feature_architecture_notes: list[str],
 ) -> list[str]:
     used_concept_fields = any(
         [
@@ -467,7 +567,6 @@ def validate_capture_scope(
     used_tech_fields = any(
         [
             normalized_stack_overview,
-            normalized_project_type,
             normalized_requirements,
             normalized_preferences,
             normalized_tech_constraints,
@@ -498,6 +597,25 @@ def validate_capture_scope(
         ]
     )
     used_plan_fields = any([normalized_plan_overview, normalized_planning_principles])
+    used_shared_project_type = bool(normalized_project_type)
+    used_feature_init_fields = any(
+        [
+            normalized_feature_goal,
+            normalized_problem,
+            normalized_expected_outcome,
+            normalized_framework,
+            normalized_structure_notes,
+            normalized_feature_interface_contracts,
+            normalized_feature_risks,
+            normalized_feature_recommendations,
+            normalized_feature_tech_notes,
+            normalized_feature_architecture_notes,
+            feature_existing_modules,
+            feature_modified_files,
+            feature_new_files,
+            feature_dependencies,
+        ]
+    )
 
     if used_concept_fields and normalized_stage != CONCEPT_STAGE:
         return ["concept-specific capture options are only supported for stage mvp.concept"]
@@ -505,10 +623,14 @@ def validate_capture_scope(
         return ["design-specific capture options are only supported for stage mvp.design"]
     if used_tech_fields and normalized_stage != TECH_STAGE:
         return ["tech-specific capture options are only supported for stage mvp.tech"]
+    if used_shared_project_type and normalized_stage not in {TECH_STAGE, FEATURE_INIT_STAGE}:
+        return ["--project-type is only supported for stages mvp.tech and feature.init"]
     if used_architecture_fields and normalized_stage != ARCHITECTURE_STAGE:
         return ["architecture-specific capture options are only supported for stage mvp.architecture"]
-    if used_plan_fields and normalized_stage != PLAN_STAGE:
-        return ["plan-specific capture options are only supported for stage mvp.plan"]
-    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE, ARCHITECTURE_STAGE, PLAN_STAGE}:
-        return ["--next-action is only supported for stages mvp.concept, mvp.design, mvp.tech, mvp.architecture, and mvp.plan"]
+    if used_feature_init_fields and normalized_stage != FEATURE_INIT_STAGE:
+        return ["feature-init-specific capture options are only supported for stage feature.init"]
+    if used_plan_fields and normalized_stage not in {PLAN_STAGE, FEATURE_PLAN_STAGE}:
+        return ["plan-specific capture options are only supported for stages mvp.plan and feature.plan"]
+    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE, ARCHITECTURE_STAGE, PLAN_STAGE, FEATURE_INIT_STAGE, FEATURE_PLAN_STAGE}:
+        return ["--next-action is only supported for stages mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, and feature.plan"]
     return []

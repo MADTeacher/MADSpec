@@ -15,6 +15,19 @@ from ..stages.design.state import (
     load_design_state,
     render_ui_design_markdown,
 )
+from ..stages.feature_init.state import (
+    is_empty_feature_init_state,
+    load_feature_init_state,
+    render_feature_architecture_markdown,
+    render_feature_context_markdown,
+    render_feature_tech_stack_markdown,
+    render_project_analysis_markdown,
+)
+from ..stages.feature_plan.state import (
+    is_empty_plan_state as is_empty_feature_plan_state,
+    load_feature_plan_state,
+    render_feature_implementation_plan_markdown,
+)
 from ..stages.plan.state import load_plan_state, render_implementation_plan_markdown
 from ..stages.tech.state import (
     load_tech_state,
@@ -25,6 +38,8 @@ from .projections import (
     build_architecture_status,
     build_concept_status,
     build_design_status,
+    build_feature_init_status,
+    build_feature_plan_status,
     build_plan_status,
     build_tech_status,
     group_records_by_step,
@@ -56,6 +71,9 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
     tech_state = load_tech_state(paths.tech_state)
     architecture_state = load_architecture_state(paths.architecture_state)
     plan_state = load_plan_state(paths.plan_state)
+    feature_init_state = load_feature_init_state(paths.feature_init_state)
+    feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
+    feature_mode = not is_empty_feature_init_state(feature_init_state)
     generated_at = active_session.get("updated_at") or active_session.get("last_checkpoint_at") or now_iso()
     decision_log = read_jsonl(paths.decision_log)
     events = read_jsonl(paths.events)
@@ -82,7 +100,9 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
 
     tech_path = paths.branch_dir / "tech-stack.md"
     tech_path.write_text(
-        render_tech_stack_markdown(
+        render_feature_tech_stack_markdown(feature_init_state, branch_name=branch_name)
+        if feature_mode
+        else render_tech_stack_markdown(
             tech_state,
             branch_name=branch_name,
             project_name=concept_state.get("projectName", ""),
@@ -93,7 +113,9 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
 
     architecture_path = paths.branch_dir / "architecture.md"
     architecture_path.write_text(
-        render_architecture_markdown(
+        render_feature_architecture_markdown(feature_init_state, branch_name=branch_name)
+        if feature_mode
+        else render_architecture_markdown(
             architecture_state,
             branch_name=branch_name,
             project_name=concept_state.get("projectName", ""),
@@ -101,6 +123,20 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
         encoding="utf-8",
     )
     generated.append(architecture_path)
+
+    project_analysis_path = paths.branch_dir / "project-analysis.md"
+    project_analysis_path.write_text(
+        render_project_analysis_markdown(feature_init_state),
+        encoding="utf-8",
+    )
+    generated.append(project_analysis_path)
+
+    feature_context_path = paths.branch_dir / "feature-context.md"
+    feature_context_path.write_text(
+        render_feature_context_markdown(feature_init_state),
+        encoding="utf-8",
+    )
+    generated.append(feature_context_path)
 
     data_model_path = paths.branch_dir / "data-model.md"
     data_model_path.write_text(
@@ -133,6 +169,8 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
             tech_state,
             architecture_state,
             plan_state,
+            feature_init_state,
+            feature_plan_state,
             generated_at,
         ),
         encoding="utf-8",
@@ -148,7 +186,14 @@ def consolidate_branch_memory(project_path: Path, branch_name: str) -> list[Path
 
     implementation_plan_path = paths.branch_dir / "implementation-plan.md"
     implementation_plan_path.write_text(
-        render_implementation_plan_markdown(
+        render_feature_implementation_plan_markdown(
+            feature_plan_state,
+            branch_name=branch_name,
+            progress=progress,
+            feature_goal=feature_init_state.get("featureGoal", ""),
+        )
+        if not is_empty_feature_plan_state(feature_plan_state)
+        else render_implementation_plan_markdown(
             plan_state,
             branch_name=branch_name,
             progress=progress,
@@ -244,18 +289,22 @@ def retrieve_memory_context(
     is_tech_stage = stage_lower == "mvp.tech"
     is_architecture_stage = stage_lower == "mvp.architecture"
     is_plan_stage = stage_lower == "mvp.plan"
+    is_feature_init_stage = stage_lower == "feature.init"
+    is_feature_plan_stage = stage_lower == "feature.plan"
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state) if is_design_stage else None
     tech_state = load_tech_state(paths.tech_state) if is_tech_stage else None
     architecture_state = load_architecture_state(paths.architecture_state) if is_architecture_stage else None
     plan_state = load_plan_state(paths.plan_state) if is_plan_stage else None
+    feature_init_state = load_feature_init_state(paths.feature_init_state) if is_feature_init_stage else None
+    feature_plan_state = load_feature_plan_state(paths.feature_plan_state) if is_feature_plan_stage else None
     if limit is None:
-        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage) else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage or is_feature_init_stage or is_feature_plan_stage) else 5
     elif limit <= 0:
-        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage) else 5
+        resolved_limit = 3 if (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage or is_feature_init_stage or is_feature_plan_stage) else 5
     else:
         resolved_limit = limit
-    include_history_records = include_history or not (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage)
+    include_history_records = include_history or not (is_concept_stage or is_design_stage or is_tech_stage or is_architecture_stage or is_plan_stage or is_feature_init_stage or is_feature_plan_stage)
     decision_log = read_jsonl(paths.decision_log) if include_history_records else []
     events = read_jsonl(paths.events) if include_history_records else []
     semantic_sets = load_semantic_record_sets(
@@ -399,6 +448,16 @@ def retrieve_memory_context(
             if is_plan_stage and plan_state is not None
             else None
         ),
+        "feature_init_status": (
+            build_feature_init_status(feature_init_state)
+            if is_feature_init_stage and feature_init_state is not None
+            else None
+        ),
+        "feature_plan_status": (
+            build_feature_plan_status(feature_plan_state, progress=progress)
+            if is_feature_plan_stage and feature_plan_state is not None
+            else None
+        ),
         "episodes": trimmed_events if include_history_records else [],
         "decision_log": trimmed_decisions if include_history_records else [],
         "artifact_state": {
@@ -406,6 +465,10 @@ def retrieve_memory_context(
             "design": design_state if (is_design_stage and full_artifact) else None,
             "tech": tech_state if (is_tech_stage and full_artifact) else None,
             "architecture": architecture_state if (is_architecture_stage and full_artifact) else None,
-            "plan": plan_state if (is_plan_stage and full_artifact) else None,
+            "plan": (
+                plan_state if (is_plan_stage and full_artifact) else feature_plan_state if (is_feature_plan_stage and full_artifact) else None
+            ),
+            "feature_init": feature_init_state if (is_feature_init_stage and full_artifact) else None,
+            "feature_plan": feature_plan_state if (is_feature_plan_stage and full_artifact) else None,
         },
     }

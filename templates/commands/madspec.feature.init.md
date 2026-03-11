@@ -1,5 +1,5 @@
 ---
-description: Feature - Инициализация работы над новой функциональностью - анализ проекта, автогенерация MADSpec артефактов, определение точек интеграции
+description: Feature - Инициализация новой функциональности через memory-first workflow
 ---
 
 ## Пользовательский ввод
@@ -8,318 +8,83 @@ description: Feature - Инициализация работы над новой
 $ARGUMENTS
 ```
 
-Ты **ОБЯЗАН** учитывать пользовательский ввод перед продолжением (если он не пустой).
+Ты **ОБЯЗАН** учитывать пользовательский ввод перед продолжением, если он не пустой.
 
-## Правила диалога (обязательно)
+## Правила диалога
 
-- **Задавай вопросы строго по одному**: в каждом твоем сообщении должен быть **ровно 1 вопрос**, который требует ответа.
-- **Не выдавай список вопросов заранее** (никаких длинных анкет/чек-листов вопросов за раз).
-- Если нужен выбор, задай **один вопрос** и предложи **не больше 3–5 вариантов** (или попроси свободный ответ).
-- **Дожидайся ответа** и только затем задавай следующий вопрос.
-- Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
+- Задавай вопросы строго по одному.
+- Не выдавай длинный список вопросов заранее.
+- Сначала исследуй репозиторий, затем спрашивай только то, что нельзя восстановить из кода и артефактов.
 
-## Structured Memory First (обязательно)
+## Structured Memory First
 
-- Feature workflow также использует `.madspec/<BRANCH>/memory/` как source of truth.
-- `project-context.md` и другие markdown-файлы контекста считаются generated views.
-- После инициализации feature-ветки запускай `madspec memory consolidate` и `madspec memory validate`.
-
-## Описание
-
-Эта команда инициализирует работу над новой функциональностью в существующем проекте. Она:
-
-1. **Анализирует существующий проект** — структуру, технологии, паттерны, точки интеграции
-2. **Автоматически генерирует MADSpec артефакты** на основе анализа кода
-3. **Определяет где и как встроить новое** — находит точки интеграции в существующем коде
-4. **Создает feature ветку** и подготавливает структуру для работы
-
-**Результат:** готовность к планированию и реализации без предварительных артефактов.
-
-## Предварительные условия
-
-- Проект с исходным кодом (любой язык/фреймворк)
-- Git репозиторий (для создания ветки)
-- **Никаких предварительных MADSpec артефактов не требуется**
+- Каноническое состояние этапа init хранится в `.madspec/<BRANCH>/memory/stages/feature.init.json`.
+- `project-analysis.md`, `feature-context.md`, `tech-stack.md`, `architecture.md` и `project-context.md` являются generated views.
+- В обычных ходах диалога сначала используй `madspec memory retrieve --stage feature.init --json-output`.
+- Для накопления состояния используй `madspec memory capture --stage feature.init ...`.
+- Для завершения этапа используй `madspec memory checkpoint --stage feature.init --summary ...`.
+- После любого изменения memory workflow views должны пересобираться через `madspec memory consolidate` и проходить `madspec memory validate`.
 
 ## Цель этапа
 
-Подготовить полноценный контекст для работы над функциональностью:
-- Понять что есть в проекте и как оно устроено
-- Определить точки интеграции для новой функциональности
-- Создать все необходимые MADSpec артефакты автоматически
-- Подготовить структуру для планирования и реализации
+Подготовить feature-ветку и зафиксировать в canonical memory:
 
+- цель фичи, проблему и ожидаемый результат;
+- каталог функций `P1/P2/P3` с явными `ID`;
+- анализ проекта и точки интеграции;
+- технический и архитектурный контекст, достаточный для `madspec.feature.plan`.
 
+## Порядок работы
 
-0. **Определение текущей ветки и создание feature ветки:**
+1. Определи текущую ветку через `madspec git current-branch`.
+2. Если пользователь ещё не работает в feature-ветке, создай её через `madspec git create-branch feature/<short-name>`.
+3. Работай только с branch-aware путями `.madspec/<BRANCH>/...`.
+4. Проанализируй проект:
+   - стек, фреймворки, package managers, test runners, CI;
+   - структуру директорий и ключевые модули;
+   - существующие точки интеграции для новой фичи;
+   - файлы для изменения и новые файлы.
+5. Если пользовательский ввод не покрывает продуктовую цель, задай один уточняющий вопрос.
+6. Сохрани результат анализа в canonical state через `madspec memory capture --stage feature.init`:
+   - `--feature-goal`
+   - `--problem`
+   - `--expected-outcome`
+   - `--project-type`
+   - `--framework`
+   - `--structure-note`
+   - `--feature-p1/--feature-p2/--feature-p3` в формате `<id>::<title>::<description>`
+   - `--existing-module`
+   - `--modified-file`
+   - `--new-file`
+   - `--interface-contract`
+   - `--dependency`
+   - `--risk`
+   - `--recommendation`
+   - `--tech-note`
+   - `--architecture-note`
+   - `--next-action`
+7. Повтори `madspec memory retrieve --stage feature.init --json-output` и проверь `feature_init_status`.
+8. Перед завершением при необходимости запроси `madspec memory retrieve --stage feature.init --json-output --full-artifact`.
+9. Зафиксируй этап через `madspec memory checkpoint --stage feature.init --summary "<validated summary>"`.
 
-   - Выполни `madspec git current-branch` для определения текущей ветки
-   - Определи основную ветку:
-     1. Проверь наличие `.madspec/main/` → если есть, `main` — основная
-     2. Иначе проверь `git branch -r` для удаленных веток
-     3. Если найдена `origin/main` или `origin/master` → используй ее
-     4. Если git недоступен, используй `main` по умолчанию
-   - Спроси у пользователя: "Какое короткое название для feature ветки?" (например: `user-auth`, `payment`, `notifications`)
-   - Создай ветку: `madspec git create-branch feature/<short-name>`
-   - Создай директорию: `.madspec/feature/<short-name>/`
+## Что считается результатом
 
-1. **Анализ существующего проекта:**
+- `.madspec/<BRANCH>/memory/stages/feature.init.json` заполнен и ratified.
+- Generated views пересобраны автоматически:
+  - `.madspec/<BRANCH>/project-analysis.md`
+  - `.madspec/<BRANCH>/feature-context.md`
+  - `.madspec/<BRANCH>/tech-stack.md`
+  - `.madspec/<BRANCH>/architecture.md`
+  - `.madspec/<BRANCH>/project-context.md`
+- В `project-analysis.md` функции используют явные `ID`, а не только текстовые labels.
+- Ветка готова к `madspec.feature.plan`.
 
-   **1.1. Определение технологического стека:**
+## Важные запреты
 
-   Автоматически определи язык, фреймворк, зависимости:
+- Не считай `project-analysis.md` или `feature-context.md` source of truth.
+- Не создавай и не редактируй generated views вручную, если то же изменение должно быть выражено через memory-команды.
+- Не хардкодь имя feature-ветки в путях; используй только `.madspec/<BRANCH>/...`.
 
-   - **JavaScript/TypeScript**: `package.json` → dependencies, devDependencies, engines
-   - **Python**: `pyproject.toml` или `requirements.txt` → dependencies
-   - **Java (Maven/Gradle)**: `pom.xml` или `build.gradle`
-   - **Go**: `go.mod` → require, go version
-   - **Rust**: `Cargo.toml` → dependencies
-   - **Flutter/Dart**: `pubspec.yaml` → dependencies, environment
-   - **Kotlin**: `build.gradle.kts`, `settings.gradle.kts`
-   - **C#**: `*.csproj`, `Directory.Build.props`
+## Завершение
 
-   Определи фреймворки:
-   - Frontend: React, Vue, Angular, Svelte, Next.js, Nuxt, Solid
-   - Backend: Express, NestJS, FastAPI, Django, Spring Boot, Gin, Echo
-   - Mobile: Flutter, React Native, SwiftUI, Jetpack Compose
-   - Database: PostgreSQL, MySQL, MongoDB, SQLite, Redis, Firebase
-   - ORM/Query Builders: Prisma, Sequelize, TypeORM, SQLAlchemy, GORM, Eloquent
-   - Testing: Jest, Vitest, Pytest, JUnit, Mocha, Cypress, Playwright
-   - Build/CI: Vite, Webpack, Cargo, Maven, Gradle, npm scripts
-
-   **1.2. Анализ структуры проекта:**
-
-   Исследуй структуру директорий:
-   - Определи source directories (`src/`, `lib/`, `app/`, `packages/`)
-   - Найди конфигурационные файлы
-   - Определи структуру тестов
-   - Найди documentation файлы (README, docs/)
-
-   **1.3. Анализ архитектуры и паттернов:**
-
-   Проанализируй исходный код для понимания:
-   - **Frontend**:
-     - Component structure (pages, components, layouts)
-     - State management (context, redux, mobx, signals)
-     - Routing (react-router, vue-router, next.js routes)
-     - Styling approach (CSS modules, Tailwind, styled-components)
-     - API communication patterns (fetch, axios, react-query, swr)
-   - **Backend**:
-     - Layer structure (controllers, services, repositories, handlers)
-     - API style (REST, GraphQL, gRPC, WebSocket)
-     - Database access patterns (ORM, query builder, raw SQL)
-     - Authentication/Authorization patterns
-     - Middleware/interceptor patterns
-   - **Mobile**:
-     - Widget/component structure
-     - Navigation patterns
-     - State management
-     - API integration patterns
-
-   **1.4. Поиск точек интеграции:**
-
-   На основе анализа определи куда интегрировать новую функциональность:
-   - Какие файлы/модули нужно модифицировать
-   - Какие новые файлы создать
-   - Какие интерфейсы/контракты соблюсти
-   - Зависимости от существующих модулей
-
-2. **Интерактивное уточнение (минимум вопросов):**
-
-   После автоматического анализа задай **один вопрос** для уточнения:
-
-   "Я проанализировал проект и понял его структуру. Пожалуйста, опиши что нужно добавить:
-   
-   1. Что конкретно должна делать новая функциональность?
-   2. Какие существующие модули/компоненты она должна использовать?
-   3. Есть ли внешние интеграции (API, сервисы)?"
-   
-   Пользователь отвечает текстом — используй этот ответ для уточнения артефактов.
-
-3. **Автогенерация MADSpec артефактов:**
-
-   На основе анализа + ответа пользователя создай:
-
-   **3.1. `tech-stack.md`:**
-   ```markdown
-   # Технологический стек
-
-   ## Язык программирования
-   - [Определено из анализа]
-
-   ## Фреймворки и библиотеки
-   - [Список из package.json/pyproject.toml/etc]
-
-   ## База данных
-   - [Определено из анализа]
-
-   ## Тестирование
-   - [Список тестовых фреймворков]
-
-   ## Инструменты сборки
-   - [Определено из анализа]
-
-   ## Дополнительные инструменты
-   - [Линтеры, форматтеры, CI/CD]
-   ```
-
-   **3.2. `concept.md`:**
-   На основе ответа пользователя + анализа структуры:
-   ```markdown
-   # Концепция
-
-   ## Цель
-   [Что делает новая функциональность - из ответа пользователя]
-
-   ## Для кого
-   [Целевая аудитория - вывести из контекста или спросить]
-
-   ## Проблема
-   [Какую проблему решает - из ответа пользователя]
-
-   ## Ожидаемый результат
-   [Что получим в итоге]
-
-   ## Функции (P1/P2/P3)
-   - **P1** (критично): [Основные функции]
-   - **P2** (важно): [Дополнительные функции]
-   - **P3** (желательно): [Будущие улучшения]
-   ```
-
-   **3.3. `architecture.md`:**
-   На основе анализа существующей архитектуры + новая функциональность:
-   ```markdown
-   # Архитектура
-
-   ## Текущая структура
-   [Краткое описание существующей архитектуры из анализа]
-
-   ## Предлагаемые изменения
-   [Как новая функциональность вписывается в существующую архитектуру]
-
-   ## Компоненты
-   - **Существующие**: [Какие компоненты используем]
-   - **Новые**: [Какие компоненты создаем]
-
-   ## Интеграция
-   [Как интегрируем с существующим кодом - из analysis]
-
-   ## Потоки данных
-   [Как данные проходят через систему]
-   ```
-
-   **3.4. `project-analysis.md` (КЛЮЧЕВОЙ АРТЕФАКТ):**
-   Используй шаблон `templates/feature/project-analysis-template.md` для создания этого файла.
-   Этот файл — результат анализа проекта и функциональных требований для новой функциональности.
-
-   Ключевые секции шаблона:
-   - **Функциональные требования (P1/P2/P3)** — функции с привязкой к файлам
-   - **Точки интеграции** — файлы для модификации и создания
-   - **Зависимости** — от существующих модулей и внешние
-   - **Рекомендации** — как встроить новую функциональность
-
-   **3.5. `feature-context.md`:**
-   ```markdown
-   # Контекст Feature
-
-   ## Описание функциональности
-   [Краткое описание из project-analysis.md - обзор функций P1/P2/P3]
-
-   ## Цель и проблема (из concept.md)
-   [Если concept.md создан - ссылка на него, иначе - кратко]
-   ```
-
-   **3.6. `project-context.md`:**
-   ```markdown
-   # Контекст проекта
-
-   ## Текущий этап
-   - **Этап**: `init` (инициализация)
-   - **Статус**: Готов к планированию
-
-   ## Артефакты
-   - [Список созданных артефактов с путями]
-
-   ## Следующий шаг
-   Запустить `/madspec.feature.plan` для планирования шагов реализации
-   ```
-
-4. **Создание структуры для планирования:**
-
-   - Создай `.madspec/feature/<short-name>/steps/`
-   - Создай `.madspec/feature/<short-name>/memory/`
-   - Создай `.madspec/feature/<short-name>/memory/progress.json` используя шаблон `templates/planning-state-template.json`:
-
-5. **Валидация готовности:**
-
-   **Обязательные пункты:**
-
-   - [ ] **Feature ветка создана**
-     - Выполнен `madspec git create-branch feature/<short-name>`
-     - Создана директория `.madspec/feature/<short-name>/`
-   
-   - [ ] **Технологический стек определен**
-     - Создан `tech-stack.md`
-     - Определены язык, фреймворк, зависимости
-   
-   - [ ] **Концепция создана**
-     - Создан `concept.md` (опционально)
-     - Если создан — определены функции P1/P2/P3
-   
-   - [ ] **Анализ проекта выполнен**
-     - Создан `project-analysis.md` (по шаблону templates/feature/project-analysis-template.md)
-     - Определены функции P1/P2/P3 с привязкой к файлам
-     - Определены точки интеграции
-     - Найдены файлы для модификации/создания
-   
-   - [ ] **Архитектура описана**
-     - Создан `architecture.md`
-     - Описаны изменения для новой функциональности
-   
-   - [ ] **Контекст feature готов**
-     - Создан `feature-context.md`
-     - Создан `project-context.md`
-   
-   - [ ] **Структура для планирования создана**
-     - Созданы `steps/`, `memory/`
-     - Создан `progress.json`
-
-6. **Отчет:**
-
-   Выведи:
-   - Feature ветка: `feature/<short-name>`
-   - Созданные артефакты:
-     - `.madspec/feature/<short-name>/tech-stack.md`
-     - `.madspec/feature/<short-name>/concept.md` (опционально)
-     - `.madspec/feature/<short-name>/architecture.md`
-     - `.madspec/feature/<short-name>/project-analysis.md` (ключевой)
-     - `.madspec/feature/<short-name>/feature-context.md`
-     - `.madspec/feature/<short-name>/project-context.md`
-   - Ключевые функции из project-analysis.md:
-     - P1: [список]
-     - P2: [список]
-     - P3: [список]
-   - Предложение: "Готов к планированию. Запустить `/madspec.feature.plan`?"
-
-## Правила
-
-- **АНАЛИЗИРУЙ** проект автоматически перед вопросами
-- **СПРАШИВАЙ** минимум — только то, что нельзя вывести из кода
-- **ГЕНЕРИРУЙ** артефакты на основе анализа + пользовательского ввода
-- **ОПРЕДЕЛЯЙ** конкретные файлы для интеграции
-- **НЕ ТРЕБУЙ** предварительных MADSpec артефактов
-
-## Выходные артефакты
-
-- `.madspec/feature/<short-name>/tech-stack.md` — технологический стек
-- `.madspec/feature/<short-name>/concept.md` — концепция функциональности (опционально)
-- `.madspec/feature/<short-name>/architecture.md` — архитектура изменений
-- `.madspec/feature/<short-name>/project-analysis.md` — анализ + функции P1/P2/P3 + точки интеграции (ключевой)
-- `.madspec/feature/<short-name>/feature-context.md` — контекст feature
-- `.madspec/feature/<short-name>/project-context.md` — навигация по проекту
-- `.madspec/feature/<short-name>/memory/progress.json` — трекинг прогресса
-- `.madspec/feature/<short-name>/steps/` — директория для шагов
-
-## Следующий этап
-
-После завершения запустите `/madspec.feature.plan` для планирования шагов реализации.
+После завершения предложи следующий шаг: `/madspec.feature.plan`.

@@ -1,6 +1,6 @@
 ---
-description: Feature - Планирование новой функциональности - создание плана реализации с разбивкой на последовательность шагов на основе анализа проекта
-handoffs: 
+description: Feature - Инкрементальное планирование реализации через memory-first workflow
+handoffs:
   - label: Начать реализацию
     agent: madspec.feature.implement
     prompt: Начни реализацию с шага [N]
@@ -12,331 +12,71 @@ handoffs:
 $ARGUMENTS
 ```
 
-Ты **ОБЯЗАН** учитывать пользовательский ввод перед продолжением (если он не пустой).
+## Structured Memory First
 
-## Правила диалога (обязательно)
-
-- **Задавай вопросы строго по одному**: в каждом твоем сообщении должен быть **ровно 1 вопрос**, который требует ответа.
-- **Не выдавай список вопросов заранее** (никаких длинных анкет/чек-листов вопросов за раз).
-- Если нужен выбор, задай **один вопрос** и предложи **не больше 3–5 вариантов** (или попроси свободный ответ).
-- **Дожидайся ответа** и только затем задавай следующий вопрос.
-- Если ответ неполный — задай **один уточняющий вопрос**, а не несколько сразу.
-
-## Structured Memory First (обязательно)
-
-- `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
-- `planning-context.md` и `project-context.md` являются generated views.
-- После изменения памяти запускай `madspec memory consolidate` и `madspec memory validate`.
-- Перед фиксацией нового шага **обязательно** проверь кандидата через `madspec memory next-step --stage feature.plan --candidate-step <step-id> --depends-on <dependency>...`.
-- Для записи нового planned step в canonical state используй `madspec memory register-step --stage feature.plan --step-id <step-id> --step-kind <code|non-code> --covers <function-id> ...`, а не ручное редактирование `progress.json`.
-
-## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
-
-**НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ НЕ ИЗМЕНЯЙ `currentImplementStep` в файле `progress.json`.**
-
-- Эта команда предназначена **ТОЛЬКО** для планирования шагов
-- Поле `currentImplementStep` управляется другими командами (например, `madspec.feature.implement`)
-- При обновлении `progress.json` **ОБЯЗАТЕЛЬНО** сохраняй значение `currentImplementStep` без изменений
-- Если `currentImplementStep` имеет значение `null` — оставь его `null`
-- Если `currentImplementStep` содержит имя шага — оставь его без изменений
-- **НАРУШЕНИЕ ЭТОГО ПРАВИЛА НЕДОПУСТИМО**
-
-## Описание
-
-На этом этапе **MADSpec (MADSpec Framework)** новая функциональность разбивается на конкретные шаги реализации с использованием **инкрементального подхода**. Каждый запуск команды создает только **один новый шаг**.
-
-**Источник правды:** `project-analysis.md` — в нем определены:
-- Функциональные требования (P1/P2/P3) с привязкой к файлам
-- Точки интеграции, файлы для модификации, новые файлы
-
-Каждый шаг должен быть:
-- Независимо тестируемым
-- Имеющим четкие критерии завершения
-- Содержащим описание что нужно сделать
-- Включающим тесты для валидации
-- Покрывающим хотя бы одну функцию из добавляемой функциональности
-- Явно классифицированным как `code` или `non-code`
-
-## TDD policy (обязательно)
-
-- Для `code` шага TDD обязателен: в плане нужно явно описать `red -> green -> refactor`.
-- В `tests.md` для `code` шага должны быть секции `Red`, `Green`, `Relevant Suite`, `Manual Checks`.
-- Для `non-code` шага TDD не обходится молча: в плане должен быть `Waiver` с причиной, а шаг регистрируется через `--step-kind non-code` и `--tdd-policy waived|not-applicable`.
-
-## Предварительные условия
-
-Должен существовать `.madspec/feature/<feature-branch>/` с артефактами от `madspec.feature.init`:
-- `project-analysis.md` — **ключевой** — функции P1/P2/P3 + точки интеграции
-- `architecture.md` — архитектура изменений
-- `tech-stack.md` — технологии
-- `concept.md` — опционально, дополнительный контекст
-- `project-context.md` — навигация
-- `memory/progress.json` — состояние планирования и прогресса
-
-Если файлы отсутствуют, предложи выполнить `/madspec.feature.init`
+- Каноническое состояние этапа хранится в `.madspec/<BRANCH>/memory/stages/feature.plan.json`.
+- Runtime state шагов хранится в `.madspec/<BRANCH>/memory/progress.json`.
+- `implementation-plan.md`, `planning-context-cache.md`, `steps/*/planning-context.md` и `project-context.md` являются generated views.
+- В обычных ходах сначала используй `madspec memory retrieve --stage feature.plan --json-output`.
+- Strategy-level изменения сохраняй через `madspec memory capture --stage feature.plan --plan-overview ... --planning-principle ... --next-action ...`.
+- Перед регистрацией шага обязательно проверь его через `madspec memory next-step --stage feature.plan --candidate-step ...`.
+- Новый planned step записывай только через `madspec memory register-step --stage feature.plan ...`.
+- Финальную ратификацию этапа делай через `madspec memory checkpoint --stage feature.plan --summary ...`.
 
 ## Цель этапа
 
-Создать детальный план реализации инкрементально на основе `project-analysis.md`:
-- Разбивает задачи на логические шаги (по одному за запуск)
-- Определяет зависимости между шагами на основе функций из project-analysis.md
+Инкрементально добавлять по одному новому шагу реализации, сохраняя:
 
+- step catalog в `feature.plan.json`;
+- покрытие функций по explicit `ID`;
+- зависимости шагов;
+- TDD policy и metadata шага;
+- generated implementation plan без ручного редактирования markdown.
 
+## Предварительные условия
 
-**Инкрементальный подход:** Каждый запуск создает только **один новый шаг**.
+- Существует `.madspec/<BRANCH>/memory/stages/feature.init.json`.
+- `madspec memory retrieve --stage feature.init --json-output` показывает достаточный `feature_init_status`.
+- Если init ещё не завершён, направь пользователя на `/madspec.feature.init`.
 
-0. **Определение текущей ветки**:
-   - **ВАЖНО**: Перед началом работы определи текущую ветку, выполнив `madspec git current-branch` из корня проекта
-   - Команда возвращает имя ветки через stdout
-   - Используй результат выполнения команды (имя ветки) для формирования путей к артефактам
-   - Все пути к артефактам должны быть в формате `.madspec/<BRANCH>/...`, где `<BRANCH>` - это имя ветки, полученное из команды
-   - Если ни команда, ни файл недоступны, используй значение по умолчанию `main`
-   - Сохрани имя ветки для использования в дальнейших шагах
+## Порядок работы
 
-1. **Проверка состояния планирования:**
-   - Проверь `.madspec/feature/<feature-branch>/memory/progress.json`
-       - Если не существует — создай на основе шаблона `.madspec/templates/planning-state-template.json`
-   - Проверь наличие директории `.madspec/feature/<feature-branch>/steps/`
-       - Если не существует — создай её
-   - Определи режим:
-     - **`initial`** — если `plannedSteps` пуст
-     - **`incremental`** — если есть запланированные шаги
+1. Определи текущую ветку через `madspec git current-branch`.
+2. Запроси `madspec memory retrieve --stage feature.plan --json-output`.
+3. Прочитай generated references:
+   - `.madspec/<BRANCH>/project-analysis.md`
+   - `.madspec/<BRANCH>/feature-context.md`
+   - `.madspec/<BRANCH>/tech-stack.md`
+   - `.madspec/<BRANCH>/architecture.md`
+4. Если стратегия ещё не зафиксирована, добавь её через `madspec memory capture --stage feature.plan --plan-overview ... --planning-principle ... --next-action ...`.
+5. Выбери следующий шаг:
+   - покрывает хотя бы одну функцию из `feature.init` catalog;
+   - использует explicit function IDs в `--covers`;
+   - имеет явный `step-kind`;
+   - имеет корректные `depends-on`.
+6. Создай source artifacts шага в `.madspec/<BRANCH>/steps/<step-id>/`:
+   - `description.md`
+   - `tasks.md`
+   - `tests.md`
+   - `validation.md`
+7. Проверь кандидата:
+   - `madspec memory next-step --stage feature.plan --candidate-step <step-id> --depends-on ...`
+8. Зарегистрируй шаг:
+   - `madspec memory register-step --stage feature.plan --step-id <step-id> --step-kind <code|non-code> --title ... --summary ... --covers <Fxx> ... --depends-on ...`
+   - для `non-code` шага обязательно передай `--tdd-policy waived|not-applicable` и `--waiver-reason`, если нужен waiver
+9. Повтори `madspec memory retrieve --stage feature.plan --json-output` и проверь `feature_plan_status`.
+10. Когда стратегия и catalog шагов готовы, зафиксируй этап через `madspec memory checkpoint --stage feature.plan --summary "<validated summary>"`.
 
-2. **Загрузка контекста (из артефактов init):**
-   
-   Прочитай:
-   - `.madspec/feature/<feature-branch>/project-analysis.md` — **ключевой**:
-     - Функциональные требования P1/P2/P3 с привязкой к файлам
-     - Какие файлы модифицировать
-     - Какие файлы создать
-     - Зависимости между модулями
-     - Рекомендации по интеграции
-   - `.madspec/feature/<feature-branch>/architecture.md` — структура изменений
-   - `.madspec/feature/<feature-branch>/tech-stack.md` — технологии
-   - `.madspec/feature/<feature-branch>/concept.md` — опционально, для понимания контекста
-   - `.madspec/feature/<feature-branch>/memory/progress.json` — что уже запланировано
+## Важные правила
 
-3. **Определение следующего шага (из project-analysis.md):**
+- Не редактируй `currentImplementStep` вручную.
+- Не редактируй `implementation-plan.md`, `planning-context-cache.md`, `planning-context.md` и `project-context.md` вручную как primary source.
+- Для `code` шага TDD policy всегда `required`.
+- Для feature coverage используй IDs из `feature.init.json`, а не свободные текстовые labels.
 
-   На основе `project-analysis.md`:
+## Что считается результатом
 
-   - **Функции P1/P2/P3** → определи которые еще не покрыты
-   - **Связанные файлы** → распредели по шагам (сгруппируй связанные)
-   - **Зависимости** → учти порядок (сначала базовые вещи, потом зависимые)
-
-   Алгоритм:
-   - Найди функции из секций P1/P2/P3 в `project-analysis.md`, которые еще не покрыты
-   - Сгруппируй функции по связанным файлам (из project-analysis.md)
-   - Выбери шаг с наивысшим приоритетом (P1 → P2 → P3)
-   - Проверь зависимости (все ли нужные шаги уже запланированы)
-   - После выбора кандидата выполни `madspec memory next-step --stage feature.plan --candidate-step step-[NN]-[name] --depends-on <dep1> ...`
-   - Если команда вернула ошибку, исправь формат шага или зависимости до записи в память
-
-4. **Создание шага на основе анализа:**
-
-   Создай директорию `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/`
-
-   **4.1. `description.md`:**
-   ```
-   # Шаг [NN]: [Название]
-   
-   ## Цель
-   [Что делаем на этом шаге]
-   
-   ## Из project-analysis.md
-   - Покрываемые функции: [список ID функций из P1/P2/P3]
-   - Файлы для модификации: [список из analysis]
-   - Новые файлы: [список из analysis]
-   
-   ## Обоснование
-   Почему этот шаг сейчас — приоритет функций, зависимости от файлов
-   ```
-
-   **4.2. `tasks.md`:**
-   ```
-   # Задачи шага [NN]
-   
-   ## Файлы для модификации
-   - [ ] Файл 1 ([причина модификации])
-   - [ ] Файл 2 ([причина модификации])
-   
-   ## Новые файлы
-   - [ ] Файл 1 ([что это и зачем])
-   - [ ] Файл 2 ([что это и зачем])
-   
-   ## Интеграция
-   - [ ] Связать с существующими модулями (из project-analysis.md)
-   - [ ] Соблюсти контракты (из architecture.md)
-   ```
-
-   **4.3. `tests.md`:**
-   ```
-   # Тесты шага [NN]
-   
-   ## Red
-   - [ ] Focused test / assertion, который сначала падает
-
-   ## Green
-   - [ ] Минимальная реализация, после которой focused test становится green
-
-   ## Relevant Suite
-   - [ ] Unit/Integration/Regression suite после refactor
-   
-   ## Manual Checks
-   - [ ] Проверить что файлы из tasks.md созданы/модифицированы
-   - [ ] Проверить интеграцию (согласно project-analysis.md)
-
-   ## Waiver
-   - [ ] Если шаг non-code: причина, почему TDD waived или not-applicable
-   ```
-
-   **4.4. `validation.md`:**
-   ```
-   # Критерии завершения шага [NN]
-   
-   ## Обязательные
-   - [ ] Все задачи из tasks.md выполнены
-   - [ ] Файлы созданы согласно описанию
-   - [ ] Интеграция с существующим кодом работает
-   - [ ] Автоматические тесты проходят
-   - [ ] Для code-step red зафиксирован до реализации
-   - [ ] Для code-step focused test стал green
-   - [ ] Для code-step relevant suite green после refactor
-   - [ ] Для non-code шага заполнен waiver
-   
-   ## Из project-analysis.md
-   - [ ] Модификации из "Файлы для модификации" выполнены
-   - [ ] Новые файлы из "Новые файлы" созданы
-   ```
-
-   **4.5. `planning-context.md` (обязательно):**
-
-   Использовать шаблон из `templates/feature/feature-planning-context-template.md`:
-
-   Скопировать содержимое шаблона и заполнить:
-   - Почему этот шаг
-   - Зависимости
-   - Покрываемые функции (P1/P2/P3 из project-analysis.md)
-   - Связанные артефакты
-   - Размер
-   - Ключевые решения
-
-5. **Обновление прогресса:**
-
-    Зарегистрируй шаг через:
-
-    ```bash
-    madspec memory register-step \
-      --stage feature.plan \
-      --step-id step-[NN]-[name] \
-      --step-kind <code|non-code> \
-      --covers F01 \
-      --covers F02 \
-      --depends-on step-01-...
-    ```
-
-    Для `non-code` шага обязательно добавь `--tdd-policy waived --waiver-reason "<причина>"` или `--tdd-policy not-applicable`.
-
-    Команда должна автоматически:
-    - сохранить `currentImplementStep` без изменений
-    - добавить шаг в `plannedSteps`
-    - обновить `stepStatus`
-    - обновить `stepMetadata`
-    - записать `coversFunctions`
-    - обновить `planningMetadata.stepDependencies`
-    - обновить `planningMetadata.lastPlannedStep`
-    - пересчитать `planningMetadata.progressMetrics`
-
-6. **Обновление implementation-plan.md:**
-
-   Добавь новый шаг в план:
-   ```markdown
-   ## Шаг [NN]: [Название]
-   
-   **Обоснование:** [из planning-context.md]
-   
-   **Задачи:** [кратко из tasks.md]
-   
-   **Тесты:** [кратко из tests.md]
-   ```
-
-7. **Визуализация прогресса:**
-
-   Выведи:
-   ```
-   Прогресс планирования:
-   P1 функции: [X/Y] покрыты ([Z%]) ████████░░
-   P2 функции: [A/B] покрыты ([C%]) ██████░░░░
-   P3 функции: [D/E] покрыты ([F%]) ████░░░░░░
-
-   Запланировано шагов: [N]
-   ```
-
-8. **Обновление project-context.md:**
-
-   ```markdown
-   ## Текущий этап
-   - **Этап**: `plan`
-   - **Статус**: Планирование в процессе
-   
-   ## Шаги реализации
-   - [N] запланировано, [M] завершено
-   
-   ## Прогресс
-   P1: [X/Y] | P2: [A/B] | P3: [D/E]
-   ```
-
-9. **Валидация шага:**
-
-- [ ] Описание понятно и связано с project-analysis.md
-- [ ] Задачи конкретные и выполнимые
-- [ ] Тесты определены, включая `Red` / `Green` / `Relevant Suite` или `Waiver`
-- [ ] Критерии завершения проверяемы
-- [ ] Зависимости учтены
-   - [ ] Шаг покрывает функцию из concept.md
-   - [ ] Файлы для модификации/создания из analysis учтены
-   - [ ] Размер шага адекватный
-
-10. **Отчет:**
-
-    - Путь к шагу: `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/`
-    - Номер и название шага
-    - Краткое описание
-    - Зависимости
-    - Прогресс планирования
-    - Вопрос: "Продолжить планирование следующего шага?"
-
-## Правила
-
-- **ИСПОЛЬЗУЙ** `project-analysis.md` как источник правды о функциях и точках интеграции
-- **РАЗБИВАЙ** на шаги на основе функций (P1/P2/P3) и связанных файлов
-- **УЧИТЫВАЙ** зависимости между файлами/модулями из analysis
-- **ГЕНЕРИРУЙ** один шаг за запуск
-- **ОБНОВЛЯЙ** progress.json после каждого шага
-- **НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ НЕ ИЗМЕНЯЙ** `currentImplementStep` в `progress.json` — это поле управляется другими командами
-
-## Структура шага
-
-Каждый шаг содержит:
-- `description.md` — что делаем + ссылки на analysis
-- `tasks.md` — файлы для модификации/создания
-- `tests.md` — тесты
-- `validation.md` — критерии завершения
-- `planning-context.md` — контекст решений
-
-## Выходные артефакты
-
-- `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/` — директория шага
-- `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/description.md` — описание шага
-- `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/tasks.md` — задачи шага
-- `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/tests.md` — тесты шага
-- `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/validation.md` — критерии завершения
-- `.madspec/feature/<feature-branch>/steps/step-[NN]-[name]/planning-context.md` — контекст планирования
-- `.madspec/feature/<feature-branch>/implementation-plan.md` — план реализации (обновляется)
-- `.madspec/feature/<feature-branch>/memory/progress.json` — прогресс планирования
-- `.madspec/feature/<feature-branch>/project-context.md` — обновленный контекст проекта
-
-## Следующий этап
-
-- Планирование завершено (все функции покрыты): `/madspec.feature.implement`
-- Планирование не завершено: запустить `/madspec.feature.plan` снова
+- `.madspec/<BRANCH>/memory/stages/feature.plan.json` содержит strategy и step catalog.
+- `progress.json` синхронизирован с `feature.plan.json`.
+- `implementation-plan.md` и `planning-context-cache.md` пересобраны автоматически.
+- Следующий executable step может быть запущен через `/madspec.feature.implement`.

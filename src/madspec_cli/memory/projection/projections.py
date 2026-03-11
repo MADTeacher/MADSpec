@@ -4,9 +4,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ..domain.progress import select_next_executable_step
 from ..stages.architecture.state import architecture_completeness_errors
 from ..stages.concept.state import concept_completeness_errors
 from ..stages.design.state import design_completeness_errors, missing_prototype_files, uncovered_design_features
+from ..stages.feature_init.state import feature_init_completeness_errors
+from ..stages.feature_plan.state import feature_plan_completeness_errors
 from ..stages.tech.state import tech_completeness_errors
 from ..stages.plan.state import plan_completeness_errors
 from ..shared.storage import read_jsonl
@@ -345,6 +348,73 @@ def build_plan_status(plan_state: dict[str, Any], *, progress: dict[str, Any]) -
             "next_actions": len(plan_state.get("nextActions", [])),
         },
         "coverage_snapshot": progress.get("planningMetadata", {}).get("progressMetrics", {}),
+        "last_checkpoint_summary": plan_state.get("checkpointSummary") or None,
+        "revision": plan_state.get("revision", 0),
+        "ratified_at": plan_state.get("ratifiedAt"),
+        "updated_at": plan_state.get("updatedAt"),
+    }
+
+
+def build_feature_init_status(feature_init_state: dict[str, Any]) -> dict[str, Any]:
+    missing_required_fields: list[str] = []
+    error_map = {
+        "feature init state must include a feature goal before checkpoint": "featureGoal",
+        "feature init state must include a problem before checkpoint": "problem",
+        "feature init state must include an expected outcome before checkpoint": "expectedOutcome",
+        "feature init state must include a framework before checkpoint": "projectAnalysis.framework",
+        "feature init state must include at least one feature before checkpoint": "features",
+        "feature init state must include integration file mappings before checkpoint": "projectAnalysis.integrationFiles",
+    }
+    for error in feature_init_completeness_errors(feature_init_state):
+        field_name = error_map.get(error)
+        if field_name and field_name not in missing_required_fields:
+            missing_required_fields.append(field_name)
+    analysis = feature_init_state.get("projectAnalysis", {})
+    return {
+        "is_complete": not missing_required_fields,
+        "missing_required_fields": missing_required_fields,
+        "counts": {
+            "p1_features": len(feature_init_state.get("features", {}).get("p1", [])),
+            "p2_features": len(feature_init_state.get("features", {}).get("p2", [])),
+            "p3_features": len(feature_init_state.get("features", {}).get("p3", [])),
+            "existing_modules": len(analysis.get("existingModules", [])),
+            "modified_files": len(analysis.get("modifiedFiles", [])),
+            "new_files": len(analysis.get("newFiles", [])),
+        },
+        "detected_stack": {
+            "project_type": analysis.get("projectType") or None,
+            "framework": analysis.get("framework") or None,
+        },
+        "integration_points_count": len(analysis.get("modifiedFiles", [])) + len(analysis.get("newFiles", [])),
+        "functions_by_priority": {
+            priority: [item.get("id", "") for item in feature_init_state.get("features", {}).get(priority, [])]
+            for priority in ("p1", "p2", "p3")
+        },
+        "last_checkpoint_summary": feature_init_state.get("checkpointSummary") or None,
+        "revision": feature_init_state.get("revision", 0),
+        "ratified_at": feature_init_state.get("ratifiedAt"),
+        "updated_at": feature_init_state.get("updatedAt"),
+    }
+
+
+def build_feature_plan_status(plan_state: dict[str, Any], *, progress: dict[str, Any]) -> dict[str, Any]:
+    missing_required_fields: list[str] = []
+    error_map = {
+        "feature plan state must include a plan overview before checkpoint": "planOverview",
+        "feature plan state must include at least one step before checkpoint": "stepCatalog",
+    }
+    for error in feature_plan_completeness_errors(plan_state):
+        field_name = error_map.get(error)
+        if field_name and field_name not in missing_required_fields:
+            missing_required_fields.append(field_name)
+    return {
+        "is_complete": not missing_required_fields,
+        "missing_required_fields": missing_required_fields,
+        "planned_steps": len(progress.get("plannedSteps", [])),
+        "completed_steps": len(progress.get("completedSteps", [])),
+        "coverage": progress.get("planningMetadata", {}).get("progressMetrics", {}),
+        "last_planned_step": progress.get("planningMetadata", {}).get("lastPlannedStep"),
+        "next_executable_step": select_next_executable_step(progress),
         "last_checkpoint_summary": plan_state.get("checkpointSummary") or None,
         "revision": plan_state.get("revision", 0),
         "ratified_at": plan_state.get("ratifiedAt"),

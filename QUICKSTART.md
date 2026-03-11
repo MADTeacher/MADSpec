@@ -19,9 +19,9 @@ madspec --help
 
 **Последовательность команд:**
 
-1. `madspec.feature.init "что добавить"` — анализ проекта + точки интеграции
-2. `madspec.feature.plan` — планирование шагов (повторять пока не спланируете все)
-3. `madspec.feature.implement` — реализация шагов (повторять пока не реализуете все)
+1. `madspec.feature.init "что добавить"` — анализ проекта и запись canonical state в `.madspec/<branch>/memory/stages/feature.init.json`
+2. `madspec.feature.plan` — планирование шагов через `.madspec/<branch>/memory/stages/feature.plan.json`
+3. `madspec.feature.implement` — реализация шагов через runtime memory workflow (`progress.json`, `active-session.json`, step records)
 4. `madspec.deploy` — подготовка к деплою (опционально)
 5. `madspec.review` — проверка качества (опционально)
 6. `madspec.security` — проверка безопасности (опционально)
@@ -49,19 +49,19 @@ madspec --help
 madspec.feature.init "система платежей через Stripe"
 ```
 
-Что происходит: анализ структуры проекта → определение точек интеграции → генерация артефактов
+Что происходит: анализ структуры проекта → запись canonical feature-init state → автогенерация `project-analysis.md`, `feature-context.md`, `tech-stack.md`, `architecture.md`
 
 **Шаг 2: Спланируйте шаги**
 ```bash
 madspec.feature.plan
 ```
-Повторяйте пока не спланируете всю функциональность.
+Повторяйте, пока не заполните `feature.plan.json` и не покроете все нужные function IDs.
 
 **Шаг 3: Реализуйте**
 ```bash
 madspec.feature.implement
 ```
-Повторяйте пока не реализуете всю функциональность.
+Повторяйте через `memory retrieve/start-step/checkpoint-step/complete-step`, пока не реализуете всю функциональность.
 
 ## Все команды
 
