@@ -109,7 +109,7 @@ def parse_navigation_value(value: str) -> dict[str, str] | None:
 
 
 def parse_screen_data_value(value: str) -> dict[str, str] | None:
-    parts = [segment.strip() for segment in value.split("::", 2)]
+    parts = [segment.strip() for segment in value.split("::")]
     if len(parts) != 3:
         return None
     screen_id = normalize_identifier(parts[0])

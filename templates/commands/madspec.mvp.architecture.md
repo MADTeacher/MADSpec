@@ -30,6 +30,7 @@ $ARGUMENTS
 - В обычных ходах диалога опирайся на `architecture_status`: каких обязательных полей не хватает, сколько уже есть директорий, сущностей, endpoint'ов и есть ли reference errors.
 - Полный `artifact_state.architecture` запрашивай только перед финальной валидацией, итоговым обзором и `checkpoint`, используя `madspec memory retrieve --stage mvp.architecture --json-output --full-artifact`.
 - По мере согласования структуры проекта, модели данных, API-контрактов, интеграций и архитектурных принципов фиксируй их через `madspec memory capture --stage mvp.architecture ...`, а не откладывай в финальный checkpoint.
+- Считай `screen.data` из design-state списком логических field id: если нужно описать поле, держи описание в UI/design narrative или в `--endpoint-field`, а не в `--screen-data`.
 - Для architecture-specific canonical state используй stage-specific flags:
   - `--architecture-overview`
   - `--project-structure <strategy::rationale>`
@@ -149,6 +150,7 @@ $ARGUMENTS
 
 8. **Сохранение артефактов**:
    - Не записывай `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/data-model.md` и `.madspec/<BRANCH>/contracts/openapi.yaml` вручную: они должны быть пересобраны из structured memory.
+   - Не редактируй `.madspec/<BRANCH>/memory/stages/mvp.architecture.json` вручную, даже если validation кажется ложным: исправляй canonical state только через memory CLI.
    - Убедись, что `project-context.md` был пересобран командой `madspec memory checkpoint`.
 
 ## Правила

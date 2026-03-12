@@ -168,8 +168,10 @@ Structured memory:
 - Если меняешь или документируешь CLI-поведение, сверяйся с текущим `README.md`, `AGENTS.md` и шаблонами команд
 - Для `mvp.concept` используй краткий `madspec memory retrieve --json-output` в обычных ходах диалога, `--include-history` только при явной необходимости, а `--full-artifact` только перед финальной валидацией, итоговым обзором и `checkpoint`
 - Для `mvp.design` в начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.design --json-output`, затем сверяй `ui-design.md` и файлы в `ui-prototype/`; не считай дизайн завершенным, пока пользователь явно не утвердил текущее состояние
+- Для `mvp.design` у `--screen-data` используй только логический field id в формате `<screen-id>::<displayed|input>::<name>`; не добавляй туда описания и дополнительные `::` сегменты
 - Для `mvp.architecture` в обычных ходах используй `madspec memory retrieve --stage mvp.architecture --json-output` и опирайся на `architecture_status`; `--full-artifact` запрашивай только перед итоговой валидацией и `checkpoint`
 - Для `mvp.architecture` у `--endpoint-field` секция `response` допустима как shorthand для `response:200`; если нужен конкретный статус ответа, используй `response:<status>`
+- Если архитектурная валидация выглядит ложной, не редактируй `.madspec/<branch>/memory/stages/*.json` вручную: сначала проверь `screen.data` и `endpoint-field`, затем исправляй state только через `madspec memory capture`/`checkpoint`
 - Для `mvp.plan` в обычных ходах используй `madspec memory retrieve --stage mvp.plan --json-output` и опирайся на `plan_status`; `--full-artifact` запрашивай только перед итоговой валидацией и `checkpoint`
 - Для `mvp.implement` в начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.implement --json-output`, затем запускай шаг через `madspec memory start-step`; после завершения TDD-цикла проверяй итог повторным `retrieve`, а `implementation-context.md` используй только как generated summary
 - Если менялись HTML/CSS-прототипы, проверь, не устарели ли `ui-design.md`, навигационное описание, user flows, coverage функций и ссылки на prototype-файлы

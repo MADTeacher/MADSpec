@@ -201,7 +201,10 @@ def parse_design_capture(
     for value in normalize_text_list(screen_data):
         parsed = parse_screen_data_value(value)
         if parsed is None:
-            errors.append(f"screen-data must use '<screen-id>::<displayed|input>::<name>' format: {value}")
+            errors.append(
+                "screen-data must use '<screen-id>::<displayed|input>::<name>' format "
+                f"with a field identifier only (no extra '::' segments): {value}"
+            )
             continue
         screen_data_updates.append(parsed)
 

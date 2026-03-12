@@ -25,6 +25,7 @@ from .shared import (
     ENDPOINT_FIELD_SECTIONS,
     SUPPORTED_API_STYLE,
     append_unique_dicts as _append_unique_dicts,
+    canonical_field_reference as _canonical_field_reference,
     append_unique_strings,
     normalize_endpoint_sections as _normalize_endpoint_sections,
     normalize_identifier as _normalize_identifier,
@@ -696,24 +697,24 @@ def architecture_reference_errors(state: dict[str, Any], *, design_state: dict[s
         if not linked:
             continue
         request_fields = {
-            _normalize_name_key(field.get("name", ""))
+            _canonical_field_reference(field.get("name", ""))
             for endpoint in linked
             for field in endpoint.get("fields", [])
             if field.get("section", "") in ENDPOINT_FIELD_SECTIONS
         }
         response_fields = {
-            _normalize_name_key(field.get("name", ""))
+            _canonical_field_reference(field.get("name", ""))
             for endpoint in linked
             for field in endpoint.get("fields", [])
             if str(field.get("section", "")).startswith("response:")
         }
         for data_kind in FLOW_DATA_KINDS:
             for name in screen.get("data", {}).get(data_kind, []):
-                if data_kind == "input" and _normalize_name_key(name) not in request_fields:
+                if data_kind == "input" and _canonical_field_reference(name) not in request_fields:
                     errors.append(
                         f"architecture screen '{screen_id}' input '{name}' is missing from linked endpoint request fields"
                     )
-                if data_kind == "displayed" and _normalize_name_key(name) not in response_fields:
+                if data_kind == "displayed" and _canonical_field_reference(name) not in response_fields:
                     errors.append(
                         f"architecture screen '{screen_id}' displayed field '{name}' is missing from linked endpoint response fields"
                     )

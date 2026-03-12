@@ -41,6 +41,8 @@
 - `madspec memory capture --stage mvp.architecture ...`
 - `madspec memory checkpoint --stage mvp.architecture --summary ...`
 
+Связанное правило из `mvp.design`: `--screen-data` хранит только логический field id в формате `<screen-id>::<displayed|input>::<name>`. Не записывай туда описания и дополнительные `::` сегменты.
+
 Ключевые flags:
 
 - `--architecture-overview`
@@ -160,6 +162,7 @@ flowchart LR
 - `screen.data.displayed` не отражен в response fields
 - `--project-structure` передан без разделителя `::`; используй формат `<strategy>::<rationale>`, например `feature-first::Keep bot-connection, workspace, and publish-log isolated by capability`
 - Для `--endpoint-field` секция `response` допустима как shorthand для `response:200`; для явных кодов ответа используй `response:<status>`
+- Не редактируй `.madspec/<BRANCH>/memory/stages/mvp.architecture.json` вручную, даже если validation кажется ложным: исправляй state только через memory CLI
 - `architecture.md` и `openapi.yaml` редактируются вручную
 
 ## Соседние команды и handoff

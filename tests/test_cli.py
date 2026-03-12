@@ -1840,6 +1840,92 @@ def test_memory_capture_architecture_accepts_response_alias_and_cleans_reject_me
     assert "capability" in rejected_capture.stdout
 
 
+def test_memory_capture_rejects_screen_data_with_extra_segments(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.design",
+            "--screen-data",
+            "publish-log::displayed::publish-events::extra",
+        ],
+    )
+
+    assert result.exit_code == 1, result.stdout
+    assert "Capture rejected. Fix the validation errors below." in result.stdout
+    assert "screen-data must use '<screen-id>::<displayed|input>::<name>' format" in result.stdout
+    assert "field identifier only" in result.stdout
+
+
+def test_memory_checkpoint_shows_validation_reject_without_allowed_stages(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.architecture",
+            "--summary",
+            "Ratify incomplete architecture state",
+        ],
+    )
+
+    assert result.exit_code == 1, result.stdout
+    assert "Checkpoint rejected. Fix the validation errors below." in result.stdout
+    assert "Allowed stages:" not in result.stdout
+    assert "architecture state must include an architecture overview before checkpoint" in result.stdout
+
+
+def test_memory_checkpoint_invalid_stage_still_shows_allowed_stages(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.fake",
+            "--summary",
+            "Invalid stage",
+        ],
+    )
+
+    assert result.exit_code == 1, result.stdout
+    assert "Checkpoint rejected. Allowed stages:" in result.stdout
+    assert "stage must be one of:" in result.stdout
+
+
 def test_git_current_branch_uses_config_fallback_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".madspec").mkdir()

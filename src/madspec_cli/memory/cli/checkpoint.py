@@ -66,8 +66,13 @@ def memory_checkpoint(
         )
         return
 
-    console.print("[red]Checkpoint rejected.[/red] " f"Allowed stages: {', '.join(sorted(CHECKPOINT_STAGES))}")
-    for error in payload.get("errors", []):
+    errors = payload.get("errors", [])
+    show_allowed_stages = any(error.startswith("stage must be one of:") for error in errors)
+    if show_allowed_stages:
+        console.print("[red]Checkpoint rejected.[/red] " f"Allowed stages: {', '.join(sorted(CHECKPOINT_STAGES))}")
+    else:
+        console.print("[red]Checkpoint rejected.[/red] Fix the validation errors below.")
+    for error in errors:
         console.print(f"[red]- {error}[/red]")
     raise typer.Exit(1)
 

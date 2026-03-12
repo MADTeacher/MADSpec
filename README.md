@@ -321,6 +321,8 @@ madspec memory promote [--branch <name>] [--json-output]
 madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-output]
 ```
 
+For `mvp.design`, `--screen-data` stores only the logical field identifier in `<screen-id>::<displayed|input>::<name>` format. Do not append descriptions or extra `::` segments there.
+
 For `mvp.architecture`, `--endpoint-field` accepts `path`, `query`, `request`, `response`, and `response:<status>` sections. Bare `response` is stored as `response:200`.
 
 **Назначение команд:**
@@ -452,6 +454,7 @@ madspec version
 **Особенности:**
 - Каноническое состояние этапа хранится в `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`
 - `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/data-model.md` и `.madspec/<BRANCH>/contracts/openapi.yaml` пересобираются из structured memory и не редактируются вручную как источник истины
+- `screen.data` в design-state хранит только логические field id; описания полей остаются в UI/design narrative и API-контрактах, а не в `--screen-data`
 - `madspec memory retrieve --stage mvp.architecture` по умолчанию возвращает краткий `architecture_status`, а полный `artifact_state.architecture` следует запрашивать только через `--full-artifact`
 - Обязательный checkpoint через `madspec memory checkpoint --stage mvp.architecture`
 - Архитектурные решения, модель данных и inventory контрактов фиксируются в typed stage-state и semantic memory до регенерации `project-context.md`
@@ -690,6 +693,8 @@ Pragmatic security/privacy audit текущего change set, codebase и branch
 Для `mvp.design` повторные `capture/checkpoint` циклы до перехода в `mvp.tech` считаются нормальным сценарием: дизайн можно дорабатывать итеративно и продолжать в новых чатах, пока пользователь явно не утвердит текущее состояние интерфейса.
 
 Для `mvp.architecture` действует тот же memory-first принцип: структура проекта, сущности, поля, связи, endpoint'ы, интеграции и архитектурные принципы сначала пишутся в `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` являются generated views.
+
+Не редактируй `.madspec/<BRANCH>/memory/stages/*.json` вручную, даже если validation кажется ложным. Исправляй canonical state только через `madspec memory capture`, `madspec memory checkpoint` и `madspec memory consolidate`.
 
 Для `mvp.plan` действует тот же memory-first принцип: стратегия реализации, planning principles и catalog шагов сначала пишутся в `.madspec/<BRANCH>/memory/stages/mvp.plan.json`, а `implementation-plan.md` и `planning-context-cache.md` являются generated views. При этом `progress.json` остается runtime-state для `plannedSteps/completedSteps/currentImplementStep/TDD`.
 

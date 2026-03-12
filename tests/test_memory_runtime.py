@@ -27,6 +27,7 @@ from madspec_cli.memory.implementation import (
     complete_implementation_step,
     start_implementation_step,
 )
+from madspec_cli.memory.stages.architecture.state import architecture_reference_errors
 
 
 def _step_status(
@@ -1711,6 +1712,173 @@ def test_capture_architecture_response_alias_satisfies_displayed_field_coverage(
     assert retrieved["architecture_status"]["missing_required_fields"] == []
     assert retrieved["architecture_status"]["reference_errors"] == []
     assert retrieved["architecture_status"]["is_complete"] is True
+
+
+def test_architecture_reference_errors_ignore_screen_data_labels_after_separator() -> None:
+    polluted_design_state = {
+        "schemaVersion": 1,
+        "designOverview": "Polluted design state from an earlier session.",
+        "createdAt": "2026-03-12T00:00:00Z",
+        "ratifiedAt": None,
+        "updatedAt": "2026-03-12T00:00:00Z",
+        "revision": 0,
+        "platforms": ["Web"],
+        "zones": [],
+        "screens": [
+            {
+                "id": "publish-log",
+                "title": "Publish log",
+                "zone": "operations",
+                "purpose": "Inspect publish attempts",
+                "prototype": ".madspec/main/ui-prototype/publish-log.html",
+                "platforms": [],
+                "covers": {"p1": [], "p2": [], "p3": ["Publish log"]},
+                "data": {
+                    "displayed": [
+                        "publish-events::Хронологический список попыток публикации с временем, статусом и сообщением Bot API."
+                    ],
+                    "input": [],
+                },
+            }
+        ],
+        "flows": [],
+        "navigation": [],
+        "platformConstraints": [],
+        "nextActions": [],
+        "checkpointSummary": "",
+    }
+    architecture_state = {
+        "architectureOverview": "Backend-first Telegram publishing architecture with feature-first modules.",
+        "projectStructure": {
+            "strategy": "feature-first",
+            "rationale": "Keep publish-log isolated by capability",
+            "directories": [{"path": "src/features/publish-log", "purpose": "Publish attempt history"}],
+        },
+        "dataModel": {
+            "entities": [
+                {
+                    "name": "PublishEvent",
+                    "description": "Attempt to publish a post",
+                    "fields": [{"name": "status", "type": "string", "required": True, "description": "Attempt status"}],
+                    "relationships": [],
+                    "states": [],
+                }
+            ]
+        },
+        "contracts": {
+            "apiStyle": "rest-openapi",
+            "endpoints": [
+                {
+                    "operationId": "listpublishevents",
+                    "method": "GET",
+                    "path": "/api/publish-events",
+                    "summary": "Load publish history",
+                    "screenIds": ["publish-log"],
+                    "fields": [
+                        {
+                            "section": "response:200",
+                            "name": "publish-events",
+                            "type": "array",
+                            "required": True,
+                            "description": "Chronological list of publish attempts",
+                        }
+                    ],
+                    "errors": [],
+                }
+            ],
+        },
+        "codePrinciples": ["Keep handlers thin."],
+        "patterns": [],
+        "integrations": [],
+        "securityNotes": [],
+        "performanceNotes": [],
+        "nextActions": [],
+    }
+
+    errors = architecture_reference_errors(architecture_state, design_state=polluted_design_state)
+
+    assert errors == []
+
+
+def test_architecture_reference_errors_match_unicode_field_names() -> None:
+    design_state = {
+        "schemaVersion": 1,
+        "designOverview": "Unicode field names should match.",
+        "createdAt": "2026-03-12T00:00:00Z",
+        "ratifiedAt": None,
+        "updatedAt": "2026-03-12T00:00:00Z",
+        "revision": 0,
+        "platforms": ["Web"],
+        "zones": [],
+        "screens": [
+            {
+                "id": "profile",
+                "title": "Profile",
+                "zone": "settings",
+                "purpose": "Review current profile state",
+                "prototype": ".madspec/main/ui-prototype/profile.html",
+                "platforms": [],
+                "covers": {"p1": [], "p2": ["Profile"], "p3": []},
+                "data": {"displayed": ["статус-публикации"], "input": []},
+            }
+        ],
+        "flows": [],
+        "navigation": [],
+        "platformConstraints": [],
+        "nextActions": [],
+        "checkpointSummary": "",
+    }
+    architecture_state = {
+        "architectureOverview": "Unicode-safe contract matching.",
+        "projectStructure": {
+            "strategy": "feature-first",
+            "rationale": "Keep profile isolated by capability",
+            "directories": [{"path": "src/features/profile", "purpose": "Profile screens"}],
+        },
+        "dataModel": {
+            "entities": [
+                {
+                    "name": "Profile",
+                    "description": "Profile aggregate",
+                    "fields": [{"name": "id", "type": "uuid", "required": True, "description": "Primary id"}],
+                    "relationships": [],
+                    "states": [],
+                }
+            ]
+        },
+        "contracts": {
+            "apiStyle": "rest-openapi",
+            "endpoints": [
+                {
+                    "operationId": "getprofile",
+                    "method": "GET",
+                    "path": "/api/profile",
+                    "summary": "Load current profile",
+                    "screenIds": ["profile"],
+                    "fields": [
+                        {
+                            "section": "response:200",
+                            "name": "статус публикации",
+                            "type": "string",
+                            "required": True,
+                            "description": "Current publication status",
+                        }
+                    ],
+                    "errors": [],
+                }
+            ],
+        },
+        "codePrinciples": ["Keep handlers thin."],
+        "patterns": [],
+        "integrations": [],
+        "securityNotes": [],
+        "performanceNotes": [],
+        "nextActions": [],
+    }
+
+    errors = architecture_reference_errors(architecture_state, design_state=design_state)
+
+    assert errors == []
 
 
 def test_validate_detects_out_of_sync_generated_architecture_artifacts(tmp_path: Path) -> None:

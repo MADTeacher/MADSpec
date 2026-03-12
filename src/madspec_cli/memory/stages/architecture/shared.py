@@ -28,6 +28,16 @@ def normalize_name_key(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", normalized)
 
 
+def canonical_field_reference(value: Any) -> str:
+    normalized = normalize_string(value)
+    if not normalized:
+        return ""
+    canonical = normalized.split("::", 1)[0].strip().casefold()
+    if not canonical:
+        return ""
+    return "".join(char for char in canonical if char.isalnum())
+
+
 def normalize_required_flag(value: Any) -> bool:
     if isinstance(value, bool):
         return value
