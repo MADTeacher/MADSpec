@@ -1624,6 +1624,95 @@ def test_architecture_stage_retrieve_returns_status_and_full_artifact(tmp_path: 
     assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
 
 
+def test_capture_architecture_response_alias_satisfies_displayed_field_coverage(tmp_path: Path) -> None:
+    paths = _bootstrap_project(tmp_path)
+    _seed_concept_for_design(paths)
+    _write_design_prototypes(paths)
+
+    capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.design",
+        design_overview="A Telegram publishing workspace with editing and event monitoring.",
+        platforms=["Web"],
+        zones=[
+            "settings::Settings::Bot setup and verification",
+            "operations::Operations::Post editing and publish monitoring",
+        ],
+        screens=[
+            "bot-connection::Bot connection::settings::.madspec/main/ui-prototype/index.html::Configure bot token and target channel",
+            "workspace-main::Workspace main::operations::.madspec/main/ui-prototype/schedule-board.html::Edit and preview the current post",
+            "publish-log::Publish log::operations::.madspec/main/ui-prototype/export-hub.html::Review publish attempts",
+        ],
+        screen_features=[
+            "bot-connection::p1::Booking workflow",
+            "workspace-main::p2::Profile studio",
+            "publish-log::p3::Export hub",
+        ],
+        flows=["publish-post::Publish post::Prepare and send a post to Telegram"],
+        flow_steps=[
+            "publish-post::bot-connection::Verify bot::Confirm Telegram access works",
+            "publish-post::workspace-main::Edit post::Prepare post content",
+            "publish-post::publish-log::Review result::Inspect publish attempt history",
+        ],
+        screen_data=[
+            "bot-connection::displayed::is_verified",
+            "workspace-main::displayed::post-core",
+            "publish-log::displayed::publish-events",
+            "workspace-main::input::content_blocks",
+        ],
+        status="validated",
+    )
+
+    captured = capture_stage_memory(
+        paths["branch_dir"].parents[1],
+        "main",
+        "mvp.architecture",
+        architecture_overview="Backend-first Telegram publishing architecture with feature-first modules.",
+        project_structure="feature-first::Keep bot-connection, workspace, and publish-log isolated by capability",
+        directories=[
+            "src/features/bot-connection::Bot setup and verification logic",
+            "src/features/workspace::Post editing and publishing logic",
+            "src/features/publish-log::Publish attempt history",
+        ],
+        entities=[
+            "Post::Draft or published content item",
+            "PublishEvent::Attempt to publish a post",
+        ],
+        entity_fields=[
+            "Post::id::uuid::required::Primary post identifier",
+            "Post::content_blocks::json::required::Structured post content",
+            "PublishEvent::id::uuid::required::Primary event identifier",
+            "PublishEvent::status::string::required::Latest publish attempt status",
+        ],
+        endpoints=[
+            "getBotConfig::GET::/api/bot-config::Load current bot settings",
+            "getPost::GET::/api/posts/{post_id}::Load a post for editing",
+            "listPublishEvents::GET::/api/publish-log::Load publish history",
+        ],
+        endpoint_screens=[
+            "getBotConfig::bot-connection",
+            "getPost::workspace-main",
+            "listPublishEvents::publish-log",
+        ],
+        endpoint_fields=[
+            "getBotConfig::response::is_verified::boolean::required::Bot API verification status",
+            "getPost::path::post_id::uuid::required::Post identifier",
+            "getPost::request::content_blocks::json::required::Structured post content",
+            "getPost::response::post-core::object::required::Core post data for the editor and preview",
+            "listPublishEvents::response::publish-events::array::required::Chronological list of publish attempts",
+        ],
+        code_principles=["Keep HTTP handlers thin and move Telegram rules into feature services."],
+        status="validated",
+    )
+    retrieved = retrieve_memory_context(paths["branch_dir"].parents[1], "main", "mvp.architecture")
+
+    assert captured["accepted"] is True
+    assert retrieved["architecture_status"]["missing_required_fields"] == []
+    assert retrieved["architecture_status"]["reference_errors"] == []
+    assert retrieved["architecture_status"]["is_complete"] is True
+
+
 def test_validate_detects_out_of_sync_generated_architecture_artifacts(tmp_path: Path) -> None:
     paths = _bootstrap_project(tmp_path)
     _seed_concept_for_design(paths)

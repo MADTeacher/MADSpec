@@ -40,7 +40,7 @@ $ARGUMENTS
   - `--entity-state <entity::state::description>`
   - `--endpoint <operation-id::METHOD::/path::summary>`
   - `--endpoint-screen <operation-id::screen-id>`
-  - `--endpoint-field <operation-id::section::name::type::required|optional::description>`
+  - `--endpoint-field <operation-id::section::name::type::required|optional::description>` where `section` is `path`, `query`, `request`, `response`, or `response:<status>`
   - `--endpoint-error <operation-id::status::code::description>`
   - `--integration <name::kind::purpose::touchpoints>`
   - `--code-principle`
@@ -109,6 +109,7 @@ $ARGUMENTS
    - Для каждого пользовательского действия из прототипов фиксируй endpoint через `--endpoint`.
    - Для связи endpoint ↔ экран используй `--endpoint-screen`.
    - Для request/path/query/response полей используй `--endpoint-field`.
+   - `response` можно использовать как shorthand для `response:200`, а `response:<status>` оставляй для явных кодов ответа.
    - Для ошибок используй `--endpoint-error`.
    - **КРИТИЧНО**: не создавай endpoint'ы, которых нет в дизайне и прототипах.
 

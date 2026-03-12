@@ -55,6 +55,8 @@ def normalize_endpoint_sections(value: Any) -> str:
     normalized = normalize_string(value).lower()
     if normalized in ENDPOINT_FIELD_SECTIONS:
         return normalized
+    if normalized == "response":
+        return "response:200"
     if normalized.startswith("response:") and len(normalized) > len("response:"):
         return normalized
     return ""

@@ -48,6 +48,8 @@ from ..stages.tech.state import (
 )
 from .shared import normalize_text_list
 
+ENDPOINT_FIELD_SECTION_HINT = "path|query|request|response|response:<status>"
+
 
 @dataclass(frozen=True)
 class ConceptCaptureParse:
@@ -365,7 +367,10 @@ def parse_architecture_capture(
     if project_structure:
         parsed_project_structure = parse_project_structure_value(project_structure)
         if parsed_project_structure is None:
-            errors.append("project-structure must use '<strategy>::<rationale>' format")
+            errors.append(
+                "project-structure must use '<strategy>::<rationale>' format, for example: "
+                "feature-first::Keep bot-connection, workspace, and publish-log isolated by capability"
+            )
 
     for value in normalize_text_list(directories):
         parsed = parse_directory_value(value)
@@ -424,7 +429,9 @@ def parse_architecture_capture(
         parsed = parse_endpoint_field_value(value)
         if parsed is None:
             errors.append(
-                f"endpoint-field must use '<operation-id>::<section>::<name>::<type>::<required|optional>::<description>' format: {value}"
+                "endpoint-field must use "
+                f"'<operation-id>::<section>::<name>::<type>::<required|optional>::<description>' format "
+                f"where <section> is {ENDPOINT_FIELD_SECTION_HINT}: {value}"
             )
             continue
         endpoint_field_updates.append(parsed)

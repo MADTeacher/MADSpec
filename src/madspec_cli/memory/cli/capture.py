@@ -63,7 +63,7 @@ def memory_capture(
     entity_state: list[str] = typer.Option(None, "--entity-state", help="Architecture-only: entity state in '<entity>::<state>::<description>' format; repeat for multiple values"),
     endpoint: list[str] = typer.Option(None, "--endpoint", help="Architecture-only: endpoint in '<operation-id>::<METHOD>::</path>::<summary>' format; repeat for multiple values"),
     endpoint_screen: list[str] = typer.Option(None, "--endpoint-screen", help="Architecture-only: endpoint to screen link in '<operation-id>::<screen-id>' format; repeat for multiple values"),
-    endpoint_field: list[str] = typer.Option(None, "--endpoint-field", help="Architecture-only: endpoint field in '<operation-id>::<section>::<name>::<type>::<required|optional>::<description>' format; repeat for multiple values"),
+    endpoint_field: list[str] = typer.Option(None, "--endpoint-field", help="Architecture-only: endpoint field in '<operation-id>::<section>::<name>::<type>::<required|optional>::<description>' format where <section> is path, query, request, response, or response:<status>; repeat for multiple values"),
     endpoint_error: list[str] = typer.Option(None, "--endpoint-error", help="Architecture-only: endpoint error in '<operation-id>::<status>::<code>::<description>' format; repeat for multiple values"),
     integration: list[str] = typer.Option(None, "--integration", help="Architecture-only: integration in '<name>::<kind>::<purpose>::<touchpoints>' format; repeat for multiple values"),
     code_principle: list[str] = typer.Option(None, "--code-principle", help="Architecture-only: code principle; repeat for multiple values"),
@@ -196,8 +196,13 @@ def memory_capture(
         )
         return
 
-    console.print("[red]Capture rejected.[/red] " f"Allowed stages: {', '.join(sorted(CAPTURE_STAGES))}")
-    for error in payload.get("errors", []):
+    errors = payload.get("errors", [])
+    show_allowed_stages = any(error.startswith("stage must be one of:") for error in errors)
+    if show_allowed_stages:
+        console.print("[red]Capture rejected.[/red] " f"Allowed stages: {', '.join(sorted(CAPTURE_STAGES))}")
+    else:
+        console.print("[red]Capture rejected.[/red] Fix the validation errors below.")
+    for error in errors:
         console.print(f"[red]- {error}[/red]")
     raise typer.Exit(1)
 

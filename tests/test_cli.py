@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 import madspec_cli as cli
 from madspec_cli.features.init.infrastructure import initializer_core
 from madspec_cli.memory import append_jsonl, get_memory_paths, make_record
+from madspec_cli.memory.stages.architecture.parsers import parse_endpoint_field_value
 
 
 runner = CliRunner()
@@ -206,6 +207,31 @@ def test_memory_commands_support_validation_and_retrieve_json(tmp_path: Path, mo
     assert next_step_select.exit_code == 0, next_step_select.stdout
     next_step_payload = json.loads(next_step_select.stdout)
     assert next_step_payload["selected_step"] == "step-02-auth-flow"
+
+
+def test_parse_endpoint_field_accepts_response_alias() -> None:
+    parsed = parse_endpoint_field_value(
+        "get-bot-config::response::is_verified::boolean::required::Bot API verification status"
+    )
+
+    assert parsed == {
+        "operationId": "get-bot-config",
+        "field": {
+            "section": "response:200",
+            "name": "is_verified",
+            "type": "boolean",
+            "required": True,
+            "description": "Bot API verification status",
+        },
+    }
+
+
+def test_parse_endpoint_field_rejects_incomplete_response_status() -> None:
+    parsed = parse_endpoint_field_value(
+        "get-bot-config::response:::boolean::required::Bot API verification status"
+    )
+
+    assert parsed is None
 
 
 def test_memory_register_step_updates_progress_and_views(tmp_path: Path, monkeypatch) -> None:
@@ -1623,6 +1649,195 @@ def test_memory_implementation_commands_drive_step_lifecycle(tmp_path: Path, mon
     assert retrieve_payload["step"]["status"]["status"] == "completed"
     assert retrieve_payload["step"]["status"]["tddPhase"] == "completed"
     assert retrieve_payload["semantic"]["facts"][0]["summary"] == "Authentication persists session data"
+
+
+def test_memory_capture_architecture_accepts_response_alias_and_cleans_reject_message(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    branch_name = "main"
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": branch_name, "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    init_result = runner.invoke(cli.app, ["memory", "init", "--branch", branch_name])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    ui_dir = project_path / ".madspec" / branch_name / "ui-prototype"
+    ui_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("index.html", "workspace-main.html", "publish-log.html"):
+        (ui_dir / name).write_text(f"<html><body>{name}</body></html>\n", encoding="utf-8")
+
+    concept_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.concept",
+            "--project-name",
+            "Telegram CRM",
+            "--system-overview",
+            "Manage bot settings, posts, and publish events from one workspace.",
+            "--audience",
+            "Content managers",
+            "--scenario",
+            "Review post content and publish it to Telegram channels",
+            "--pain",
+            "Telegram publishing is fragmented across manual tools",
+            "--feature-p1",
+            "Bot connection::Configure the bot token and channel",
+            "--feature-p2",
+            "Workspace::Create and edit posts",
+            "--feature-p3",
+            "Publish log::Review publish attempts",
+            "--json-output",
+        ],
+    )
+    assert concept_capture.exit_code == 0, concept_capture.stdout
+
+    design_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.design",
+            "--design-overview",
+            "A workspace-first Telegram publishing UI.",
+            "--platform",
+            "Web",
+            "--zone",
+            "settings::Settings::Bot setup and verification",
+            "--zone",
+            "operations::Operations::Post editing and monitoring",
+            "--screen",
+            "bot-connection::Bot connection::settings::.madspec/main/ui-prototype/index.html::Configure bot token and target channel",
+            "--screen",
+            "workspace-main::Workspace main::operations::.madspec/main/ui-prototype/workspace-main.html::Edit and preview a post",
+            "--screen",
+            "publish-log::Publish log::operations::.madspec/main/ui-prototype/publish-log.html::Inspect publish attempts",
+            "--screen-feature",
+            "bot-connection::p1::Bot connection",
+            "--screen-feature",
+            "workspace-main::p2::Workspace",
+            "--screen-feature",
+            "publish-log::p3::Publish log",
+            "--flow",
+            "publish-post::Publish post::Prepare and send a post to Telegram",
+            "--flow-step",
+            "publish-post::bot-connection::Verify bot::Confirm Telegram access works",
+            "--flow-step",
+            "publish-post::workspace-main::Edit post::Prepare post content for sending",
+            "--flow-step",
+            "publish-post::publish-log::Review log::Inspect the publish attempt result",
+            "--screen-data",
+            "bot-connection::displayed::is_verified",
+            "--screen-data",
+            "workspace-main::displayed::post-core",
+            "--screen-data",
+            "publish-log::displayed::publish-events",
+            "--screen-data",
+            "workspace-main::input::content_blocks",
+            "--json-output",
+        ],
+    )
+    assert design_capture.exit_code == 0, design_capture.stdout
+
+    architecture_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.architecture",
+            "--architecture-overview",
+            "Backend-first Telegram publishing architecture with feature-first modules.",
+            "--project-structure",
+            "feature-first::Keep bot-connection, workspace, and publish-log isolated by capability",
+            "--directory",
+            "src/features/bot-connection::Bot setup and verification logic",
+            "--directory",
+            "src/features/workspace::Post editing and publishing logic",
+            "--directory",
+            "src/features/publish-log::Publish attempt history",
+            "--entity",
+            "Post::Draft or published content item",
+            "--entity-field",
+            "Post::id::uuid::required::Primary post identifier",
+            "--entity-field",
+            "Post::content_blocks::json::required::Structured post content",
+            "--entity",
+            "PublishEvent::Attempt to publish a post",
+            "--entity-field",
+            "PublishEvent::id::uuid::required::Primary event identifier",
+            "--entity-field",
+            "PublishEvent::status::string::required::Latest publish attempt status",
+            "--endpoint",
+            "getBotConfig::GET::/api/bot-config::Load current bot settings",
+            "--endpoint-screen",
+            "getBotConfig::bot-connection",
+            "--endpoint-field",
+            "getBotConfig::response::is_verified::boolean::required::Bot API verification status",
+            "--endpoint",
+            "getPost::GET::/api/posts/{post_id}::Load a post for editing",
+            "--endpoint-screen",
+            "getPost::workspace-main",
+            "--endpoint-field",
+            "getPost::path::post_id::uuid::required::Post identifier",
+            "--endpoint-field",
+            "getPost::request::content_blocks::json::required::Structured post content",
+            "--endpoint-field",
+            "getPost::response::post-core::object::required::Core post data for the editor and preview",
+            "--endpoint",
+            "listPublishEvents::GET::/api/publish-log::Load publish history",
+            "--endpoint-screen",
+            "listPublishEvents::publish-log",
+            "--endpoint-field",
+            "listPublishEvents::response::publish-events::array::required::Chronological list of publish attempts",
+            "--code-principle",
+            "Keep HTTP handlers thin and move Telegram rules into feature services.",
+            "--json-output",
+        ],
+    )
+    assert architecture_capture.exit_code == 0, architecture_capture.stdout
+
+    retrieve_result = runner.invoke(
+        cli.app,
+        ["memory", "retrieve", "--branch", branch_name, "--stage", "mvp.architecture", "--json-output"],
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["architecture_status"]["missing_required_fields"] == []
+    assert retrieve_payload["architecture_status"]["reference_errors"] == []
+    assert retrieve_payload["architecture_status"]["is_complete"] is True
+
+    rejected_capture = runner.invoke(
+        cli.app,
+        [
+            "memory",
+            "capture",
+            "--branch",
+            branch_name,
+            "--stage",
+            "mvp.architecture",
+            "--project-structure",
+            "backend-first mono-repo without separator",
+        ],
+    )
+    assert rejected_capture.exit_code == 1, rejected_capture.stdout
+    assert "Capture rejected. Fix the validation errors below." in rejected_capture.stdout
+    assert "Allowed stages:" not in rejected_capture.stdout
+    assert "project-structure must use '<strategy>::<rationale>' format" in rejected_capture.stdout
+    assert "feature-first::Keep bot-connection, workspace, and publish-log isolated by" in rejected_capture.stdout
+    assert "capability" in rejected_capture.stdout
 
 
 def test_git_current_branch_uses_config_fallback_json(tmp_path: Path, monkeypatch) -> None:

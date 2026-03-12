@@ -158,6 +158,8 @@ flowchart LR
 - endpoint ссылается на неизвестный `screenId`
 - design screen не связан ни с одним endpoint
 - `screen.data.displayed` не отражен в response fields
+- `--project-structure` передан без разделителя `::`; используй формат `<strategy>::<rationale>`, например `feature-first::Keep bot-connection, workspace, and publish-log isolated by capability`
+- Для `--endpoint-field` секция `response` допустима как shorthand для `response:200`; для явных кодов ответа используй `response:<status>`
 - `architecture.md` и `openapi.yaml` редактируются вручную
 
 ## Соседние команды и handoff

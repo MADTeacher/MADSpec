@@ -321,6 +321,8 @@ madspec memory promote [--branch <name>] [--json-output]
 madspec memory learn --input <file.json|file.jsonl> [--branch <name>] [--json-output]
 ```
 
+For `mvp.architecture`, `--endpoint-field` accepts `path`, `query`, `request`, `response`, and `response:<status>` sections. Bare `response` is stored as `response:200`.
+
 **Назначение команд:**
 - `memory init` - создает структуру memory-файлов проекта и procedural rules
 - `memory status` - показывает состояние structured memory
