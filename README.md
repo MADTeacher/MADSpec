@@ -75,29 +75,21 @@ uvx --from git+https://github.com/MADTeacher/MADSpec.git madspec init <PROJECT_N
 
 ```mermaid
 flowchart TB
-    A["Инициализация проекта: `madspec init`"] --> B["Концепция продукта: `/madspec.mvp.concept`"]
-    B --> C["Дизайн и прототипы: `/madspec.mvp.design`"]
-    C --> D["Выбор стека: `/madspec.mvp.tech`"]
-    D --> E["Архитектура и контракты: `/madspec.mvp.architecture`"]
-    E --> F["Дальше возможны два способа работы"]
+    A["Инициализация проекта: madspec init"] --> B["Концепция продукта: /madspec.mvp.concept"]
+    B --> C["Дизайн и прототипы: /madspec.mvp.design"]
+    C --> D["Выбор стека: /madspec.mvp.tech"]
+    D --> E["Архитектура и контракты: /madspec.mvp.architecture"]
+    E --> F["Дальше можно работать двумя способами"]
 
-    F --> G1
-    F --> G2
+    F --> G["Вариант 1: несколько запусков /madspec.mvp.plan, пока план не будет готов полностью"]
+    G --> H["После этого несколько запусков /madspec.mvp.implement, пока не будут завершены все шаги"]
 
-    subgraph G1["Вариант 1: сначала полностью допланировать"]
-        direction TB
-        P1["Добавлять шаги: `/madspec.mvp.plan`"] --> P2["План готов полностью"]
-        P2 --> P3["Реализовывать шаги: `/madspec.mvp.implement`"]
-    end
+    F --> I["Вариант 2: запланировать следующий шаг через /madspec.mvp.plan"]
+    I --> J["Сразу реализовать его через /madspec.mvp.implement"]
+    J --> K["Повторять связку plan -> implement, пока работа не будет завершена"]
 
-    subgraph G2["Вариант 2: идти итерациями"]
-        direction TB
-        I1["Запланировать следующий шаг: `/madspec.mvp.plan`"] --> I2["Сразу реализовать его: `/madspec.mvp.implement`"]
-        I2 --> I3["Повторять цикл `plan -> implement`, пока работа не завершена"]
-    end
-
-    P3 --> R["Проверка после реализации: `/madspec.review` и `/madspec.security`"]
-    I3 --> R
+    H --> R["После реализации по необходимости: /madspec.review и /madspec.security"]
+    K --> R
 ```
 
 Кратко по этапам:
@@ -110,6 +102,7 @@ flowchart TB
 - `/madspec.mvp.plan` - добавляет и уточняет шаги реализации
 - `/madspec.mvp.implement` - выполняет запланированные шаги реализации
 - `/madspec.review` и `/madspec.security` - используются после реализации для проверки качества и рисков
+
 ```bash
 madspec init <PROJECT_NAME> --ai <agent>
 /madspec.mvp.concept "Идея проекта"
@@ -130,26 +123,18 @@ madspec init <PROJECT_NAME> --ai <agent>
 
 ```mermaid
 flowchart TB
-    A["Существующий проект"] --> B["Контекст новой функции: `/madspec.feature.init`"]
-    B --> C["Дальше возможны два способа работы"]
+    A["Существующий проект"] --> B["Контекст новой функции: /madspec.feature.init"]
+    B --> C["Дальше можно работать двумя способами"]
 
-    C --> D1
-    C --> D2
+    C --> D["Вариант 1: несколько запусков /madspec.feature.plan, пока feature-план не будет готов полностью"]
+    D --> E["После этого несколько запусков /madspec.feature.implement, пока не будут завершены все шаги"]
 
-    subgraph D1["Вариант 1: сначала полностью допланировать feature"]
-        direction TB
-        P1["Добавлять шаги: `/madspec.feature.plan`"] --> P2["Feature-план готов полностью"]
-        P2 --> P3["Реализовывать шаги: `/madspec.feature.implement`"]
-    end
+    C --> F["Вариант 2: запланировать следующий шаг через /madspec.feature.plan"]
+    F --> G["Сразу реализовать его через /madspec.feature.implement"]
+    G --> H["Повторять связку plan -> implement, пока feature не будет завершена"]
 
-    subgraph D2["Вариант 2: идти короткими итерациями"]
-        direction TB
-        I1["Запланировать следующий шаг: `/madspec.feature.plan`"] --> I2["Сразу реализовать его: `/madspec.feature.implement`"]
-        I2 --> I3["Повторять цикл `plan -> implement`, пока feature не завершена"]
-    end
-
-    P3 --> R["Проверка после реализации: `/madspec.review` и `/madspec.security`"]
-    I3 --> R
+    E --> R["После реализации по необходимости: /madspec.review и /madspec.security"]
+    H --> R
 ```
 
 Кратко по этапам:
@@ -158,6 +143,7 @@ flowchart TB
 - `/madspec.feature.plan` - формирует или уточняет шаги реализации для этой функции
 - `/madspec.feature.implement` - реализует подготовленные шаги в существующем коде
 - `/madspec.review` и `/madspec.security` - используются после реализации для проверки качества и рисков
+
 
 ```bash
 /madspec.feature.init "Описание новой функции"
