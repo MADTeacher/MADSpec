@@ -14,6 +14,13 @@ $ARGUMENTS
 
 Ты **ОБЯЗАН** учитывать пользовательский ввод перед продолжением (если он не пустой).
 
+## Обязательный skill для visual design
+
+- При работе над `madspec.mvp.design`, если проектируются UI/UX-решения, storyboard и HTML/CSS-прототипы, **обязательно** подключай skill `frontend-design` как основной design-skill.
+- `frontend-design` отвечает за качество, характер и выразительность визуального решения.
+- `.madspec/templates/ui-storyboard-contract.md` задает structural contract, review-навигацию и обязательную структуру storyboard, но **не заменяет** `frontend-design` и не диктует визуальный стиль.
+- `madspec memory retrieve/capture/checkpoint/validate` остаются обязательным механизмом для canonical state, coverage и консистентности артефактов.
+
 ## Правила диалога (обязательно)
 
 - **Задавай вопросы строго по одному**: в каждом твоем сообщении должен быть **ровно 1 вопрос**, который требует ответа.

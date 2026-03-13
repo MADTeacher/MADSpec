@@ -81,6 +81,7 @@ Structured memory:
 - Начинай с чтения существующих артефактов в `.madspec/<branch>/`, а не с предположений о текущем этапе
 - Для MVP соблюдай порядок `concept -> design -> tech -> architecture -> plan -> implement`
 - Для `mvp.design` считай нормой длинную итеративную работу через много независимых чатов: новый чат должен восстанавливать состояние из `.madspec/<branch>/memory/`, `ui-design.md` и `ui-prototype/`, а не из истории предыдущего разговора
+- Для `mvp.design` при проектировании UI/UX, storyboard и HTML/CSS-прототипов обязательно подключай skill `frontend-design` как основной design-skill; `ui-storyboard-contract` задает структуру и review-flow, а `frontend-design` отвечает за визуальное качество и характер решения
 - Для `mvp.design` prototype files считай approved storyboard contract: они не обязаны быть сделаны по общей болванке, но обязаны быть кликабельны по основным review journeys
 - Для `mvp.tech` работай так же memory-first: источник истины — `.madspec/<branch>/memory/stages/mvp.tech.json`, а `tech-stack.md` является generated artifact и не редактируется вручную
 - Для `mvp.architecture` работай так же memory-first: источник истины — `.madspec/<branch>/memory/stages/mvp.architecture.json`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` являются generated artifacts и не редактируются вручную
@@ -170,6 +171,7 @@ Structured memory:
 - Если меняешь или документируешь CLI-поведение, сверяйся с текущим `README.md`, `AGENTS.md` и шаблонами команд
 - Для `mvp.concept` используй краткий `madspec memory retrieve --json-output` в обычных ходах диалога, `--include-history` только при явной необходимости, а `--full-artifact` только перед финальной валидацией, итоговым обзором и `checkpoint`
 - Для `mvp.design` в начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.design --json-output`, затем сверяй `ui-design.md`, `.madspec/templates/ui-storyboard-contract.md` и файлы в `ui-prototype/`; не считай дизайн завершенным, пока пользователь явно не утвердил текущее состояние
+- Для `mvp.design` не подменяй skill `frontend-design` общими правилами storyboard contract: visual direction, typography, color, composition и ощущение интерфейса должны идти через этот skill, а structured memory фиксирует утвержденный state
 - Для `mvp.design` у `--screen-data` используй только логический field id в формате `<screen-id>::<displayed|input>::<name>`; не добавляй туда описания и дополнительные `::` сегменты
 - Для `mvp.architecture` в обычных ходах используй `madspec memory retrieve --stage mvp.architecture --json-output` и опирайся на `architecture_status`; `--full-artifact` запрашивай только перед итоговой валидацией и `checkpoint`
 - Для `mvp.architecture` у `--endpoint-field` секция `response` допустима как shorthand для `response:200`; если нужен конкретный статус ответа, используй `response:<status>`

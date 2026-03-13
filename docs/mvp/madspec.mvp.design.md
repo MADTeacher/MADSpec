@@ -16,6 +16,7 @@
 - доступны prototype paths в `.madspec/<BRANCH>/ui-prototype/`
 - design references должны указывать на существующие screens, zones и prototype files
 - доступен `.madspec/templates/ui-storyboard-contract.md` как structural guide для прототипа
+- для UI/UX-проектирования и storyboard-прототипов агент обязан использовать skill `frontend-design` как основной design-skill
 
 ## Источник истины
 
@@ -41,6 +42,7 @@
 - `madspec memory capture --stage mvp.design ...`
 - `madspec memory checkpoint --stage mvp.design --summary ...`
 - `.madspec/templates/ui-storyboard-contract.md`
+- skill `frontend-design` для visual/UI/UX design-решений
 
 Ключевые flags:
 
@@ -60,12 +62,13 @@
 ## Пошаговый runtime workflow
 
 1. Агент читает `concept` и затем `design_status`.
-2. Выделяет primary review flow и остальные journeys, которые пользователь должен пройти кликами.
-3. По мере согласования экранов и потоков пишет `capture`.
-4. Runtime обновляет `zones`, `screens`, `flows`, `navigation`, `platformConstraints`.
-5. `design_completeness_errors()` проверяет platforms, screens, flows, navigation и coverage всех concept features.
-6. `design_reference_errors()` проверяет links на неизвестные screen/zone и отсутствие prototype files.
-7. После полного покрытия и approval storyboard выполняется `checkpoint`.
+2. Для visual/UI/UX-проектирования обязательно подключает skill `frontend-design`; `ui-storyboard-contract` при этом используется как structural contract, а не как источник визуального стиля.
+3. Выделяет primary review flow и остальные journeys, которые пользователь должен пройти кликами.
+4. По мере согласования экранов и потоков пишет `capture`.
+5. Runtime обновляет `zones`, `screens`, `flows`, `navigation`, `platformConstraints`.
+6. `design_completeness_errors()` проверяет platforms, screens, flows, navigation и coverage всех concept features.
+7. `design_reference_errors()` проверяет links на неизвестные screen/zone и отсутствие prototype files.
+8. После полного покрытия и approval storyboard выполняется `checkpoint`.
 
 ## Canonical data model
 
