@@ -71,6 +71,45 @@ uvx --from git+https://github.com/MADTeacher/MADSpec.git madspec init <PROJECT_N
 
 Используйте команды `madspec.mvp.*`, когда создаете продукт с нуля:
 
+Ниже показан типовой порядок работы. После базовых стадий можно либо сначала полностью закончить планирование, либо идти итерациями: планирование -> реализация -> планирование -> реализация.
+
+```mermaid
+flowchart TB
+    A["Инициализация проекта: `madspec init`"] --> B["Концепция продукта: `/madspec.mvp.concept`"]
+    B --> C["Дизайн и прототипы: `/madspec.mvp.design`"]
+    C --> D["Выбор стека: `/madspec.mvp.tech`"]
+    D --> E["Архитектура и контракты: `/madspec.mvp.architecture`"]
+    E --> F["Дальше возможны два способа работы"]
+
+    F --> G1
+    F --> G2
+
+    subgraph G1["Вариант 1: сначала полностью допланировать"]
+        direction TB
+        P1["Добавлять шаги: `/madspec.mvp.plan`"] --> P2["План готов полностью"]
+        P2 --> P3["Реализовывать шаги: `/madspec.mvp.implement`"]
+    end
+
+    subgraph G2["Вариант 2: идти итерациями"]
+        direction TB
+        I1["Запланировать следующий шаг: `/madspec.mvp.plan`"] --> I2["Сразу реализовать его: `/madspec.mvp.implement`"]
+        I2 --> I3["Повторять цикл `plan -> implement`, пока работа не завершена"]
+    end
+
+    P3 --> R["Проверка после реализации: `/madspec.review` и `/madspec.security`"]
+    I3 --> R
+```
+
+Кратко по этапам:
+
+- `madspec init <PROJECT_NAME> --ai <agent>` - создает проект, структуру `.madspec` и команды для выбранной AI-среды
+- `/madspec.mvp.concept` - фиксирует идею проекта, целевую аудиторию, сценарии и ключевые функции
+- `/madspec.mvp.design` - описывает пользовательский опыт, экраны и прототипы интерфейса
+- `/madspec.mvp.tech` - помогает выбрать стек технологий и зафиксировать технические решения
+- `/madspec.mvp.architecture` - формализует структуру проекта, модель данных и контракты
+- `/madspec.mvp.plan` - добавляет и уточняет шаги реализации
+- `/madspec.mvp.implement` - выполняет запланированные шаги реализации
+- `/madspec.review` и `/madspec.security` - используются после реализации для проверки качества и рисков
 ```bash
 madspec init <PROJECT_NAME> --ai <agent>
 /madspec.mvp.concept "Идея проекта"
@@ -81,15 +120,52 @@ madspec init <PROJECT_NAME> --ai <agent>
 /madspec.mvp.implement
 ```
 
+Подробности по каждой стадии есть в [документации MVP-процесса](docs/mvp/README.md).
+
 ### Feature-Процесс
 
 Используйте команды `madspec.feature.*`, когда добавляете функциональность в существующий проект:
+
+Ниже показан типовой путь для работы в уже существующем проекте. После `feature.init` можно либо сначала собрать весь план, либо идти короткими итерациями `plan -> implement`.
+
+```mermaid
+flowchart TB
+    A["Существующий проект"] --> B["Контекст новой функции: `/madspec.feature.init`"]
+    B --> C["Дальше возможны два способа работы"]
+
+    C --> D1
+    C --> D2
+
+    subgraph D1["Вариант 1: сначала полностью допланировать feature"]
+        direction TB
+        P1["Добавлять шаги: `/madspec.feature.plan`"] --> P2["Feature-план готов полностью"]
+        P2 --> P3["Реализовывать шаги: `/madspec.feature.implement`"]
+    end
+
+    subgraph D2["Вариант 2: идти короткими итерациями"]
+        direction TB
+        I1["Запланировать следующий шаг: `/madspec.feature.plan`"] --> I2["Сразу реализовать его: `/madspec.feature.implement`"]
+        I2 --> I3["Повторять цикл `plan -> implement`, пока feature не завершена"]
+    end
+
+    P3 --> R["Проверка после реализации: `/madspec.review` и `/madspec.security`"]
+    I3 --> R
+```
+
+Кратко по этапам:
+
+- `/madspec.feature.init` - описывает новую функцию и собирает контекст существующего проекта
+- `/madspec.feature.plan` - формирует или уточняет шаги реализации для этой функции
+- `/madspec.feature.implement` - реализует подготовленные шаги в существующем коде
+- `/madspec.review` и `/madspec.security` - используются после реализации для проверки качества и рисков
 
 ```bash
 /madspec.feature.init "Описание новой функции"
 /madspec.feature.plan
 /madspec.feature.implement
 ```
+
+Подробности по этому сценарию есть в [документации Feature-процесса](docs/feature/README.md).
 
 ### Общие Команды
 
