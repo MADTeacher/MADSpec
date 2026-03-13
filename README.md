@@ -190,10 +190,11 @@ MADSpec хранит основное состояние проекта в `.mad
 
 ### Навыки Агента
 
-Во время инициализации MADSpec также копирует навыки агента в целевую среду, включая:
+Во время инициализации MADSpec также копирует навыки агента в целевую среду из каталога `skills/`, включая:
 
-- `generate-agents-md`
-- `madspec-cli-operator`
+- [`frontend-design`](skills/frontend-design/SKILL.md)
+- [`generate-agents-md`](skills/generate-agents-md/SKILL.md)
+- [`madspec-cli-operator`](skills/madspec-cli-operator/SKILL.md)
 
 ### Субагенты
 
