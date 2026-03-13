@@ -71,6 +71,38 @@
 - `--full-artifact`
 - `--include-history`
 
+## Слои Памяти
+
+`madspec memory` использует несколько слоев памяти с разной ролью. Это помогает отделить операционную историю работы от канонических branch-level знаний.
+
+| Слой | Что хранит | Кто пишет | Когда читается | Роль |
+| --- | --- | --- | --- | --- |
+| `episodes/events.jsonl` | События хода работы | `start-step`, `checkpoint-step`, `complete-step`, `memory learn` | `memory retrieve` для implementation, review и security; для ранних planning-stage стадий только с `--include-history` | Операционная история |
+| `working/decision-log.jsonl` | Кандидаты решений, checkpoint notes, procedural hints | `memory capture`, `memory checkpoint`, `memory learn` | `memory retrieve`, `memory promote` | Буфер решений и learning-кандидатов |
+| `semantic/facts.jsonl` | Подтвержденные факты | `complete-step` и `memory promote` | retrieval и сборка производных представлений | Каноническое знание |
+| `semantic/decisions.jsonl` | Подтвержденные решения | `complete-step` и `memory promote` | retrieval и сборка производных представлений | Каноническое знание |
+| `semantic/contracts.jsonl` | Подтвержденные контракты и обязательства | `complete-step` и `memory promote` | retrieval и сборка производных представлений | Каноническое знание |
+
+Практически это означает:
+
+- `episodes` отвечает на вопрос "что происходило по ходу работы"
+- `decision_log` отвечает на вопрос "что еще нужно осмыслить, утвердить или продвинуть"
+- `semantic/*` отвечает на вопрос "что уже считается подтвержденной истиной для ветки и стадии"
+
+## Как Двигаются Записи Между Слоями
+
+Типичный поток выглядит так:
+
+1. `start-step`, `checkpoint-step` и `complete-step` пишут операционные события в `episodes`.
+2. `capture`, `checkpoint` и `memory learn` добавляют заметки и кандидаты в `decision_log`.
+3. `complete-step` может сразу записать подтвержденные `facts`, `decisions` и `contracts` в `semantic/*`.
+4. `memory promote` просматривает validated записи из `episodes` и `decision_log` и переносит их в `semantic/*`, если они еще не были продвинуты.
+
+Из этого следуют два правила чтения:
+
+- Для `mvp.concept`, `mvp.design`, `mvp.tech`, `mvp.architecture`, `mvp.plan`, `feature.init` и `feature.plan` история по умолчанию не подмешивается в `retrieve`; используйте `--include-history`, если нужен `episodes` и `decision_log`.
+- Для implementation, `review` и `security` история обычно важна для продолжения работы, поэтому `retrieve` включает ее автоматически.
+
 ## Типовые Сценарии Использования
 
 ### Посмотреть состояние стадии перед продолжением
