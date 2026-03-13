@@ -31,7 +31,7 @@ MADSpec управляет разработкой через агентные к
 Для нового продукта:
 
 - `/madspec.mvp.concept` — зафиксировать идею, аудиторию, pain points, P1/P2/P3
-- `/madspec.mvp.design` — сделать UI-видение и HTML/CSS-прототипы
+- `/madspec.mvp.design` — сделать UI-видение и storyboard HTML/CSS-прототипы
 - `/madspec.mvp.tech` — выбрать стек и обосновать его
 - `/madspec.mvp.architecture` — определить архитектуру, модель данных, контракты
 - `/madspec.deploy` — описать окружения, CI/CD, секреты, observability, rollout
@@ -81,6 +81,7 @@ Structured memory:
 - Начинай с чтения существующих артефактов в `.madspec/<branch>/`, а не с предположений о текущем этапе
 - Для MVP соблюдай порядок `concept -> design -> tech -> architecture -> plan -> implement`
 - Для `mvp.design` считай нормой длинную итеративную работу через много независимых чатов: новый чат должен восстанавливать состояние из `.madspec/<branch>/memory/`, `ui-design.md` и `ui-prototype/`, а не из истории предыдущего разговора
+- Для `mvp.design` prototype files считай approved storyboard contract: они не обязаны быть сделаны по общей болванке, но обязаны быть кликабельны по основным review journeys
 - Для `mvp.tech` работай так же memory-first: источник истины — `.madspec/<branch>/memory/stages/mvp.tech.json`, а `tech-stack.md` является generated artifact и не редактируется вручную
 - Для `mvp.architecture` работай так же memory-first: источник истины — `.madspec/<branch>/memory/stages/mvp.architecture.json`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` являются generated artifacts и не редактируются вручную
 - Для `mvp.plan` работай так же memory-first: источник истины — `.madspec/<branch>/memory/stages/mvp.plan.json`, а `implementation-plan.md` и `planning-context-cache.md` являются generated artifacts и не редактируются вручную
@@ -100,6 +101,7 @@ Structured memory:
 - Перед реализацией сверяйся с `implementation-plan.md`, `steps/`, `memory/progress.json` и relevant generated context
 - Если работа идёт через structured memory, сначала обновляй memory, потом пересобирай views, потом валидируй
 - Для `mvp.design` любой подтвержденный change в экране, потоке, навигации, platform-specific поведении, данных на экране или coverage функций обязан сопровождаться проверкой и актуализацией связанных design-артефактов и structured memory
+- Для `mvp.design` не показывай пользователю `P1/P2/P3` как визуальные бейджи в прототипе; приоритеты нужны для internal coverage, а не для review storyboard
 - Для изменений интерфейса соблюдай порядок `source artifacts -> canonical memory -> generated views -> validate`: сначала обнови прототипы и typed state, затем связанные описания, потом `madspec memory consolidate`, затем `madspec memory validate`
 
 ## Что агент должен проверять сам
@@ -167,13 +169,14 @@ Structured memory:
 - Если нужно менять сам MADSpec CLI, используй текущий internal layout: `src/madspec_cli/features/*/cli.py` для entrypoints `init/git/meta`, `src/madspec_cli/memory/cli/` для memory-команд, `application/` для orchestration и `shared/*` для общих адаптеров; legacy-модули допустимы только как compatibility/backend слой
 - Если меняешь или документируешь CLI-поведение, сверяйся с текущим `README.md`, `AGENTS.md` и шаблонами команд
 - Для `mvp.concept` используй краткий `madspec memory retrieve --json-output` в обычных ходах диалога, `--include-history` только при явной необходимости, а `--full-artifact` только перед финальной валидацией, итоговым обзором и `checkpoint`
-- Для `mvp.design` в начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.design --json-output`, затем сверяй `ui-design.md` и файлы в `ui-prototype/`; не считай дизайн завершенным, пока пользователь явно не утвердил текущее состояние
+- Для `mvp.design` в начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.design --json-output`, затем сверяй `ui-design.md`, `.madspec/templates/ui-storyboard-contract.md` и файлы в `ui-prototype/`; не считай дизайн завершенным, пока пользователь явно не утвердил текущее состояние
 - Для `mvp.design` у `--screen-data` используй только логический field id в формате `<screen-id>::<displayed|input>::<name>`; не добавляй туда описания и дополнительные `::` сегменты
 - Для `mvp.architecture` в обычных ходах используй `madspec memory retrieve --stage mvp.architecture --json-output` и опирайся на `architecture_status`; `--full-artifact` запрашивай только перед итоговой валидацией и `checkpoint`
 - Для `mvp.architecture` у `--endpoint-field` секция `response` допустима как shorthand для `response:200`; если нужен конкретный статус ответа, используй `response:<status>`
 - Если архитектурная валидация выглядит ложной, не редактируй `.madspec/<branch>/memory/stages/*.json` вручную: сначала проверь `screen.data` и `endpoint-field`, затем исправляй state только через `madspec memory capture`/`checkpoint`
 - Для `mvp.plan` в обычных ходах используй `madspec memory retrieve --stage mvp.plan --json-output` и опирайся на `plan_status`; `--full-artifact` запрашивай только перед итоговой валидацией и `checkpoint`
 - Для `mvp.implement` в начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.implement --json-output`, затем запускай шаг через `madspec memory start-step`; после завершения TDD-цикла проверяй итог повторным `retrieve`, а `implementation-context.md` используй только как generated summary
-- Если менялись HTML/CSS-прототипы, проверь, не устарели ли `ui-design.md`, навигационное описание, user flows, coverage функций и ссылки на prototype-файлы
+- Если менялись HTML/CSS-прототипы, проверь, не устарели ли `ui-design.md`, navigation, review journeys, coverage функций и ссылки на prototype-файлы
+- Для UI-реализации сверяй не только `ui-design.md`, но и реальный кликабельный путь из `ui-prototype/index.html`; если реализация хочет отойти от storyboard, сначала вернись к `mvp.design` или явно зафиксируй approval на drift
 - Если менялась архитектура, модель данных или контракты, обновляй canonical architecture-state через `madspec memory capture`, затем пересобирай generated artifacts и валидируй memory
 - Не расширяй этот skill до полной документации продукта; держи его как операторский слой

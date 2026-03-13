@@ -709,6 +709,10 @@ def test_memory_capture_supports_design_stage_state_and_retrieve(tmp_path: Path,
     assert retrieve_full_payload["artifact_state"]["design"]["checkpointSummary"] == "Design ratified for prototype review"
     assert retrieve_full_payload["artifact_state"]["design"]["revision"] == 1
     assert retrieve_full_payload["decision_log"] != []
+    ui_design = (project_path / ".madspec" / branch_name / "ui-design.md").read_text(encoding="utf-8")
+    assert "## Review Journeys" in ui_design
+    assert "Storyboard path" in ui_design
+    assert "Покрытие функций" not in ui_design
 
 
 def test_memory_retrieve_returns_tech_status_and_full_artifact(tmp_path: Path, monkeypatch) -> None:

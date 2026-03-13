@@ -89,6 +89,7 @@ $ARGUMENTS
 - **ВАЖНО**: При планировании шага, который реализует функцию:
   - Проверь наличие связанных артефактов (UI-дизайн, контракты API, модели данных)
   - Если такие файлы существуют, они **ОБЯЗАТЕЛЬНО** должны быть связаны в описании шага
+  - Для UI-шага явно свяжи step с конкретными storyboard screens, entry screens и review journeys, а не только с общей директорией `ui-prototype/`
 
 ## Цель этапа
 
@@ -144,7 +145,8 @@ $ARGUMENTS
      - Для функции, которую планируется реализовать в шаге, проверь наличие:
        - **UI-дизайн** (если шаг связан с UI):
          - Файл с описанием дизайна UI (`.madspec/ui-design.md`)
-         - HTML прототипы (`.madspec/ui-prototype/*.html`)
+         - HTML storyboard-прототипы (`.madspec/ui-prototype/*.html`)
+         - Конкретный primary flow / review journey, который шаг не должен сломать
        - **Контракты API** (если шаг связан с API, интеграцией или обменом данными):
          - Файлы контрактов в `.madspec/contracts/` (OpenAPI, GraphQL schema, gRPC proto)
          - Основной файл контрактов `.madspec/contracts/openapi.yaml` (если используется REST API)
@@ -159,6 +161,7 @@ $ARGUMENTS
      - Убедись, что шаг не имеет зависимостей
        - **ВАЖНО**: Создавай только один шаг за запуск для соблюдения инкрементального подхода
        - **ВАЖНО**: Если для функции существуют связанные артефакты (UI-дизайн, контракты API, модели данных), включи ссылки на них в описание шага
+       - Для UI-шагов укажи в `description.md` и `planning-context.md`, какие screen prototypes и flow transitions являются acceptance contract
        - Если `.madspec/<BRANCH>/deployment.md` существует: добавляй в `tasks.md/tests.md/validation.md` требования, которые нужны для выбранного деплоя (например, контейнеризация, CI pipeline, конфигурация/секреты, миграции, healthchecks, логирование/метрики/алерты, стратегия отката), но не добавляй лишние задачи без необходимости
    
    - Инициализируй `.madspec/<BRANCH>/memory/progress.json`:
@@ -216,7 +219,8 @@ $ARGUMENTS
      - Для функции, которую планируется реализовать в шаге, проверь наличие:
        - **UI-дизайн** (если шаг связан с UI):
          - Файл с описанием дизайна UI (`.madspec/ui-design.md`)
-         - HTML прототипы (`.madspec/ui-prototype/*.html`)
+         - HTML storyboard-прототипы (`.madspec/ui-prototype/*.html`)
+         - Конкретные review journeys и entry screens
        - **Контракты API** (если шаг связан с API, интеграцией или обменом данными):
          - Файлы контрактов в `.madspec/contracts/` (OpenAPI, GraphQL schema, gRPC proto)
          - Основной файл контрактов `.madspec/contracts/openapi.yaml` (если используется REST API)
@@ -233,6 +237,7 @@ $ARGUMENTS
      - В `validation.md` для `code` шага обязательно добавь критерии: red зафиксирован, focused test green, relevant suite green после refactor, regression сохранена
      - **ОБЯЗАТЕЛЬНО**: Если для функции существуют связанные артефакты, включи ссылки на них в `description.md` и `tasks.md`:
        - Файлы UI-дизайна (`.madspec/<BRANCH>/ui-design.md`, `.madspec/<BRANCH>/ui-prototype/*.html`)
+       - Конкретные storyboard flows / entry screens, которые задают expected behavior
        - Контракты API (`.madspec/<BRANCH>/contracts/openapi.yaml`, `.madspec/<BRANCH>/contracts/*.graphql`, `.madspec/<BRANCH>/contracts/*.proto`, и т.д.)
        - Модели данных (`.madspec/<BRANCH>/data-model.md`)
      - Если `.madspec/<BRANCH>/deployment.md` существует: добавь в `tasks.md/tests.md/validation.md` требования, которые нужны для выбранного деплоя (например, контейнеризация, CI pipeline, конфигурация/секреты, миграции, healthchecks, логирование/метрики/алерты, стратегия отката), но не добавляй лишние задачи без необходимости

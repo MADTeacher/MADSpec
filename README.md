@@ -405,12 +405,15 @@ madspec version
 
 ### Этап 1: Дизайн UI (`madspec.mvp.design`)
 
-Создание интерактивных HTML/CSS прототипов интерфейса на основе концепции. Прототипы можно открыть в браузере (включая встроенный браузер IDE) для визуального просмотра и утверждения.
+Создание интерактивных storyboard HTML/CSS прототипов интерфейса на основе концепции. Прототипы можно открыть в браузере (включая встроенный браузер IDE), пройти по кликабельным сценариям и утвердить до реализации.
 
 **Особенности:**
 - Прототипы создаются как реальные HTML/CSS файлы, которые можно открыть в браузере
+- `index.html` используется как storyboard entrypoint для review journeys, а не как каталог функций
+- Визуальный стиль проектируется с нуля под домен проекта, без обязательной HTML-болванки
 - Прототипы создаются с учетом платформ из концепции - мобильные паттерны для Mobile, десктопные для Desktop, адаптивные для Web
-- Создание локального сервера для просмотра прототипов (Go, Python или Node.js)
+- Для структуры storyboard используется `.madspec/templates/ui-storyboard-contract.md`
+- Для локального просмотра используется самый простой доступный static server, без отдельного выбора от пользователя
 - Автоматическая валидация дизайна (покрытие функций, логика потоков, соответствие платформам)
 - Каноническое состояние дизайна хранится в `.madspec/<BRANCH>/memory/stages/mvp.design.json`
 - `.madspec/<BRANCH>/ui-design.md` пересобирается из structured memory и не редактируется вручную как основной источник истины
@@ -420,11 +423,10 @@ madspec version
 
 **Выходные артефакты:**
 - `.madspec/<BRANCH>/memory/stages/mvp.design.json` - основной файл данных этапа design
-- `.madspec/<BRANCH>/ui-prototype/` - директория с HTML/CSS прототипами
-  - `index.html` - главный файл с навигацией
+- `.madspec/<BRANCH>/ui-prototype/` - директория со storyboard HTML/CSS прототипами
+  - `index.html` - главный storyboard entrypoint
   - `[screen-name].html` - HTML файлы для каждого экрана
   - `README.md` - инструкция по запуску локального сервера
-  - Локальный сервер (если создан)
 - `.madspec/<BRANCH>/ui-design.md` - generated artifact дизайна с ссылками на прототипы
 - `.madspec/<BRANCH>/project-context.md` - regenerated view контекста проекта
 
@@ -500,13 +502,13 @@ madspec version
 
 ### Этап 5: Реализация (`madspec.mvp.implement`)
 
-Пошаговая реализация проекта с автоматической валидацией. HTML прототипы используются как референс для реализации интерфейса.
+Пошаговая реализация проекта с автоматической валидацией. Утвержденные HTML storyboard-прототипы используются как UI contract для реализации интерфейса.
 
 **Особенности:**
 - Последовательное выполнение шагов с учетом зависимостей
 - Для `code` шагов обязателен цикл `red -> green -> refactor`, который фиксируется через `madspec memory checkpoint-step`
 - Для `non-code` шагов обход TDD допускается только через явный `waiver` или `not-applicable` в metadata шага
-- Использование HTML прототипов из `.madspec/<BRANCH>/ui-prototype/` как визуального гайда при реализации интерфейса
+- Использование HTML storyboard-прототипов из `.madspec/<BRANCH>/ui-prototype/` как утвержденного UI contract при реализации интерфейса
 - Автоматическая валидация каждого шага перед переходом к следующему
 - **Обязательные коммиты в GIT после каждого успешно завершенного шага** (только после валидации)
 - Canonical state обновляется через `madspec memory start-step`, `madspec memory checkpoint-step`, `madspec memory complete-step`
@@ -579,8 +581,7 @@ Pragmatic security/privacy audit текущего change set, codebase и branch
 ├── templates/            # Шаблоны для артефактов (общие для всех веток)
 │   ├── concept-template.md
 │   ├── ui-design-template.md
-│   ├── html-prototype-template.html
-│   ├── index-prototype-template.html
+│   ├── ui-storyboard-contract.md
 │   ├── tech-stack-template.md
 │   ├── architecture-template.md
 │   ├── deployment-template.md
@@ -596,11 +597,10 @@ Pragmatic security/privacy audit текущего change set, codebase и branch
 │   ├── planning-context-cache-template.md
 │   └── project-context-template.md
 ├── <branch-name>/        # Артефакты для конкретной ветки (MVP или Feature)
-│   ├── ui-prototype/     # HTML/CSS прототипы (создается на этапе design)
+│   ├── ui-prototype/     # storyboard HTML/CSS прототипы (создается на этапе design)
 │   │   ├── index.html
 │   │   ├── [screen-name].html
 │   │   ├── README.md     # Инструкция по запуску локального сервера
-│   │   └── [local_server] # Локальный сервер (если создан)
 │   ├── steps/            # Шаги реализации (создается на этапе plan)
 │   │   └── step-[NN]-[name]/ # Директория каждого шага
 │   │       ├── description.md        # Описание шага
@@ -690,7 +690,7 @@ Pragmatic security/privacy audit текущего change set, codebase и branch
 
 Для non-iterative стадий `concept/design/tech/architecture/plan/review/security` рекомендуется сначала накапливать знания через `madspec memory capture`, а потом завершать стадию кратким `madspec memory checkpoint --summary ...`. Это убирает необходимость сжимать весь диалог в один финальный payload.
 
-Для `mvp.design` повторные `capture/checkpoint` циклы до перехода в `mvp.tech` считаются нормальным сценарием: дизайн можно дорабатывать итеративно и продолжать в новых чатах, пока пользователь явно не утвердит текущее состояние интерфейса.
+Для `mvp.design` повторные `capture/checkpoint` циклы до перехода в `mvp.tech` считаются нормальным сценарием: дизайн можно дорабатывать итеративно и продолжать в новых чатах, пока пользователь явно не утвердит текущее состояние storyboard-прототипа.
 
 Для `mvp.architecture` действует тот же memory-first принцип: структура проекта, сущности, поля, связи, endpoint'ы, интеграции и архитектурные принципы сначала пишутся в `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` являются generated views.
 
@@ -741,7 +741,7 @@ madspec memory checkpoint \
 
 1. Краткий `madspec memory retrieve --stage mvp.design --json-output`
 2. `madspec memory capture --stage mvp.design ...`
-3. Обновление HTML/CSS-прототипов в `.madspec/<branch>/ui-prototype/`
+3. Обновление storyboard HTML/CSS-прототипов в `.madspec/<branch>/ui-prototype/`
 4. При необходимости `madspec memory retrieve --stage mvp.design --json-output --full-artifact`
 5. `madspec memory checkpoint --stage mvp.design ...`
 
@@ -753,7 +753,7 @@ madspec memory checkpoint \
 - `design_status.missing_prototype_files`
 - `design_status.counts`
 
-Если в `mvp.design` изменились HTML/CSS-прототипы, агент обязан проверить и при необходимости актуализировать `ui-design.md`, navigation, user flows, coverage функций и ссылки на prototype-файлы до завершения работы.
+Если в `mvp.design` изменились HTML/CSS-прототипы, агент обязан проверить и при необходимости актуализировать `ui-design.md`, navigation, review journeys, coverage функций и ссылки на prototype-файлы до завершения работы.
 
 Для `mvp.plan` используйте следующий цикл:
 1. Краткий `madspec memory retrieve --stage mvp.plan --json-output`

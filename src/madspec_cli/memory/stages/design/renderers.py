@@ -21,6 +21,10 @@ def render_ui_design_markdown(
         zone.get("id", ""): zone.get("title", "") or zone.get("id", "")
         for zone in normalized["zones"]
     }
+    screen_titles = {
+        screen.get("id", ""): screen.get("title", "") or screen.get("id", "")
+        for screen in normalized["screens"]
+    }
 
     def render_list(values: list[str]) -> list[str]:
         if not values:
@@ -43,13 +47,81 @@ def render_ui_design_markdown(
         "",
         f"**Главный файл прототипа**: `{main_prototype}`",
         "",
-        "## Платформы",
-        "",
-        *render_list(normalized["platforms"]),
-        "",
-        "## Основные экраны",
+        "## Точка входа для review",
         "",
     ]
+
+    if normalized["flows"]:
+        primary_flow = normalized["flows"][0]
+        primary_steps = primary_flow.get("steps", [])
+        entry_screen_id = primary_steps[0].get("screenId", "") if primary_steps else ""
+        lines.extend(
+            [
+                f"- **Primary flow**: `{primary_flow.get('title', 'Без названия')}`",
+                f"- **Entry screen**: `{screen_titles.get(entry_screen_id, entry_screen_id or 'Не указан')}`",
+                "",
+            ]
+        )
+    else:
+        lines.extend(["- Пока не зафиксировано.", ""])
+
+    lines.extend(
+        [
+            "## Review Journeys",
+            "",
+        ]
+    )
+
+    if not normalized["flows"]:
+        lines.append("Пока не зафиксировано.")
+        lines.append("")
+    else:
+        for index, flow in enumerate(normalized["flows"], start=1):
+            steps = flow.get("steps", [])
+            entry_screen_id = steps[0].get("screenId", "") if steps else ""
+            path = " -> ".join(
+                screen_titles.get(step.get("screenId", ""), step.get("screenId", "") or "Не указан")
+                for step in steps
+            )
+            lines.extend(
+                [
+                    f"### Journey {index}: {flow.get('title', 'Без названия')}",
+                    "",
+                    f"**Goal**: {flow.get('goal', '') or 'Пока не зафиксировано.'}",
+                    f"**Entry screen**: {screen_titles.get(entry_screen_id, entry_screen_id or 'Не указан')}",
+                    f"**Storyboard path**: {path or 'Пока не зафиксировано.'}",
+                    "",
+                    "**Шаги review-прохождения**:",
+                ]
+            )
+            if steps:
+                lines.extend(
+                    [
+                        f"{step_index}. `{screen_titles.get(step.get('screenId', ''), step.get('screenId', '') or 'Не указан')}` -> {step.get('action', '')} -> {step.get('result', '')}"
+                        for step_index, step in enumerate(steps, start=1)
+                    ]
+                )
+            else:
+                lines.append("1. Пока не зафиксировано.")
+            lines.extend(
+                [
+                    "",
+                    "**Альтернативные пути**:",
+                    *render_list(flow.get("alternatives", [])),
+                    "",
+                ]
+            )
+
+    lines.extend(
+        [
+            "## Платформы",
+            "",
+            *render_list(normalized["platforms"]),
+            "",
+            "## Экранный инвентарь",
+            "",
+        ]
+    )
 
     if not normalized["screens"]:
         lines.append("Пока не зафиксировано.")
@@ -64,15 +136,6 @@ def render_ui_design_markdown(
                     f"**Функциональная зона**: {zone_titles.get(screen.get('zone', ''), screen.get('zone', '') or 'Не указана')}",
                     f"**Назначение**: {screen.get('purpose', '') or 'Пока не зафиксировано.'}",
                     "",
-                    "**Покрытие функций**:",
-                    *(
-                        [
-                            f"- {priority.upper()}: "
-                            + (", ".join(screen.get("covers", {}).get(priority, [])) or "Пока не зафиксировано.")
-                            for priority in PRIORITIES
-                        ]
-                    ),
-                    "",
                     "**Платформы**:",
                     *render_list(screen.get("platforms", [])),
                     "",
@@ -85,46 +148,14 @@ def render_ui_design_markdown(
                 ]
             )
 
-    lines.extend(["## Пользовательские потоки", ""])
-    if not normalized["flows"]:
-        lines.append("Пока не зафиксировано.")
-        lines.append("")
-    else:
-        for flow in normalized["flows"]:
-            lines.extend(
-                [
-                    f"### {flow.get('id', 'flow')}: {flow.get('title', 'Без названия')}",
-                    "",
-                    f"**Цель пользователя**: {flow.get('goal', '') or 'Пока не зафиксировано.'}",
-                    "",
-                    "**Шаги**:",
-                ]
-            )
-            if flow.get("steps"):
-                lines.extend(
-                    [
-                        f"{index}. `{step.get('screenId', '')}` -> {step.get('action', '')} -> {step.get('result', '')}"
-                        for index, step in enumerate(flow["steps"], start=1)
-                    ]
-                )
-            else:
-                lines.append("1. Пока не зафиксировано.")
-            lines.extend(
-                [
-                    "",
-                    "**Альтернативные пути**:",
-                    *render_list(flow.get("alternatives", [])),
-                    "",
-                ]
-            )
-
     lines.extend(["## Навигация", ""])
     if not normalized["navigation"]:
         lines.append("Пока не зафиксировано.")
     else:
         for item in normalized["navigation"]:
             lines.append(
-                f"- `{item.get('from', '')}` -> `{item.get('to', '')}` через {item.get('trigger', '')}"
+                f"- `{screen_titles.get(item.get('from', ''), item.get('from', '') or 'Не указан')}` -> "
+                f"`{screen_titles.get(item.get('to', ''), item.get('to', '') or 'Не указан')}` через {item.get('trigger', '')}"
             )
 
     lines.extend(

@@ -23,6 +23,9 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         names = set(zf.namelist())
         assert ".madspec/procedures/next-step-selection.md" in names
         assert ".madspec/templates/active-session-template.json" in names
+        assert ".madspec/templates/ui-storyboard-contract.md" in names
+        assert ".madspec/templates/html-prototype-template.html" not in names
+        assert ".madspec/templates/index-prototype-template.html" not in names
         assert not any(name.startswith(".madspec/scripts/") for name in names)
         assert any(name.endswith("madspec.mvp.plan.md") or name.endswith("madspec.mvp.plan.agent.md") for name in names)
         assert any(name.startswith(".cursor/commands/") or name.startswith(".opencode/command/") or name.startswith(".github/agents/") for name in names)

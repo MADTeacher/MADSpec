@@ -2,7 +2,7 @@
 
 ## Назначение команды
 
-`madspec.mvp.design` описывает UX/UI проекта: платформы, зоны, экраны, пользовательские потоки, навигацию и покрытие concept features через design-state и prototype files.
+`madspec.mvp.design` фиксирует UX/UI проекта как review-ready storyboard: платформы, зоны, экраны, journeys, навигацию и coverage concept features через design-state и prototype files.
 
 ## Когда запускать
 
@@ -15,6 +15,7 @@
 - существует завершенный `mvp.concept`
 - доступны prototype paths в `.madspec/<BRANCH>/ui-prototype/`
 - design references должны указывать на существующие screens, zones и prototype files
+- доступен `.madspec/templates/ui-storyboard-contract.md` как structural guide для прототипа
 
 ## Источник истины
 
@@ -39,6 +40,7 @@
 - `madspec memory retrieve --stage mvp.design --json-output`
 - `madspec memory capture --stage mvp.design ...`
 - `madspec memory checkpoint --stage mvp.design --summary ...`
+- `.madspec/templates/ui-storyboard-contract.md`
 
 Ключевые flags:
 
@@ -58,11 +60,12 @@
 ## Пошаговый runtime workflow
 
 1. Агент читает `concept` и затем `design_status`.
-2. По мере согласования экранов и потоков пишет `capture`.
-3. Runtime обновляет `zones`, `screens`, `flows`, `navigation`, `platformConstraints`.
-4. `design_completeness_errors()` проверяет platforms, screens, flows, navigation и coverage всех concept features.
-5. `design_reference_errors()` проверяет links на неизвестные screen/zone и отсутствие prototype files.
-6. После полного покрытия выполняется `checkpoint`.
+2. Выделяет primary review flow и остальные journeys, которые пользователь должен пройти кликами.
+3. По мере согласования экранов и потоков пишет `capture`.
+4. Runtime обновляет `zones`, `screens`, `flows`, `navigation`, `platformConstraints`.
+5. `design_completeness_errors()` проверяет platforms, screens, flows, navigation и coverage всех concept features.
+6. `design_reference_errors()` проверяет links на неизвестные screen/zone и отсутствие prototype files.
+7. После полного покрытия и approval storyboard выполняется `checkpoint`.
 
 ## Canonical data model
 
@@ -89,11 +92,17 @@
 - все concept features покрыты через `screens[].covers`
 - все prototype paths существуют
 
+Интерпретация storyboard:
+
+- `flows[].steps` = canonical порядок review journey
+- первый step каждого flow = entry screen сценария
+- первый flow = primary review flow
+- `screens[].covers` остаются internal coverage-слоем и не обязаны рендериться в user-facing design artifact
+
 ## Generated artifacts
 
 - `ui-design.md`
-- `project-context.md`
-- prototype files в `.madspec/<BRANCH>/ui-prototype/` используются как reference inputs
+- prototype files в `.madspec/<BRANCH>/ui-prototype/` используются как approved storyboard contract для review и handoff
 
 ## Диаграммы
 
@@ -118,7 +127,7 @@ sequenceDiagram
 
     A->>M: retrieve(stage=mvp.design)
     M-->>A: design_status
-    loop Экраны и потоки
+    loop Экраны и journeys
         A->>M: capture(screen/flow/nav/constraint)
         M->>D: upsert state
         M->>P: validate paths
@@ -128,25 +137,6 @@ sequenceDiagram
     M->>G: regenerate
 ```
 
-```mermaid
-stateDiagram-v2
-    [*] --> Empty
-    Empty --> Draft
-    Draft --> Covered: screens and flows exist
-    Covered --> Ready: all concept features covered
-    Ready --> Ratified: checkpoint accepted
-    Ready --> Draft: reference/completeness error
-```
-
-```mermaid
-flowchart LR
-    C["mvp.concept.json"] --> F["concept feature list"]
-    D["mvp.design.json"] --> S["screens.covers"]
-    S --> V["coverage validator"]
-    F --> V
-    D --> U["ui-design.md"]
-```
-
 ## Типовые ошибки / drift / ограничения
 
 - экран ссылается на неизвестную `zone`
@@ -154,6 +144,8 @@ flowchart LR
 - `prototype` path отсутствует в репозитории
 - часть concept features не покрыта design-state
 - `ui-design.md` обновлен вручную и расходится с stage-state
+- `index.html` ведет себя как каталог файлов вместо storyboard entrypoint
+- primary journey нельзя пройти кликами без ручного перехода по URL
 
 ## Соседние команды и handoff
 

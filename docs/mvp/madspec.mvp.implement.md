@@ -15,6 +15,7 @@
 - существуют `.madspec/<BRANCH>/implementation-plan.md` и `progress.json`
 - шаги уже зарегистрированы через `mvp.plan`
 - для code steps действует TDD discipline
+- для UI-шагов утвержденные прототипы из `.madspec/<BRANCH>/ui-prototype/` считаются UI contract, а не необязательным референсом
 
 ## Источник истины
 
@@ -49,8 +50,9 @@
 1. Агент читает implement context через `retrieve`.
 2. Запускает step через `start-step`, явно или по `nextExecutableStep`.
 3. Для code steps фиксирует `red`, `green`, `refactor` через `checkpoint-step`.
-4. `complete-step` закрывает шаг, пишет semantic records и продвигает `currentImplementStep`.
-5. После успешного completion агент создает git commit.
+4. Для UI-step реализация сверяется с утвержденным storyboard из `ui-prototype/index.html` и связанных экранов.
+5. `complete-step` закрывает шаг, пишет semantic records и продвигает `currentImplementStep`.
+6. После успешного completion агент создает git commit.
 
 ## Canonical data model
 
@@ -139,6 +141,7 @@ flowchart LR
 - step завершается без TDD evidence при `tddPolicy=required`
 - шаг запускается до завершения зависимостей
 - агент ориентируется на имя директории, а не на `retrieve/start-step` output
+- UI реализуется "примерно похоже", но расходится с утвержденным storyboard без обновления `mvp.design`
 
 ## Соседние команды и handoff
 

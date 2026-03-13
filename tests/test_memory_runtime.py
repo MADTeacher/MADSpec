@@ -1408,8 +1408,13 @@ def test_design_stage_retrieve_returns_design_status_and_full_artifact(tmp_path:
     assert checkpointed["accepted"] is True
     assert retrieved_full["artifact_state"]["design"]["checkpointSummary"] == "Design ratified for prototype review"
     assert retrieved_full["artifact_state"]["design"]["revision"] == 1
+    assert "## Точка входа для review" in ui_design
+    assert "## Review Journeys" in ui_design
     assert "Schedule board" in ui_design
     assert "Manage booking" in ui_design
+    assert "Storyboard path" in ui_design
+    assert "Покрытие функций" not in ui_design
+    assert "- P1:" not in ui_design
     assert validate_branch_memory(paths["branch_dir"].parents[1], "main") == []
 
 
