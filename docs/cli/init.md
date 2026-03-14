@@ -34,6 +34,7 @@ madspec init --here [OPTIONS]
 - `kilocode`
 - `roo`
 - `sourcecraft`
+- `qwen`
 - `copilot`
 
 ## Что Происходит Во Время Инициализации
@@ -65,6 +66,12 @@ madspec init . --ai sourcecraft
 
 ```bash
 madspec init --here --ai opencode --no-git
+```
+
+Инициализировать проект для Qwen Code:
+
+```bash
+madspec init my-project --ai qwen
 ```
 
 ## Связанные Документы

@@ -17,7 +17,10 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
 
     archive_dir = repo_root / ".genreleases"
     archives = sorted(archive_dir.glob(f"madspec-template-*-{tag}.zip"))
-    assert len(archives) == 6
+    assert len(archives) == 7
+
+    qwen_archive = archive_dir / f"madspec-template-qwen-{tag}.zip"
+    assert qwen_archive.exists()
 
     with zipfile.ZipFile(archives[0]) as zf:
         names = set(zf.namelist())
@@ -113,3 +116,11 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "madspec memory checkpoint-step --stage feature.implement" in feature_implement_body
         assert "madspec memory complete-step --stage feature.implement" in feature_implement_body
         assert "implementation-context.md` и `project-context.md` являются generated views" in feature_implement_body
+
+    with zipfile.ZipFile(qwen_archive) as zf:
+        names = set(zf.namelist())
+        assert any(name.startswith(".qwen/commands/") for name in names)
+        qwen_command = next(name for name in names if name.endswith("madspec.mvp.concept.md"))
+        qwen_body = zf.read(qwen_command).decode("utf-8")
+        assert "{{args}}" in qwen_body
+        assert "$ARGUMENTS" not in qwen_body

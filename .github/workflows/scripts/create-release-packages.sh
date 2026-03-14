@@ -6,7 +6,7 @@ set -euo pipefail
 # Usage: .github/workflows/scripts/create-release-packages.sh <version>
 #   Version argument should include leading 'v'.
 #   Optionally set AGENTS env var to limit what gets built.
-#     AGENTS  : space or comma separated subset of: cursor-agent opencode kilocode roo sourcecraft copilot (default: all)
+#     AGENTS  : space or comma separated subset of: cursor-agent opencode kilocode roo sourcecraft qwen copilot (default: all)
 
 if [[ $# -ne 1 ]]; then
   echo "Usage: $0 <version-with-v-prefix>" >&2
@@ -73,7 +73,7 @@ generate_commands() {
     body="$file_content"
 
     # Apply other substitutions
-    body=$(sed "s/{ARGS}/$arg_format/g; s/__AGENT__/$agent/g" <<< "$body" | rewrite_paths)
+    body=$(sed "s|{ARGS}|$arg_format|g; s|\\\$ARGUMENTS|$arg_format|g; s|__AGENT__|$agent|g" <<< "$body" | rewrite_paths)
 
     case $ext in
       md)
@@ -130,6 +130,11 @@ build_variant() {
       generate_commands sourcecraft md "\$ARGUMENTS" "$base_dir/.codeassistant/commands"
       [[ -d skills ]] && { mkdir -p "$base_dir/.codeassistant/skills"; cp -r skills/* "$base_dir/.codeassistant/skills/"; echo "Copied skills -> .codeassistant/skills"; }
       ;;
+    qwen)
+      mkdir -p "$base_dir/.qwen/commands"
+      generate_commands qwen md "{{args}}" "$base_dir/.qwen/commands"
+      [[ -d skills ]] && { mkdir -p "$base_dir/.qwen/skills"; cp -r skills/* "$base_dir/.qwen/skills/"; echo "Copied skills -> .qwen/skills"; }
+      ;;
     copilot)
       mkdir -p "$base_dir/.github/agents"
       generate_commands copilot agent.md "\$ARGUMENTS" "$base_dir/.github/agents"
@@ -147,7 +152,7 @@ build_variant() {
 }
 
 # Determine agent list
-ALL_AGENTS=(cursor-agent opencode kilocode roo sourcecraft copilot)
+ALL_AGENTS=(cursor-agent opencode kilocode roo sourcecraft qwen copilot)
 
 norm_list() {
   # convert comma+space separated -> line separated unique while preserving order of first occurrence

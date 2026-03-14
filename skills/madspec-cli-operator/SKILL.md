@@ -51,7 +51,7 @@ MADSpec управляет разработкой через агентные к
 
 ### CLI-команды
 
-- `madspec init` — развернуть шаблон проекта под выбранного агента
+- `madspec init` — развернуть шаблон проекта под выбранного агента (`cursor-agent`, `opencode`, `kilocode`, `roo`, `sourcecraft`, `qwen`, `copilot`)
 - `madspec check` — проверить наличие git и поддерживаемых агентных инструментов
 - `madspec version` — показать версию CLI и шаблона
 - `madspec migrate` — перенести старую плоскую `.madspec/` структуру в branch-aware layout

@@ -41,6 +41,7 @@ MADSpec supports multiple AI agents by generating agent-specific command files a
 | **Kilo Code**              | `.kilocode/rules/`     | Markdown | N/A (IDE-based) | Kilo Code IDE               |
 | **Roo Code**               | `.roo/rules/`          | Markdown | N/A (IDE-based) | Roo Code IDE                |
 | **SourceCraft**            | `.codeassistant/commands/` | Markdown | N/A (IDE-based) | SourceCraft IDE         |
+| **Qwen Code**              | `.qwen/commands/`      | Markdown | `qwen`          | Qwen Code CLI               |
 | **GitHub Copilot**         | `.github/agents/`      | Markdown | N/A (IDE-based) | GitHub Copilot in VS Code   |
 
 ### Step-by-Step Integration Guide
@@ -51,17 +52,18 @@ Follow these steps to add a new agent (using a hypothetical new agent as an exam
 
 **IMPORTANT**: Use the actual CLI tool name as the key, not a shortened version.
 
-Add the new agent to the `AGENT_CONFIG` dictionary in `src/madcpec_cli/__init__.py`. This is the **single source of truth** for all agent metadata:
+Add the new agent to the `AGENT_CONFIG` dictionary in `src/madspec_cli/config.py`. This is the **single source of truth** for all agent metadata:
 
 ```python
 AGENT_CONFIG = {
     # ... existing agents ...
-    "new-agent-cli": {  # Use the ACTUAL CLI tool name (what users type in terminal)
-        "name": "New Agent Display Name",
-        "folder": ".newagent/",  # Directory for agent files
-        "install_url": "https://example.com/install",  # URL for installation docs (or None if IDE-based)
-        "requires_cli": True,  # True if CLI tool required, False for IDE-based agents
-    },
+    "new-agent-cli": AgentConfig(
+        name="New Agent Display Name",
+        folder=".newagent/",
+        commands_subdir="commands",
+        install_url="https://example.com/install",
+        requires_cli=True,
+    ),
 }
 ```
 
@@ -76,6 +78,7 @@ This eliminates the need for special-case mappings throughout the codebase.
 
 - `name`: Human-readable display name shown to users
 - `folder`: Directory where agent-specific files are stored (relative to project root)
+- `commands_subdir`: Subdirectory under the agent folder where commands are generated
 - `install_url`: Installation documentation URL (set to `None` for IDE-based agents)
 - `requires_cli`: Whether the agent requires a CLI tool check during initialization
 
@@ -84,7 +87,7 @@ This eliminates the need for special-case mappings throughout the codebase.
 Update the `--ai` parameter help text in the `init()` command to include the new agent:
 
 ```python
-ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: cursor-agent, opencode, kilocode, roo, sourcecraft, or new-agent-cli"),
+ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: cursor-agent, opencode, kilocode, roo, sourcecraft, qwen, copilot, or new-agent-cli"),
 ```
 
 Also update any function docstrings, examples, and error messages that list available agents.
@@ -105,7 +108,7 @@ Modify `.github/workflows/scripts/create-release-packages.sh`:
 ##### Add to ALL_AGENTS array
 
 ```bash
-ALL_AGENTS=(cursor-agent opencode kilocode roo sourcecraft new-agent)
+ALL_AGENTS=(cursor-agent opencode kilocode roo sourcecraft qwen new-agent)
 ```
 
 ##### Add case statement for directory structure
@@ -116,6 +119,9 @@ case $agent in
   new-agent)
     mkdir -p "$base_dir/.newagent/commands"
     generate_commands new-agent md "\$ARGUMENTS" "$base_dir/.newagent/commands" ;;
+  qwen)
+    mkdir -p "$base_dir/.qwen/commands"
+    generate_commands qwen md "{{args}}" "$base_dir/.qwen/commands" ;;
 esac
 ```
 
@@ -151,6 +157,7 @@ For agents that require CLI tools, the checks are handled automatically based on
 Require a command-line tool to be installed:
 
 - **opencode**: `opencode` CLI
+- **Qwen Code**: `qwen` CLI
 
 ### IDE-Based Agents
 
@@ -165,7 +172,7 @@ Work within integrated development environments:
 
 ### Markdown Format
 
-Used by: Cursor, opencode, Kilo Code, Roo Code, SourceCraft
+Used by: Cursor, opencode, Kilo Code, Roo Code, SourceCraft, Qwen Code
 
 **Standard format:**
 
@@ -174,7 +181,7 @@ Used by: Cursor, opencode, Kilo Code, Roo Code, SourceCraft
 description: "Command description"
 ---
 
-Command content with $ARGUMENTS placeholder.
+Command content with the agent-specific arguments placeholder.
 ```
 
 **Important:** Commands call MADSpec CLI directly for branch and git operations, for example `madspec git current-branch`, `madspec git init`, and `madspec git commit`.
@@ -186,11 +193,12 @@ Command content with $ARGUMENTS placeholder.
 - **Kilo Code**: `.kilocode/rules/`
 - **Roo Code**: `.roo/rules/`
 - **SourceCraft**: `.codeassistant/commands/`
+- **Qwen Code**: `.qwen/commands/`
 - **GitHub Copilot**: `.github/agents/`  
 
 ## Argument Patterns
 
-MADSpec uses `$ARGUMENTS` placeholder for all Markdown-based commands.
+MADSpec uses `$ARGUMENTS` for most Markdown-based commands and `{{args}}` for Qwen Code.
 
 ## Testing New Agent Integration
 
@@ -204,7 +212,7 @@ MADSpec uses `$ARGUMENTS` placeholder for all Markdown-based commands.
 
 1. **Using shorthand keys instead of actual CLI tool names**: Always use the actual executable name as the AGENT_CONFIG key.
 2. **Incorrect `requires_cli` value**: Set to `True` only for agents that actually have CLI tools to check; set to `False` for IDE-based agents.
-3. **Wrong argument format**: Use `$ARGUMENTS` placeholder for all Markdown commands.
+3. **Wrong argument format**: Match the target agent's placeholder format (`$ARGUMENTS` for most Markdown agents, `{{args}}` for Qwen Code).
 4. **Directory naming**: Follow agent-specific conventions exactly (check existing agents for patterns).
 5. **Help text inconsistency**: Update all user-facing text consistently (help strings, docstrings, README, error messages).
 

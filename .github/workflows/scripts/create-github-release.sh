@@ -11,7 +11,7 @@ if [[ ! -f .genreleases/release-notes.txt ]]; then
   exit 1
 fi
 
-# Release artifact paths for MADSpec's 6 agents
+# Release artifact paths for MADSpec's 7 agents
 gh release create "$VERSION" \
   --title "$VERSION" \
   --notes-file .genreleases/release-notes.txt \
@@ -20,6 +20,7 @@ gh release create "$VERSION" \
   .genreleases/madspec-template-kilocode-"$VERSION".zip \
   .genreleases/madspec-template-roo-"$VERSION".zip \
   .genreleases/madspec-template-sourcecraft-"$VERSION".zip \
+  .genreleases/madspec-template-qwen-"$VERSION".zip \
   .genreleases/madspec-template-copilot-"$VERSION".zip
 
 echo "Created GitHub release $VERSION"

@@ -6,7 +6,7 @@ MADSpec - это фреймворк для разработки программ
 
 - Командам, которые хотят работать с AI-агентами более предсказуемо
 - Проектам, где важно сохранять прозрачность архитектурных решений и прогресса реализации
-- Пользователям Cursor, GitHub Copilot, opencode, Roo Code, Kilo Code и SourceCraft, которым нужен единый процесс работы
+- Пользователям Cursor, GitHub Copilot, opencode, Roo Code, Kilo Code, SourceCraft и Qwen Code, которым нужен единый процесс работы
 
 ## Что Дает MADSpec
 
@@ -63,6 +63,7 @@ uvx --from git+https://github.com/MADTeacher/MADSpec.git madspec init <PROJECT_N
 | [Kilo Code](https://github.com/Kilo-Org/kilocode) | IDE | `.kilocode/rules/` | Нет |
 | [Roo Code](https://roocode.com/) | IDE | `.roo/rules/` | Нет |
 | [SourceCraft](https://sourcecraft.dev/) | IDE | `.codeassistant/commands/` | Нет |
+| [Qwen Code](https://github.com/QwenLM/qwen-code) | CLI | `.qwen/commands/` | Да |
 | [GitHub Copilot](https://github.com/features/copilot) | IDE | `.github/agents/` | Нет |
 
 ## Как Работать С MADSpec

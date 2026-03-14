@@ -109,6 +109,31 @@ def test_init_creates_structured_memory_layout(tmp_path: Path, monkeypatch) -> N
     assert (project_path / ".madspec" / "main" / "implementation-plan.md").exists()
 
 
+def test_init_accepts_qwen_agent(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(initializer_core, "download_and_extract_template", _fake_download)
+    result = runner.invoke(
+        cli.app,
+        ["init", "demo", "--ai", "qwen", "--no-git", "--ignore-agent-tools"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "Selected AI assistant:" in result.stdout
+    assert "qwen" in result.stdout
+
+
+def test_init_rejects_unknown_agent_and_lists_qwen(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        cli.app,
+        ["init", "demo", "--ai", "unknown-agent", "--no-git"],
+    )
+
+    assert result.exit_code == 1
+    assert "Invalid AI assistant 'unknown-agent'" in result.stdout
+    assert "qwen" in result.stdout
+
+
 def test_memory_commands_support_validation_and_retrieve_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     project_path = tmp_path
