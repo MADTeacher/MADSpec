@@ -23,6 +23,43 @@ BANNER = """
 """
 
 TAGLINE = "MADSpec Framework"
+
+
+def _init_windows_console() -> None:
+    """Set UTF-8 codepage and enable VT processing on Windows.
+
+    Must run before Console() so Rich detects ANSI support
+    and avoids the legacy Win32 renderer that chokes on cp1251.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleOutputCP(65001)
+        kernel32.SetConsoleCP(65001)
+        STD_OUTPUT_HANDLE = -11
+        ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        handle = kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
+        if handle and handle != -1:
+            mode = ctypes.c_ulong()
+            if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                kernel32.SetConsoleMode(
+                    handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+                )
+    except Exception:
+        pass
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+_init_windows_console()
+
 console = Console()
 
 
@@ -205,16 +242,20 @@ class BannerGroup(TyperGroup):
 
 
 def show_banner() -> None:
-    banner_lines = BANNER.strip().split("\n")
-    colors = ["bright_blue", "blue", "cyan", "bright_cyan", "white", "bright_white"]
+    try:
+        banner_lines = BANNER.strip().split("\n")
+        colors = ["bright_blue", "blue", "cyan", "bright_cyan", "white", "bright_white"]
 
-    styled_banner = Text()
-    for index, line in enumerate(banner_lines):
-        styled_banner.append(line + "\n", style=colors[index % len(colors)])
+        styled_banner = Text()
+        for index, line in enumerate(banner_lines):
+            styled_banner.append(line + "\n", style=colors[index % len(colors)])
 
-    console.print(Align.center(styled_banner))
-    console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))
-    console.print()
+        console.print(Align.center(styled_banner))
+        console.print(Align.center(Text(TAGLINE, style="italic bright_yellow")))
+        console.print()
+    except UnicodeEncodeError:
+        console.print("[bright_blue]MADSpec Framework[/bright_blue]")
+        console.print()
 
 
 def maybe_show_root_banner() -> None:

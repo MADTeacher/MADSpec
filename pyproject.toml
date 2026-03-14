@@ -1,6 +1,6 @@
 [project]
 name = "madspec-cli"
-version = "0.4.2"
+version = "0.4.3"
 description = "CLI tool for MADSpec - experimental framework for software development using LLM agents"
 requires-python = ">=3.11"
 license = {text = "MIT"}
