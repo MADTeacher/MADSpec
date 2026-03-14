@@ -36,6 +36,7 @@ $ARGUMENTS
 - Перед `madspec memory register-step` сначала создай или обнови step source artifacts в `.madspec/<BRANCH>/steps/<step-id>/`.
 - Для записи нового planned step в canonical state используй `madspec memory register-step --stage mvp.plan --step-id <step-id> --step-kind <code|non-code> --title <title> --summary <summary> --covers <function> --related-artifact <path> --size <small|medium|large> --complexity <low|medium|high> ...`, а не ручное редактирование `progress.json`.
 - После каждого подтвержденного изменения стратегии или catalog шагов ратифицируй состояние через `madspec memory checkpoint --stage mvp.plan ...`.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture`, `madspec memory checkpoint` и `madspec memory register-step` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory register-step --from-file .madspec/.tmp/register-args.json --json-output`). Ключи JSON соответствуют именам полей команды, плюс `stage`, `branch`, `json_output` на верхнем уровне.
 
 ## КРИТИЧЕСКИ ВАЖНО: Запрет изменения currentImplementStep
 

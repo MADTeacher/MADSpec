@@ -6,6 +6,7 @@ import typer
 
 from madspec_cli.memory.workflow.implementation_shared import IMPLEMENTATION_STAGES
 from madspec_cli.shared.cli.banners import console, show_banner
+from madspec_cli.shared.cli.file_input import read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.implementation_steps import (
@@ -18,7 +19,8 @@ from ..domain.branch_layout import resolve_target_branch
 
 
 def memory_start_step(
-    stage: str = typer.Option(..., "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
+    stage: str = typer.Option(None, "--stage", help="Implementation stage: mvp.implement or feature.implement"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to next executable step"),
     summary: str = typer.Option(None, "--summary", help="Optional active goal override"),
@@ -26,6 +28,19 @@ def memory_start_step(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Select and start an implementation step in structured memory."""
+    if from_file:
+        file_data = read_args_file(from_file)
+        stage = file_data.pop("stage", stage)
+        branch_name = file_data.pop("branch", branch_name)
+        step_id = file_data.pop("step_id", step_id)
+        summary = file_data.pop("summary", summary)
+        evidence = file_data.pop("evidence", evidence)
+        json_output = file_data.pop("json_output", json_output)
+
+    if not stage:
+        console.print("[red]--stage is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     result = start_step(
@@ -53,7 +68,8 @@ def memory_start_step(
 
 
 def memory_checkpoint_step(
-    stage: str = typer.Option(..., "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
+    stage: str = typer.Option(None, "--stage", help="Implementation stage: mvp.implement or feature.implement"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to current implementation step"),
     summary: str = typer.Option(None, "--summary", help="Optional checkpoint summary"),
@@ -65,6 +81,35 @@ def memory_checkpoint_step(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Persist an in-progress implementation checkpoint into structured memory."""
+    if from_file:
+        file_data = read_args_file(from_file)
+        stage = file_data.pop("stage", stage)
+        branch_name = file_data.pop("branch", branch_name)
+        json_output = file_data.pop("json_output", json_output)
+        options = {
+            "step_id": file_data.get("step_id", step_id),
+            "summary": file_data.get("summary", summary),
+            "tdd_phase": file_data.get("tdd_phase", tdd_phase),
+            "red_evidence": file_data.get("red_evidence", red_evidence or []),
+            "green_evidence": file_data.get("green_evidence", green_evidence or []),
+            "refactor_note": file_data.get("refactor_note", refactor_note),
+            "evidence": file_data.get("evidence", evidence or []),
+        }
+    else:
+        options = {
+            "step_id": step_id,
+            "summary": summary,
+            "tdd_phase": tdd_phase,
+            "red_evidence": red_evidence or [],
+            "green_evidence": green_evidence or [],
+            "refactor_note": refactor_note,
+            "evidence": evidence or [],
+        }
+
+    if not stage:
+        console.print("[red]--stage is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     result = checkpoint_step(
@@ -72,15 +117,7 @@ def memory_checkpoint_step(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
-            options={
-                "step_id": step_id,
-                "summary": summary,
-                "tdd_phase": tdd_phase,
-                "red_evidence": red_evidence or [],
-                "green_evidence": green_evidence or [],
-                "refactor_note": refactor_note,
-                "evidence": evidence or [],
-            },
+            options=options,
         )
     )
 
@@ -105,8 +142,9 @@ def memory_checkpoint_step(
 
 
 def memory_complete_step(
-    stage: str = typer.Option(..., "--stage", help="Implementation stage: mvp.implement or feature.implement"),
-    summary: str = typer.Option(..., "--summary", help="Completion summary for the implementation step"),
+    from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
+    stage: str = typer.Option(None, "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    summary: str = typer.Option(None, "--summary", help="Completion summary for the implementation step"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to current implementation step"),
     red_evidence: list[str] = typer.Option(None, "--red-evidence", help="Red-phase evidence; repeat for multiple values"),
@@ -119,6 +157,43 @@ def memory_complete_step(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Mark an implementation step complete and advance structured memory state."""
+    if from_file:
+        file_data = read_args_file(from_file)
+        stage = file_data.pop("stage", stage)
+        summary = file_data.pop("summary", summary)
+        branch_name = file_data.pop("branch", branch_name)
+        json_output = file_data.pop("json_output", json_output)
+        options = {
+            "step_id": file_data.get("step_id", step_id),
+            "summary": summary,
+            "red_evidence": file_data.get("red_evidence", red_evidence or []),
+            "green_evidence": file_data.get("green_evidence", green_evidence or []),
+            "refactor_note": file_data.get("refactor_note", refactor_note),
+            "evidence": file_data.get("evidence", evidence or []),
+            "facts": file_data.get("facts", fact or []),
+            "decisions": file_data.get("decisions", decision or []),
+            "contracts": file_data.get("contracts", contract or []),
+        }
+    else:
+        options = {
+            "step_id": step_id,
+            "summary": summary,
+            "red_evidence": red_evidence or [],
+            "green_evidence": green_evidence or [],
+            "refactor_note": refactor_note,
+            "evidence": evidence or [],
+            "facts": fact or [],
+            "decisions": decision or [],
+            "contracts": contract or [],
+        }
+
+    if not stage:
+        console.print("[red]--stage is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+    if not summary:
+        console.print("[red]--summary is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     result = complete_step(
@@ -126,17 +201,7 @@ def memory_complete_step(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
-            options={
-                "step_id": step_id,
-                "summary": summary,
-                "red_evidence": red_evidence or [],
-                "green_evidence": green_evidence or [],
-                "refactor_note": refactor_note,
-                "evidence": evidence or [],
-                "facts": fact or [],
-                "decisions": decision or [],
-                "contracts": contract or [],
-            },
+            options=options,
         )
     )
 

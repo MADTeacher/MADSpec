@@ -70,14 +70,19 @@ Structured memory:
 
 - `madspec memory init` — создать memory layout для ветки
 - `madspec memory status` — проверить текущее состояние memory
-- `madspec memory capture` — накапливать validated facts/decisions/contracts/questions по stage
-- `madspec memory checkpoint` — завершить non-iterative stage и обновить derived state
+- `madspec memory capture` — накапливать validated facts/decisions/contracts/questions по stage; поддерживает `--from-file`
+- `madspec memory checkpoint` — завершить non-iterative stage и обновить derived state; поддерживает `--from-file`
 - `madspec memory retrieve` — получить минимальный контекст stage/step; для `mvp.concept` по умолчанию возвращает краткий `concept_status`, для `mvp.design` — `design_status`, для `mvp.tech` — `tech_status`, для `mvp.plan` — `plan_status`, а полный stage artifact state отдает только по `--full-artifact`
 - `madspec memory consolidate` — пересобрать markdown views из structured memory
 - `madspec memory validate` — проверить согласованность памяти и generated views
+- `madspec memory register-step` — зарегистрировать шаг планирования; поддерживает `--from-file`
+- `madspec memory start-step` — запустить шаг реализации; поддерживает `--from-file`
+- `madspec memory checkpoint-step` — зафиксировать промежуточное состояние шага; поддерживает `--from-file`
+- `madspec memory complete-step` — завершить шаг реализации; поддерживает `--from-file`
 
 ## Рабочие инварианты
 
+- Для команд `memory capture`, `memory checkpoint`, `memory register-step`, `memory start-step`, `memory checkpoint-step` и `memory complete-step` **ОБЯЗАТЕЛЬНО** используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>`. Это гарантирует работу на всех платформах (Windows имеет лимит ~8191 символов для cmd.exe) и устраняет проблемы с экранированием спецсимволов в shell
 - Начинай с чтения существующих артефактов в `.madspec/<branch>/`, а не с предположений о текущем этапе
 - Для MVP соблюдай порядок `concept -> design -> tech -> architecture -> plan -> implement`
 - Для `mvp.design` считай нормой длинную итеративную работу через много независимых чатов: новый чат должен восстанавливать состояние из `.madspec/<branch>/memory/`, `ui-design.md` и `ui-prototype/`, а не из истории предыдущего разговора
@@ -162,6 +167,14 @@ Structured memory:
 
 - Можно адаптироваться, но нужно явно назвать, какие артефакты и решения тогда останутся непокрытыми
 - Для ускорения допустимо делать минимальный проход, но не выдавай неподготовленный этап за полноценно завершённый
+
+### Команда memory падает на Windows / слишком длинная командная строка
+
+- Windows cmd.exe ограничивает командную строку ~8191 символами, PowerShell sandbox агентов может иметь ещё более жёсткие ограничения
+- Команда `memory capture` с ~75 параметрами легко превышает этот лимит при заполнении данными архитектуры, дизайна или концепции
+- Решение: используй `--from-file <path>` — запиши все аргументы в JSON-файл и передай путь к нему
+- Пример: `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`
+- JSON-файл содержит те же ключи, что и `options` dict соответствующей команды, плюс `stage`, `branch`, `json_output`, `status` и `summary` на верхнем уровне
 
 ## Практика работы
 

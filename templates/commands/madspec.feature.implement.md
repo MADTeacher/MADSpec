@@ -17,6 +17,7 @@ $ARGUMENTS
 - Для запуска шага используй `madspec memory start-step --stage feature.implement`.
 - Для TDD checkpoint используй `madspec memory checkpoint-step --stage feature.implement`.
 - Для завершения шага используй `madspec memory complete-step --stage feature.implement`.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory start-step`, `madspec memory checkpoint-step` и `madspec memory complete-step` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory complete-step --from-file .madspec/.tmp/complete-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `step_id`, `summary`, `tdd_phase`, `facts`, `decisions`), плюс `stage`, `branch`, `json_output` на верхнем уровне.
 
 ## Предварительные условия
 

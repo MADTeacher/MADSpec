@@ -55,6 +55,7 @@ $ARGUMENTS
   - `--fact/--decision/--contract` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`
   - `--evidence` — ссылки на `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/data-model.md`, `.madspec/<BRANCH>/contracts/openapi.yaml`
 - `madspec memory checkpoint` сам обновляет structured memory, затем выполняет `madspec memory consolidate` и `madspec memory validate`.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `entities`, `entity_fields`, `endpoints`, `endpoint_fields`, `directories`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
 
 ## Описание
 

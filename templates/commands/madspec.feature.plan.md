@@ -22,6 +22,7 @@ $ARGUMENTS
 - Перед регистрацией шага обязательно проверь его через `madspec memory next-step --stage feature.plan --candidate-step ...`.
 - Новый planned step записывай только через `madspec memory register-step --stage feature.plan ...`.
 - Финальную ратификацию этапа делай через `madspec memory checkpoint --stage feature.plan --summary ...`.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture`, `madspec memory checkpoint` и `madspec memory register-step` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory register-step --from-file .madspec/.tmp/register-args.json --json-output`). Ключи JSON соответствуют именам полей команды, плюс `stage`, `branch`, `json_output` на верхнем уровне.
 
 ## Цель этапа
 

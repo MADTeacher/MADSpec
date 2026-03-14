@@ -1930,6 +1930,278 @@ def test_memory_checkpoint_invalid_stage_still_shows_allowed_stages(tmp_path: Pa
     assert "stage must be one of:" in result.stdout
 
 
+# ── --from-file tests ──────────────────────────────────────────────────────────
+
+
+def test_memory_capture_from_file(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    args_file = tmp_path / "capture-args.json"
+    args_file.write_text(
+        json.dumps({
+            "stage": "mvp.concept",
+            "branch": "main",
+            "json_output": True,
+            "project_name": "FromFileProject",
+            "system_overview": "A system built via --from-file.",
+            "audiences": ["Developers"],
+            "scenarios": ["Deploy from CI"],
+            "pain_points": ["Manual setup"],
+            "feature_p1": ["CI Pipeline::Automated deploy"],
+            "constraints": ["Must run on Linux"],
+            "next_actions": ["Proceed to design"],
+        }),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(args_file), "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True
+
+
+def test_memory_capture_from_file_missing_stage(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    args_file = tmp_path / "capture-args.json"
+    args_file.write_text(json.dumps({"summary": "No stage provided"}), encoding="utf-8")
+
+    result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(args_file)])
+    assert result.exit_code == 1
+    assert "--stage is required" in result.stdout
+
+
+def test_memory_capture_from_file_bad_json(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    args_file = tmp_path / "bad.json"
+    args_file.write_text("not json {{{", encoding="utf-8")
+
+    result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(args_file)])
+    assert result.exit_code != 0
+
+
+def test_memory_capture_from_file_not_found(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(tmp_path / "missing.json")])
+    assert result.exit_code != 0
+
+
+def test_memory_checkpoint_from_file(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    capture_args = tmp_path / "capture.json"
+    capture_args.write_text(
+        json.dumps({
+            "stage": "mvp.concept",
+            "branch": "main",
+            "project_name": "CheckpointTest",
+            "system_overview": "Test system for checkpoint from-file.",
+            "audiences": ["QA Engineers"],
+            "scenarios": ["Run tests in CI"],
+            "pain_points": ["Manual QA is slow"],
+            "feature_p1": ["Test::Test feature"],
+        }),
+        encoding="utf-8",
+    )
+    capture_result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(capture_args), "--json-output"])
+    assert capture_result.exit_code == 0, capture_result.stdout
+
+    checkpoint_args = tmp_path / "checkpoint.json"
+    checkpoint_args.write_text(
+        json.dumps({
+            "stage": "mvp.concept",
+            "branch": "main",
+            "summary": "Concept checkpoint via --from-file",
+            "evidence": [".madspec/main/concept.md"],
+        }),
+        encoding="utf-8",
+    )
+    result = runner.invoke(cli.app, ["memory", "checkpoint", "--from-file", str(checkpoint_args), "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True
+
+
+def test_memory_checkpoint_from_file_missing_summary(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    args_file = tmp_path / "checkpoint.json"
+    args_file.write_text(json.dumps({"stage": "mvp.concept"}), encoding="utf-8")
+
+    result = runner.invoke(cli.app, ["memory", "checkpoint", "--from-file", str(args_file)])
+    assert result.exit_code == 1
+    assert "--summary is required" in result.stdout
+
+
+def test_memory_register_step_from_file(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = project_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        "# Concept\n\n### Приоритет 1\n- Auth: sign in users\n",
+        encoding="utf-8",
+    )
+    runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    _create_step_artifacts(branch_dir, "step-01-auth")
+
+    args_file = tmp_path / "register.json"
+    args_file.write_text(
+        json.dumps({
+            "stage": "mvp.plan",
+            "branch": "main",
+            "step_id": "step-01-auth",
+            "step_kind": "code",
+            "covers": ["Auth"],
+        }),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(cli.app, ["memory", "register-step", "--from-file", str(args_file), "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True
+
+
+def test_memory_register_step_from_file_missing_required(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    args_file = tmp_path / "register.json"
+    args_file.write_text(json.dumps({"stage": "mvp.plan"}), encoding="utf-8")
+
+    result = runner.invoke(cli.app, ["memory", "register-step", "--from-file", str(args_file)])
+    assert result.exit_code == 1
+    assert "--step-id is required" in result.stdout
+
+
+def test_memory_implementation_lifecycle_from_file(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = project_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        "# Concept\n\n### Приоритет 1\n- Auth: sign in\n",
+        encoding="utf-8",
+    )
+    runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    _create_step_artifacts(branch_dir, "step-01-auth")
+
+    runner.invoke(
+        cli.app,
+        [
+            "memory", "register-step",
+            "--branch", "main",
+            "--stage", "mvp.plan",
+            "--step-id", "step-01-auth",
+            "--step-kind", "code",
+            "--covers", "Auth",
+            "--json-output",
+        ],
+    )
+
+    start_file = tmp_path / "start.json"
+    start_file.write_text(
+        json.dumps({"stage": "mvp.implement", "branch": "main"}),
+        encoding="utf-8",
+    )
+    start_result = runner.invoke(cli.app, ["memory", "start-step", "--from-file", str(start_file), "--json-output"])
+    assert start_result.exit_code == 0, start_result.stdout
+    assert json.loads(start_result.stdout)["step_id"] == "step-01-auth"
+
+    checkpoint_file = tmp_path / "checkpoint-step.json"
+    checkpoint_file.write_text(
+        json.dumps({
+            "stage": "mvp.implement",
+            "branch": "main",
+            "step_id": "step-01-auth",
+            "tdd_phase": "red",
+            "summary": "Red phase via from-file",
+            "red_evidence": ["pytest tests/test_auth.py"],
+        }),
+        encoding="utf-8",
+    )
+    cp_result = runner.invoke(cli.app, ["memory", "checkpoint-step", "--from-file", str(checkpoint_file), "--json-output"])
+    assert cp_result.exit_code == 0, cp_result.stdout
+    cp_payload = json.loads(cp_result.stdout)
+    assert cp_payload["tdd_phase"] == "red"
+
+    complete_file = tmp_path / "complete.json"
+    complete_file.write_text(
+        json.dumps({
+            "stage": "mvp.implement",
+            "branch": "main",
+            "step_id": "step-01-auth",
+            "summary": "Auth completed via from-file",
+            "green_evidence": ["pytest tests/test_auth.py"],
+            "refactor_note": "No refactor needed.",
+            "facts": ["Auth uses JWT tokens"],
+            "decisions": ["Chose bcrypt for hashing"],
+        }),
+        encoding="utf-8",
+    )
+    complete_result = runner.invoke(cli.app, ["memory", "complete-step", "--from-file", str(complete_file), "--json-output"])
+    assert complete_result.exit_code == 0, complete_result.stdout
+    complete_payload = json.loads(complete_result.stdout)
+    assert complete_payload["written"]["facts"] == 1
+    assert complete_payload["written"]["decisions"] == 1
+
+
+def test_memory_complete_step_from_file_missing_summary(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    args_file = tmp_path / "complete.json"
+    args_file.write_text(json.dumps({"stage": "mvp.implement"}), encoding="utf-8")
+
+    result = runner.invoke(cli.app, ["memory", "complete-step", "--from-file", str(args_file)])
+    assert result.exit_code == 1
+    assert "--summary is required" in result.stdout
+
+
+def test_memory_start_step_from_file_missing_stage(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    args_file = tmp_path / "start.json"
+    args_file.write_text(json.dumps({"step_id": "step-01"}), encoding="utf-8")
+
+    result = runner.invoke(cli.app, ["memory", "start-step", "--from-file", str(args_file)])
+    assert result.exit_code == 1
+    assert "--stage is required" in result.stdout
+
+
 def test_git_current_branch_uses_config_fallback_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".madspec").mkdir()

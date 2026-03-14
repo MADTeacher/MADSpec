@@ -6,6 +6,7 @@ import typer
 
 from madspec_cli.memory.stage_capture import CAPTURE_STAGES
 from madspec_cli.shared.cli.banners import console, show_banner
+from madspec_cli.shared.cli.file_input import read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.capture_stage import CaptureStageRequest, execute as capture_stage
@@ -13,7 +14,8 @@ from ..domain.branch_layout import resolve_target_branch
 
 
 def memory_capture(
-    stage: str = typer.Option(..., "--stage", help="Stage to capture: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
+    from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
+    stage: str = typer.Option(None, "--stage", help="Stage to capture: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
     summary: str = typer.Option(None, "--summary", help="Optional stage note summary"),
     fact: list[str] = typer.Option(None, "--fact", help="Fact to capture; repeat for multiple values"),
     decision: list[str] = typer.Option(None, "--decision", help="Decision to capture; repeat for multiple values"),
@@ -89,6 +91,92 @@ def memory_capture(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Capture incremental non-iterative stage memory before final checkpoint."""
+    if from_file:
+        file_data = read_args_file(from_file)
+        stage = file_data.pop("stage", stage)
+        branch_name = file_data.pop("branch", branch_name)
+        json_output = file_data.pop("json_output", json_output)
+        status = file_data.pop("status", status)
+        options = file_data
+    else:
+        options = {
+            "summary": summary,
+            "facts": fact or [],
+            "decisions": decision or [],
+            "contracts": contract or [],
+            "evidence": evidence or [],
+            "questions": question or [],
+            "pending_actions": pending_action or [],
+            "project_name": project_name,
+            "system_overview": system_overview,
+            "audiences": audience or [],
+            "scenarios": scenario or [],
+            "pain_points": pain or [],
+            "feature_p1": feature_p1 or [],
+            "feature_p2": feature_p2 or [],
+            "feature_p3": feature_p3 or [],
+            "constraints": constraint or [],
+            "assumptions": assumption or [],
+            "next_actions": next_action or [],
+            "design_overview": design_overview,
+            "platforms": platform or [],
+            "zones": zone or [],
+            "screens": screen or [],
+            "screen_features": screen_feature or [],
+            "flows": flow or [],
+            "flow_steps": flow_step or [],
+            "flow_alternatives": flow_alternative or [],
+            "navigation": nav or [],
+            "platform_constraints": platform_constraint or [],
+            "screen_data": screen_data or [],
+            "stack_overview": stack_overview,
+            "project_type": project_type,
+            "framework": framework,
+            "requirements": requirement or [],
+            "structure_notes": structure_note or [],
+            "preferences": preference or [],
+            "tech_constraints": tech_constraint or [],
+            "stack_components": stack_component or [],
+            "libraries": library or [],
+            "code_organization": code_organization,
+            "alternatives": alternative or [],
+            "architecture_overview": architecture_overview,
+            "project_structure": project_structure,
+            "directories": directory or [],
+            "entities": entity or [],
+            "entity_fields": entity_field or [],
+            "entity_relationships": entity_relationship or [],
+            "entity_states": entity_state or [],
+            "endpoints": endpoint or [],
+            "endpoint_screens": endpoint_screen or [],
+            "endpoint_fields": endpoint_field or [],
+            "endpoint_errors": endpoint_error or [],
+            "integrations": integration or [],
+            "code_principles": code_principle or [],
+            "architecture_patterns": pattern or [],
+            "security_notes": security_note or [],
+            "performance_notes": performance_note or [],
+            "plan_overview": plan_overview,
+            "planning_principles": planning_principle or [],
+            "feature_goal": feature_goal,
+            "problem": problem,
+            "expected_outcome": expected_outcome,
+            "existing_modules": existing_module or [],
+            "modified_files": modified_file or [],
+            "new_files": new_file or [],
+            "interface_contracts": interface_contract or [],
+            "dependencies": dependency or [],
+            "risks": risk or [],
+            "recommendations": recommendation or [],
+            "tech_notes": tech_note or [],
+            "architecture_notes": architecture_note or [],
+            "status": status,
+        }
+
+    if not stage:
+        console.print("[red]--stage is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     result = capture_stage(
@@ -96,79 +184,7 @@ def memory_capture(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
-            options={
-                "summary": summary,
-                "facts": fact or [],
-                "decisions": decision or [],
-                "contracts": contract or [],
-                "evidence": evidence or [],
-                "questions": question or [],
-                "pending_actions": pending_action or [],
-                "project_name": project_name,
-                "system_overview": system_overview,
-                "audiences": audience or [],
-                "scenarios": scenario or [],
-                "pain_points": pain or [],
-                "feature_p1": feature_p1 or [],
-                "feature_p2": feature_p2 or [],
-                "feature_p3": feature_p3 or [],
-                "constraints": constraint or [],
-                "assumptions": assumption or [],
-                "next_actions": next_action or [],
-                "design_overview": design_overview,
-                "platforms": platform or [],
-                "zones": zone or [],
-                "screens": screen or [],
-                "screen_features": screen_feature or [],
-                "flows": flow or [],
-                "flow_steps": flow_step or [],
-                "flow_alternatives": flow_alternative or [],
-                "navigation": nav or [],
-                "platform_constraints": platform_constraint or [],
-                "screen_data": screen_data or [],
-                "stack_overview": stack_overview,
-                "project_type": project_type,
-                "framework": framework,
-                "requirements": requirement or [],
-                "structure_notes": structure_note or [],
-                "preferences": preference or [],
-                "tech_constraints": tech_constraint or [],
-                "stack_components": stack_component or [],
-                "libraries": library or [],
-                "code_organization": code_organization,
-                "alternatives": alternative or [],
-                "architecture_overview": architecture_overview,
-                "project_structure": project_structure,
-                "directories": directory or [],
-                "entities": entity or [],
-                "entity_fields": entity_field or [],
-                "entity_relationships": entity_relationship or [],
-                "entity_states": entity_state or [],
-                "endpoints": endpoint or [],
-                "endpoint_screens": endpoint_screen or [],
-                "endpoint_fields": endpoint_field or [],
-                "endpoint_errors": endpoint_error or [],
-                "integrations": integration or [],
-                "code_principles": code_principle or [],
-                "architecture_patterns": pattern or [],
-                "security_notes": security_note or [],
-                "performance_notes": performance_note or [],
-                "plan_overview": plan_overview,
-                "planning_principles": planning_principle or [],
-                "feature_goal": feature_goal,
-                "problem": problem,
-                "expected_outcome": expected_outcome,
-                "existing_modules": existing_module or [],
-                "modified_files": modified_file or [],
-                "new_files": new_file or [],
-                "interface_contracts": interface_contract or [],
-                "dependencies": dependency or [],
-                "risks": risk or [],
-                "recommendations": recommendation or [],
-                "tech_notes": tech_note or [],
-                "architecture_notes": architecture_note or [],
-                "status": status,
-            },
+            options=options,
         )
     )
 

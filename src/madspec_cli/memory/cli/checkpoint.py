@@ -6,6 +6,7 @@ import typer
 
 from madspec_cli.memory.checkpoint import CHECKPOINT_STAGES
 from madspec_cli.shared.cli.banners import console, show_banner
+from madspec_cli.shared.cli.file_input import read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.checkpoint_stage import CheckpointStageRequest, execute as checkpoint_stage
@@ -13,8 +14,9 @@ from ..domain.branch_layout import resolve_target_branch
 
 
 def memory_checkpoint(
-    stage: str = typer.Option(..., "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
-    summary: str = typer.Option(..., "--summary", help="Stage checkpoint summary"),
+    from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
+    stage: str = typer.Option(None, "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
+    summary: str = typer.Option(None, "--summary", help="Stage checkpoint summary"),
     fact: list[str] = typer.Option(None, "--fact", help="Validated fact; repeat for multiple values"),
     decision: list[str] = typer.Option(None, "--decision", help="Validated decision; repeat for multiple values"),
     contract: list[str] = typer.Option(None, "--contract", help="Validated contract/constraint; repeat for multiple values"),
@@ -25,6 +27,37 @@ def memory_checkpoint(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Persist a non-iterative stage checkpoint into structured memory."""
+    if from_file:
+        file_data = read_args_file(from_file)
+        stage = file_data.pop("stage", stage)
+        summary = file_data.pop("summary", summary)
+        branch_name = file_data.pop("branch", branch_name)
+        json_output = file_data.pop("json_output", json_output)
+        options = {
+            "facts": file_data.get("facts", []),
+            "decisions": file_data.get("decisions", []),
+            "contracts": file_data.get("contracts", []),
+            "evidence": file_data.get("evidence", []),
+            "questions": file_data.get("questions", []),
+            "pending_actions": file_data.get("pending_actions", []),
+        }
+    else:
+        options = {
+            "facts": fact or [],
+            "decisions": decision or [],
+            "contracts": contract or [],
+            "evidence": evidence or [],
+            "questions": question or [],
+            "pending_actions": pending_action or [],
+        }
+
+    if not stage:
+        console.print("[red]--stage is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+    if not summary:
+        console.print("[red]--summary is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     result = checkpoint_stage(
@@ -33,14 +66,7 @@ def memory_checkpoint(
             branch_name=target_branch,
             stage=stage,
             summary=summary,
-            options={
-                "facts": fact or [],
-                "decisions": decision or [],
-                "contracts": contract or [],
-                "evidence": evidence or [],
-                "questions": question or [],
-                "pending_actions": pending_action or [],
-            },
+            options=options,
         )
     )
 

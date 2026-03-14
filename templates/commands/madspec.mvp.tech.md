@@ -48,6 +48,7 @@ $ARGUMENTS
   - `--evidence .madspec/<BRANCH>/tech-stack.md`
   - `--fact/--decision/--contract` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`
 - `madspec memory checkpoint` сам пересобирает generated views и запускает validation.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `stack_components`, `libraries`, `requirements`, `tech_constraints`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
 
 ## Предварительные условия
 

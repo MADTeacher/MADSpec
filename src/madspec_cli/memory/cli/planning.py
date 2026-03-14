@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from madspec_cli.shared.cli.banners import console, show_banner
+from madspec_cli.shared.cli.file_input import read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.determine_next_step import DetermineNextStepRequest, execute as determine_next_step
@@ -54,10 +55,11 @@ def memory_next_step(
 
 
 def memory_register_step(
-    stage: str = typer.Option(..., "--stage", help="Planning stage, e.g. mvp.plan or feature.plan"),
-    step_id: str = typer.Option(..., "--step-id", help="New step identifier"),
+    from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
+    stage: str = typer.Option(None, "--stage", help="Planning stage, e.g. mvp.plan or feature.plan"),
+    step_id: str = typer.Option(None, "--step-id", help="New step identifier"),
     covers: list[str] = typer.Option(None, "--covers", help="Covered function ids/labels; repeat for multiple values."),
-    step_kind: str = typer.Option(..., "--step-kind", help="Step kind: code or non-code"),
+    step_kind: str = typer.Option(None, "--step-kind", help="Step kind: code or non-code"),
     tdd_policy: str = typer.Option(None, "--tdd-policy", help="TDD policy: required, waived, or not-applicable"),
     waiver_reason: str = typer.Option(None, "--waiver-reason", help="Reason for waiving TDD on non-code steps"),
     title: str = typer.Option(None, "--title", help="Optional human-readable step title for the generated implementation plan"),
@@ -70,6 +72,33 @@ def memory_register_step(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Register a planned step and update coverage metadata in progress.json."""
+    if from_file:
+        file_data = read_args_file(from_file)
+        stage = file_data.pop("stage", stage)
+        step_id = file_data.pop("step_id", step_id)
+        covers = file_data.pop("covers", covers)
+        step_kind = file_data.pop("step_kind", step_kind)
+        tdd_policy = file_data.pop("tdd_policy", tdd_policy)
+        waiver_reason = file_data.pop("waiver_reason", waiver_reason)
+        title = file_data.pop("title", title)
+        branch_name = file_data.pop("branch", branch_name)
+        depends_on = file_data.pop("depends_on", depends_on)
+        summary = file_data.pop("summary", summary)
+        related_artifact = file_data.pop("related_artifacts", related_artifact)
+        size = file_data.pop("size", size)
+        complexity = file_data.pop("complexity", complexity)
+        json_output = file_data.pop("json_output", json_output)
+
+    if not stage:
+        console.print("[red]--stage is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+    if not step_id:
+        console.print("[red]--step-id is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+    if not step_kind:
+        console.print("[red]--step-kind is required (pass it via CLI or inside the JSON file)[/red]")
+        raise typer.Exit(1)
+
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     result = register_step(
