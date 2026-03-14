@@ -1991,6 +1991,67 @@ def test_memory_capture_from_file(tmp_path: Path, monkeypatch) -> None:
     assert payload["accepted"] is True
 
 
+def test_memory_capture_from_file_accepts_cli_alias_keys(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    args_file = tmp_path / "capture-aliases.json"
+    args_file.write_text(
+        json.dumps({
+            "stage": "mvp.concept",
+            "branch": "main",
+            "project_name": "AliasProject",
+            "system_overview": "A system built via CLI-style aliases.",
+            "audience": ["Developers"],
+            "scenario": ["Deploy from CI"],
+            "pain": ["Manual setup"],
+            "feature_p1": ["CI Pipeline::Automated deploy"],
+            "constraint": ["Must run on Linux"],
+            "next_action": ["Proceed to design"],
+        }),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(args_file), "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True
+
+
+def test_memory_capture_from_file_accepts_hyphenated_keys(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    args_file = tmp_path / "capture-hyphenated.json"
+    args_file.write_text(
+        json.dumps({
+            "stage": "review",
+            "branch": "main",
+            "summary": "Review findings from JSON aliases",
+            "fact": ["Observed issue in review flow"],
+            "pending-action": ["Investigate retry handling"],
+        }),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(args_file), "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True
+    assert payload["written"]["facts"] == 1
+    assert payload["written"]["pending_actions"] == 1
+
+
 def test_memory_capture_from_file_missing_stage(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     project_path = tmp_path
@@ -2065,6 +2126,52 @@ def test_memory_checkpoint_from_file(tmp_path: Path, monkeypatch) -> None:
     assert payload["accepted"] is True
 
 
+def test_memory_checkpoint_from_file_accepts_alias_keys(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+
+    capture_args = tmp_path / "capture.json"
+    capture_args.write_text(
+        json.dumps({
+            "stage": "mvp.concept",
+            "branch": "main",
+            "project_name": "CheckpointAliasTest",
+            "system_overview": "Test system for checkpoint alias support.",
+            "audiences": ["QA Engineers"],
+            "scenarios": ["Run tests in CI"],
+            "pain_points": ["Manual QA is slow"],
+            "feature_p1": ["Test::Test feature"],
+        }),
+        encoding="utf-8",
+    )
+    capture_result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(capture_args), "--json-output"])
+    assert capture_result.exit_code == 0, capture_result.stdout
+
+    checkpoint_args = tmp_path / "checkpoint-alias.json"
+    checkpoint_args.write_text(
+        json.dumps({
+            "stage": "mvp.concept",
+            "branch": "main",
+            "summary": "Checkpoint via alias keys",
+            "fact": ["Validated concept"],
+            "pending_action": ["Start design"],
+        }),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(cli.app, ["memory", "checkpoint", "--from-file", str(checkpoint_args), "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True
+    assert payload["written"]["decision_log"] == 1
+    assert payload["written"]["facts"] == 1
+
+
 def test_memory_checkpoint_from_file_missing_summary(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     project_path = tmp_path
@@ -2107,6 +2214,42 @@ def test_memory_register_step_from_file(tmp_path: Path, monkeypatch) -> None:
             "step_id": "step-01-auth",
             "step_kind": "code",
             "covers": ["Auth"],
+        }),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(cli.app, ["memory", "register-step", "--from-file", str(args_file), "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True
+
+
+def test_memory_register_step_from_file_accepts_hyphenated_alias_keys(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = project_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        "# Concept\n\n### Приоритет 1\n- Auth: sign in users\n",
+        encoding="utf-8",
+    )
+    runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    _create_step_artifacts(branch_dir, "step-01-auth")
+
+    args_file = tmp_path / "register-hyphen.json"
+    args_file.write_text(
+        json.dumps({
+            "stage": "mvp.plan",
+            "branch": "main",
+            "step-id": "step-01-auth",
+            "step-kind": "code",
+            "covers": ["Auth"],
+            "related-artifact": ["steps/step-01-auth/tasks.md"],
         }),
         encoding="utf-8",
     )
@@ -2203,6 +2346,87 @@ def test_memory_implementation_lifecycle_from_file(tmp_path: Path, monkeypatch) 
     complete_payload = json.loads(complete_result.stdout)
     assert complete_payload["written"]["facts"] == 1
     assert complete_payload["written"]["decisions"] == 1
+
+
+def test_memory_complete_step_from_file_accepts_alias_keys(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    project_path = tmp_path
+    (project_path / ".madspec").mkdir()
+    (project_path / ".madspec" / "config.json").write_text(
+        json.dumps({"currentBranch": "main", "version": "1.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    branch_dir = project_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    (branch_dir / "concept.md").write_text(
+        "# Concept\n\n### Приоритет 1\n- Auth: sign in\n",
+        encoding="utf-8",
+    )
+    runner.invoke(cli.app, ["memory", "init", "--branch", "main"])
+    _create_step_artifacts(branch_dir, "step-01-auth")
+
+    runner.invoke(
+        cli.app,
+        [
+            "memory", "register-step",
+            "--branch", "main",
+            "--stage", "mvp.plan",
+            "--step-id", "step-01-auth",
+            "--step-kind", "code",
+            "--covers", "Auth",
+            "--json-output",
+        ],
+    )
+
+    start_file = tmp_path / "start.json"
+    start_file.write_text(
+        json.dumps({"stage": "mvp.implement", "branch": "main"}),
+        encoding="utf-8",
+    )
+    start_result = runner.invoke(cli.app, ["memory", "start-step", "--from-file", str(start_file), "--json-output"])
+    assert start_result.exit_code == 0, start_result.stdout
+
+    complete_file = tmp_path / "complete-alias.json"
+    complete_file.write_text(
+        json.dumps({
+            "stage": "mvp.implement",
+            "branch": "main",
+            "step-id": "step-01-auth",
+            "summary": "Auth completed via alias keys",
+            "red-evidence": ["pytest tests/test_auth.py"],
+            "green-evidence": ["pytest tests/test_auth.py"],
+            "refactor-note": "No refactor needed.",
+            "fact": ["Auth uses JWT tokens"],
+            "decision": ["Chose bcrypt for hashing"],
+            "contract": ["Password hash stays internal"],
+        }),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(cli.app, ["memory", "complete-step", "--from-file", str(complete_file), "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["written"]["facts"] == 1
+    assert payload["written"]["decisions"] == 1
+    assert payload["written"]["contracts"] == 1
+
+
+def test_memory_from_file_rejects_unknown_fields_with_cli_error(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    args_file = tmp_path / "capture-unknown.json"
+    args_file.write_text(
+        json.dumps({
+            "stage": "mvp.concept",
+            "mystery_field": "???",
+        }),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(cli.app, ["memory", "capture", "--from-file", str(args_file)])
+    assert result.exit_code != 0
+    assert "Unsupported fields in args file: mystery_field" in (result.stdout + result.stderr)
+    assert "TypeError" not in result.stdout
 
 
 def test_memory_complete_step_from_file_missing_summary(tmp_path: Path, monkeypatch) -> None:

@@ -18,6 +18,50 @@ from ..application.implementation_steps import (
 from ..domain.branch_layout import resolve_target_branch
 
 
+START_STEP_FROM_FILE_ALLOWED_KEYS = {
+    "stage",
+    "branch",
+    "step_id",
+    "summary",
+    "evidence",
+    "json_output",
+}
+
+CHECKPOINT_STEP_FROM_FILE_ALLOWED_KEYS = {
+    "stage",
+    "branch",
+    "step_id",
+    "summary",
+    "tdd_phase",
+    "red_evidence",
+    "green_evidence",
+    "refactor_note",
+    "evidence",
+    "json_output",
+}
+
+COMPLETE_STEP_FROM_FILE_ALIASES = {
+    "fact": "facts",
+    "decision": "decisions",
+    "contract": "contracts",
+}
+
+COMPLETE_STEP_FROM_FILE_ALLOWED_KEYS = {
+    "stage",
+    "summary",
+    "branch",
+    "step_id",
+    "red_evidence",
+    "green_evidence",
+    "refactor_note",
+    "evidence",
+    "facts",
+    "decisions",
+    "contracts",
+    "json_output",
+}
+
+
 def memory_start_step(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Implementation stage: mvp.implement or feature.implement"),
@@ -29,7 +73,7 @@ def memory_start_step(
 ) -> None:
     """Select and start an implementation step in structured memory."""
     if from_file:
-        file_data = read_args_file(from_file)
+        file_data = read_args_file(from_file, allowed_keys=START_STEP_FROM_FILE_ALLOWED_KEYS)
         stage = file_data.pop("stage", stage)
         branch_name = file_data.pop("branch", branch_name)
         step_id = file_data.pop("step_id", step_id)
@@ -82,7 +126,7 @@ def memory_checkpoint_step(
 ) -> None:
     """Persist an in-progress implementation checkpoint into structured memory."""
     if from_file:
-        file_data = read_args_file(from_file)
+        file_data = read_args_file(from_file, allowed_keys=CHECKPOINT_STEP_FROM_FILE_ALLOWED_KEYS)
         stage = file_data.pop("stage", stage)
         branch_name = file_data.pop("branch", branch_name)
         json_output = file_data.pop("json_output", json_output)
@@ -158,7 +202,11 @@ def memory_complete_step(
 ) -> None:
     """Mark an implementation step complete and advance structured memory state."""
     if from_file:
-        file_data = read_args_file(from_file)
+        file_data = read_args_file(
+            from_file,
+            aliases=COMPLETE_STEP_FROM_FILE_ALIASES,
+            allowed_keys=COMPLETE_STEP_FROM_FILE_ALLOWED_KEYS,
+        )
         stage = file_data.pop("stage", stage)
         summary = file_data.pop("summary", summary)
         branch_name = file_data.pop("branch", branch_name)

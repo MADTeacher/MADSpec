@@ -13,6 +13,28 @@ from ..application.register_step import RegisterStepRequest, execute as register
 from ..domain.branch_layout import resolve_target_branch
 
 
+REGISTER_STEP_FROM_FILE_ALIASES = {
+    "related_artifact": "related_artifacts",
+}
+
+REGISTER_STEP_FROM_FILE_ALLOWED_KEYS = {
+    "stage",
+    "step_id",
+    "covers",
+    "step_kind",
+    "tdd_policy",
+    "waiver_reason",
+    "title",
+    "branch",
+    "depends_on",
+    "summary",
+    "related_artifacts",
+    "size",
+    "complexity",
+    "json_output",
+}
+
+
 def memory_next_step(
     stage: str = typer.Option(..., "--stage", help="Target stage, e.g. mvp.plan or mvp.implement"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to inspect"),
@@ -73,7 +95,11 @@ def memory_register_step(
 ) -> None:
     """Register a planned step and update coverage metadata in progress.json."""
     if from_file:
-        file_data = read_args_file(from_file)
+        file_data = read_args_file(
+            from_file,
+            aliases=REGISTER_STEP_FROM_FILE_ALIASES,
+            allowed_keys=REGISTER_STEP_FROM_FILE_ALLOWED_KEYS,
+        )
         stage = file_data.pop("stage", stage)
         step_id = file_data.pop("step_id", step_id)
         covers = file_data.pop("covers", covers)

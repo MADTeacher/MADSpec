@@ -174,7 +174,9 @@ Structured memory:
 - Команда `memory capture` с ~75 параметрами легко превышает этот лимит при заполнении данными архитектуры, дизайна или концепции
 - Решение: используй `--from-file <path>` — запиши все аргументы в JSON-файл и передай путь к нему
 - Пример: `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`
-- JSON-файл содержит те же ключи, что и `options` dict соответствующей команды, плюс `stage`, `branch`, `json_output`, `status` и `summary` на верхнем уровне
+- Предпочитай canonical internal keys из `options` dict соответствующей команды, плюс `stage`, `branch`, `json_output`, `status` и `summary` на верхнем уровне
+- CLI также принимает alias-ключи в стиле флагов, включая `snake_case` и `hyphen-case`, например `audience`/`pain`/`pending-action`/`related-artifact`
+- Если указаны и canonical key, и alias, canonical key имеет приоритет; неизвестные поля нужно считать ошибкой входного JSON, а не нормальным вариантом
 
 ## Практика работы
 

@@ -13,6 +13,28 @@ from ..application.checkpoint_stage import CheckpointStageRequest, execute as ch
 from ..domain.branch_layout import resolve_target_branch
 
 
+CHECKPOINT_FROM_FILE_ALIASES = {
+    "fact": "facts",
+    "decision": "decisions",
+    "contract": "contracts",
+    "question": "questions",
+    "pending_action": "pending_actions",
+}
+
+CHECKPOINT_FROM_FILE_ALLOWED_KEYS = {
+    "stage",
+    "summary",
+    "branch",
+    "json_output",
+    "facts",
+    "decisions",
+    "contracts",
+    "evidence",
+    "questions",
+    "pending_actions",
+}
+
+
 def memory_checkpoint(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
@@ -28,7 +50,11 @@ def memory_checkpoint(
 ) -> None:
     """Persist a non-iterative stage checkpoint into structured memory."""
     if from_file:
-        file_data = read_args_file(from_file)
+        file_data = read_args_file(
+            from_file,
+            aliases=CHECKPOINT_FROM_FILE_ALIASES,
+            allowed_keys=CHECKPOINT_FROM_FILE_ALLOWED_KEYS,
+        )
         stage = file_data.pop("stage", stage)
         summary = file_data.pop("summary", summary)
         branch_name = file_data.pop("branch", branch_name)

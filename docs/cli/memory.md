@@ -84,7 +84,16 @@
 }
 ```
 
-Ключи в JSON соответствуют именам полей в словаре `options` конкретной команды. Поля верхнего уровня (`stage`, `branch`, `json_output`, `status`, `summary`) извлекаются отдельно.
+Предпочтительный формат - canonical internal keys, которые соответствуют именам полей в словаре `options` конкретной команды. Поля верхнего уровня (`stage`, `branch`, `json_output`, `status`, `summary`) извлекаются отдельно.
+
+CLI также принимает alias-ключи в стиле флагов, включая `snake_case` и `hyphen-case`. Например:
+
+- `audience` -> `audiences`
+- `pain` -> `pain_points`
+- `pending-action` -> `pending_actions`
+- `related-artifact` -> `related_artifacts`
+
+Если в JSON одновременно указаны canonical key и его alias, canonical key имеет приоритет. Неизвестные поля CLI отклоняет с понятной ошибкой вместо traceback.
 
 **Пример использования:**
 
