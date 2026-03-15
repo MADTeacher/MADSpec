@@ -14,9 +14,9 @@ $ARGUMENTS
 
 ## Обязательные skills
 
-- Перед началом работы обязательно найди и прочитай skill `madspec-cli-operator` по пути `.madspec/templates/../skills/madspec-cli-operator/SKILL.md` (или найди его в проекте).
+- Перед началом работы обязательно найди и прочитай skill `madspec-cli-operator`.
 - Дальше работай, опираясь на `madspec-cli-operator` как на базовый operational layer для workflow `madspec.*`, branch-aware артефактов `.madspec/` и команд MADSpec CLI.
-- Для visual/UI/UX design дополнительно обязательно найди и прочитай skill `frontend-design` по пути `.madspec/templates/../skills/frontend-design/SKILL.md` (или найди его в проекте).
+- Для visual/UI/UX design дополнительно обязательно найди и прочитай skill `frontend-design`.
 - Используй `madspec-cli-operator` как базовый workflow/CLI skill, а `frontend-design` как основной design-skill.
 
 Ты **ОБЯЗАН** учитывать пользовательский ввод перед продолжением (если он не пустой).
@@ -104,8 +104,8 @@ $ARGUMENTS
    - Прочитай `.madspec/<BRANCH>/concept.md`.
    - Прочитай `.madspec/<BRANCH>/project-context.md`.
    - Загрузи `.madspec/templates/ui-storyboard-contract.md`.
-   - Найди и прочитай skill `madspec-cli-operator` (обычно `.madspec/skills/madspec-cli-operator/SKILL.md` или аналогичный путь в проекте).
-   - Найди и прочитай skill `frontend-design` (обычно `.madspec/skills/frontend-design/SKILL.md` или аналогичный путь в проекте).
+   - Найди и прочитай skill `madspec-cli-operator`.
+   - Найди и прочитай skill `frontend-design`.
    - Извлеки все concept features и ключевые пользовательские сценарии.
    - Если в concept есть authentication, onboarding, verification или другой access gate, используй его как начало primary review flow.
 
