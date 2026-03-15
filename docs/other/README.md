@@ -2,6 +2,8 @@
 
 Этот раздел описывает cross-cutting команды, которые могут запускаться после появления заметного change set и branch context.
 
+Все команды этого раздела должны начинать с чтения и применения skill `madspec-cli-operator`.
+
 ## Команды
 
 - [`review`](madspec.review.md) — change-aware анализ качества реализации, соответствия intent ветки и improvement backlog

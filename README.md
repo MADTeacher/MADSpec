@@ -68,6 +68,8 @@ uvx --from git+https://github.com/MADTeacher/MADSpec.git madspec init <PROJECT_N
 
 ## Как Работать С MADSpec
 
+Все сгенерированные slash-команды `madspec.*` должны начинаться с чтения и применения skill `madspec-cli-operator`. Для `madspec.mvp.design` дополнительно обязателен skill `frontend-design`.
+
 ### MVP-Процесс
 
 Используйте команды `madspec.mvp.*`, когда создаете продукт с нуля:
@@ -77,7 +79,7 @@ uvx --from git+https://github.com/MADTeacher/MADSpec.git madspec init <PROJECT_N
 1. Если хотите сразу создать новый проект вместе с MADSpec, используйте `madspec init <PROJECT_NAME> --ai <agent>`.
 2. Если директория проекта уже существует, используйте `madspec init .`; при необходимости AI-среду можно передать через `--ai <agent>` или выбрать вручную во время запуска.
 3. `/madspec.mvp.concept` - зафиксировать идею проекта, целевую аудиторию, сценарии и ключевые функции.
-4. `/madspec.mvp.design` - описать пользовательский опыт, экраны и прототипы интерфейса; для visual/UI/UX design на этой стадии агент обязан использовать skill `frontend-design`.
+4. `/madspec.mvp.design` - описать пользовательский опыт, экраны и прототипы интерфейса; на этой стадии агент обязан использовать оба skill: `madspec-cli-operator` как workflow/CLI skill и `frontend-design` для visual/UI/UX design.
 5. `/madspec.mvp.tech` - выбрать стек технологий и зафиксировать технические решения.
 6. `/madspec.mvp.architecture` - формализовать структуру проекта, модель данных и контракты.
 
@@ -193,9 +195,9 @@ MADSpec хранит основное состояние проекта в `.mad
 
 Во время инициализации MADSpec также копирует навыки агента в целевую среду из каталога `skills/`, включая:
 
+- [`madspec-cli-operator`](skills/madspec-cli-operator/SKILL.md) — базовый operational skill, который должны читать все команды `madspec.*`
 - [`frontend-design`](skills/frontend-design/SKILL.md)
 - [`generate-agents-md`](skills/generate-agents-md/SKILL.md)
-- [`madspec-cli-operator`](skills/madspec-cli-operator/SKILL.md)
 
 ### Субагенты
 

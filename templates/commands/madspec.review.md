@@ -8,6 +8,11 @@ description: Review после реализации или набора изме
 $ARGUMENTS
 ```
 
+## Обязательный skill `madspec-cli-operator`
+
+- Перед началом работы обязательно найди и прочитай skill `madspec-cli-operator` по пути `.madspec/templates/../skills/madspec-cli-operator/SKILL.md` (или найди его в проекте).
+- Дальше работай, опираясь на `madspec-cli-operator` как на базовый operational layer для workflow `madspec.*`, branch-aware артефактов `.madspec/` и команд MADSpec CLI.
+
 Ты **ОБЯЗАН** учитывать пользовательский ввод перед продолжением (если он не пустой).
 
 ## Правила диалога (обязательно)

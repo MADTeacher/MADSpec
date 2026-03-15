@@ -2,6 +2,8 @@
 
 Раздел описывает workflow разработки новой функциональности в уже существующем проекте. Здесь framework не переизобретает продукт с нуля, а строит planning и implementation вокруг анализа текущего codebase.
 
+Все feature-команды должны начинать с чтения и применения skill `madspec-cli-operator`.
+
 ## Рекомендуемый порядок
 
 1. [`feature.init`](madspec.feature.init.md)

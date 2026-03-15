@@ -44,6 +44,17 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "--step-kind" in command_body
         assert "red -> green -> refactor" in command_body
 
+        command_files = [
+            name
+            for name in names
+            if name.startswith((".cursor/commands/", ".opencode/command/", ".kilocode/rules/", ".roo/rules/", ".codeassistant/commands/", ".github/agents/"))
+            and (name.endswith(".md") or name.endswith(".agent.md"))
+        ]
+        assert command_files
+        for packaged_command in command_files:
+            packaged_body = zf.read(packaged_command).decode("utf-8")
+            assert "madspec-cli-operator" in packaged_body
+
         for stage_name in (
             "madspec.mvp.concept",
             "madspec.mvp.design",
@@ -57,10 +68,13 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             )
             stage_body = zf.read(stage_command).decode("utf-8")
             assert "madspec memory checkpoint" in stage_body
+            assert "madspec-cli-operator" in stage_body
             if stage_name == "madspec.mvp.tech":
                 assert "mvp.tech.json" in stage_body
                 assert "tech_status" in stage_body
                 assert "generated artifact" in stage_body
+            if stage_name == "madspec.mvp.design":
+                assert "frontend-design" in stage_body
             if stage_name == "madspec.mvp.architecture":
                 assert "mvp.architecture.json" in stage_body
                 assert "architecture_status" in stage_body
@@ -77,6 +91,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "madspec memory start-step --stage mvp.implement" in implement_body
         assert "madspec memory checkpoint-step --stage mvp.implement" in implement_body
         assert "madspec memory complete-step --stage mvp.implement" in implement_body
+        assert "madspec-cli-operator" in implement_body
         assert "Не редактируй `progress.json` вручную." in implement_body or "не редактируй `.madspec/<BRANCH>/memory/progress.json` вручную" in implement_body
         assert "implementation-context.md` и `project-context.md` являются generated views" in implement_body
         assert "После успешной валидации шага создай `.madspec/<BRANCH>/steps/step-[NN]-[name]/implementation-context.md`" not in implement_body
@@ -91,6 +106,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "madspec memory retrieve --stage feature.init" in feature_init_body
         assert "madspec memory capture --stage feature.init" in feature_init_body
         assert "madspec memory checkpoint --stage feature.init" in feature_init_body
+        assert "madspec-cli-operator" in feature_init_body
         assert ".madspec/<BRANCH>/memory/stages/feature.init.json" in feature_init_body
         assert ".madspec/feature/" not in feature_init_body
 
@@ -102,6 +118,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         feature_plan_body = zf.read(feature_plan_command).decode("utf-8")
         assert "madspec memory retrieve --stage feature.plan" in feature_plan_body
         assert "madspec memory register-step --stage feature.plan" in feature_plan_body
+        assert "madspec-cli-operator" in feature_plan_body
         assert ".madspec/<BRANCH>/memory/stages/feature.plan.json" in feature_plan_body
         assert "generated views" in feature_plan_body
 
@@ -115,6 +132,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "madspec memory start-step --stage feature.implement" in feature_implement_body
         assert "madspec memory checkpoint-step --stage feature.implement" in feature_implement_body
         assert "madspec memory complete-step --stage feature.implement" in feature_implement_body
+        assert "madspec-cli-operator" in feature_implement_body
         assert "implementation-context.md` и `project-context.md` являются generated views" in feature_implement_body
 
     with zipfile.ZipFile(qwen_archive) as zf:
@@ -124,3 +142,4 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         qwen_body = zf.read(qwen_command).decode("utf-8")
         assert "{{args}}" in qwen_body
         assert "$ARGUMENTS" not in qwen_body
+        assert "madspec-cli-operator" in qwen_body

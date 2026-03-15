@@ -15,6 +15,7 @@
 - доступна текущая branch context через `madspec git current-branch`
 - доступен `.madspec/<BRANCH>/memory/`
 - ручное редактирование `concept.md` не используется как источник истины
+- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
 
 ## Источник истины
 

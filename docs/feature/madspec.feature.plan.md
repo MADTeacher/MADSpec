@@ -15,6 +15,7 @@
 - существует ratified `feature.init.json`
 - planning coverage использует feature IDs из `feature.init`
 - generated planning files не редактируются вручную
+- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
 
 ## Источник истины
 

@@ -14,6 +14,9 @@ description: Операционный skill по MADSpec Framework и MADSpec CL
 - использовать MADSpec CLI (`madspec init`, `madspec git`, `madspec memory`, `madspec check`, `madspec version`, `madspec migrate`)
 - понять, какой этап следующий, каких артефактов не хватает, и как восстановить workflow после сбоя
 
+Все сгенерированные команды `madspec.*` должны начинать работу с чтения и применения этого skill как базового operational layer.
+Исключения нет: для `mvp.design` этот skill тоже обязателен, но там дополнительно подключается `frontend-design` как отдельный design-skill.
+
 ## Что такое MADSpec
 
 MADSpec управляет разработкой через агентные команды и branch-aware артефакты в `.madspec/<branch>/`.

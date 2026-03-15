@@ -16,6 +16,7 @@
 - доступны prototype paths в `.madspec/<BRANCH>/ui-prototype/`
 - design references должны указывать на существующие screens, zones и prototype files
 - доступен `.madspec/templates/ui-storyboard-contract.md` как structural guide для прототипа
+- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
 - для UI/UX-проектирования и storyboard-прототипов агент обязан использовать skill `frontend-design` как основной design-skill
 
 ## Источник истины
@@ -62,7 +63,8 @@
 ## Пошаговый runtime workflow
 
 1. Агент читает `concept` и затем `design_status`.
-2. Для visual/UI/UX-проектирования обязательно подключает skill `frontend-design`; `ui-storyboard-contract` при этом используется как structural contract, а не как источник визуального стиля.
+2. Перед основной работой обязательно подключает skill `madspec-cli-operator` как базовый workflow/CLI skill.
+3. Для visual/UI/UX-проектирования обязательно подключает skill `frontend-design`; `ui-storyboard-contract` при этом используется как structural contract, а не как источник визуального стиля.
 3. Выделяет primary review flow и остальные journeys, которые пользователь должен пройти кликами.
 4. По мере согласования экранов и потоков пишет `capture`.
 5. Runtime обновляет `zones`, `screens`, `flows`, `navigation`, `platformConstraints`.

@@ -12,6 +12,11 @@ handoffs:
 $ARGUMENTS
 ```
 
+## Обязательный skill `madspec-cli-operator`
+
+- Перед началом работы обязательно найди и прочитай skill `madspec-cli-operator` по пути `.madspec/templates/../skills/madspec-cli-operator/SKILL.md` (или найди его в проекте).
+- Дальше работай, опираясь на `madspec-cli-operator` как на базовый operational layer для workflow `madspec.*`, branch-aware артефактов `.madspec/` и команд MADSpec CLI.
+
 ## Structured Memory First
 
 - Каноническое состояние этапа хранится в `.madspec/<BRANCH>/memory/stages/feature.plan.json`.

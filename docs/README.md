@@ -35,6 +35,7 @@
 
 - Основное состояние живет в `.madspec/<BRANCH>/memory/`
 - Производные представления пересобираются из структурированной памяти и не являются основным источником данных
+- Все сгенерированные команды `madspec.*` должны начинать с чтения и применения skill `madspec-cli-operator`
 - `madspec memory retrieve` используется для чтения stage context
 - `madspec memory capture` фиксирует подтвержденные факты, решения, контракты и состояние конкретной стадии
 - `madspec memory checkpoint` ратифицирует stage-level состояние и инициирует consolidate + validate

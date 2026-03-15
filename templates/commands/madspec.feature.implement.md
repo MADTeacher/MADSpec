@@ -8,6 +8,11 @@ description: Feature - Пошаговая реализация через implem
 $ARGUMENTS
 ```
 
+## Обязательный skill `madspec-cli-operator`
+
+- Перед началом работы обязательно найди и прочитай skill `madspec-cli-operator` по пути `.madspec/templates/../skills/madspec-cli-operator/SKILL.md` (или найди его в проекте).
+- Дальше работай, опираясь на `madspec-cli-operator` как на базовый operational layer для workflow `madspec.*`, branch-aware артефактов `.madspec/` и команд MADSpec CLI.
+
 ## Structured Memory First
 
 - Канонический runtime-state этапа implement хранится в `.madspec/<BRANCH>/memory/progress.json` и `.madspec/<BRANCH>/memory/working/active-session.json`.

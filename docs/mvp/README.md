@@ -2,6 +2,8 @@
 
 Раздел описывает полный workflow разработки нового проекта с нуля. В MVP-режиме каждая стадия добавляет новый слой canonical state, а generated artifacts только отражают уже ратифицированные данные.
 
+Все MVP-команды должны начинать с чтения и применения skill `madspec-cli-operator`. Для `mvp.design` дополнительно обязателен skill `frontend-design`.
+
 ## Рекомендуемый порядок
 
 1. [`mvp.concept`](madspec.mvp.concept.md)

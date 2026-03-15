@@ -2,6 +2,8 @@
 
 MADSpec — фреймворк для быстрой разработки MVP и добавления новых фич в проект. Основа workflow: branch-aware structured memory в `.madspec/<branch>/memory/` и generated artifacts, которые пересобираются из canonical state.
 
+Все сгенерированные команды `madspec.*` должны начинаться с чтения и применения skill `madspec-cli-operator`. Для `madspec.mvp.design` дополнительно обязателен skill `frontend-design`.
+
 Подробная workflow-документация:
 
 - [`docs/README.md`](/Users/madteacher/Documents/GitHub/MADSpec/docs/README.md)
@@ -102,6 +104,8 @@ madspec.feature.implement
 
 При инициализации MADSpec копирует навыки в вашу среду (например, `.cursor/skills/`):
 
+- **madspec-cli-operator** — базовый operational skill для всех команд `madspec.*`
+- **frontend-design** — обязательный visual/UI/UX skill для `madspec.mvp.design`
 - **generate-agents-md** — генерация AGENTS.md по лучшим практикам
 
 ## Что вы получаете

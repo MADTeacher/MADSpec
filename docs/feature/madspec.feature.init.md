@@ -15,6 +15,7 @@
 - существует codebase для анализа
 - доступен branch context
 - агент готов фиксировать findings в `feature.init.json`, а не только в markdown notes
+- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
 
 ## Источник истины
 

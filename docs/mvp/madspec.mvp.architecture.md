@@ -15,6 +15,7 @@
 - завершены `mvp.concept`, `mvp.design`, `mvp.tech`
 - screens и data coverage из design уже известны
 - agent не редактирует `architecture.md` или `openapi.yaml` вручную
+- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
 
 ## Источник истины
 

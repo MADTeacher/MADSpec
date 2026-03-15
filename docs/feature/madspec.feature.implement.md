@@ -15,6 +15,7 @@
 - шаги уже запланированы
 - существует `progress.json`
 - `project-analysis.md` используется только как reference, не как primary source
+- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
 
 ## Источник истины
 

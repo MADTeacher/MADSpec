@@ -15,6 +15,7 @@
 - завершены предыдущие MVP стадии
 - существует или может быть создан `.madspec/<BRANCH>/memory/progress.json`
 - `currentImplementStep` нельзя менять вручную
+- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
 
 ## Источник истины
 
