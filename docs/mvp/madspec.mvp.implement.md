@@ -46,14 +46,17 @@
 - `madspec memory complete-step --stage mvp.implement`
 - `madspec git commit --message ...`
 
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и текущие policy validations. При неочевидных блокировках допускается отдельный `madspec policy validate --stage mvp.implement --step-id <step-id> --json-output`.
+
 ## Пошаговый runtime workflow
 
 1. Агент читает implement context через `retrieve`.
-2. Запускает step через `start-step`, явно или по `nextExecutableStep`.
-3. Для code steps фиксирует `red`, `green`, `refactor` через `checkpoint-step`.
-4. Для UI-step реализация сверяется с утвержденным storyboard из `ui-prototype/index.html` и связанных экранов.
-5. `complete-step` закрывает шаг, пишет semantic records и продвигает `currentImplementStep`.
-6. После успешного completion агент создает git commit.
+2. Агент сверяет выбранный step с `policy_context` и active required policies.
+3. Запускает step через `start-step`, явно или по `nextExecutableStep`.
+4. Для code steps фиксирует `red`, `green`, `refactor` через `checkpoint-step`.
+5. Для UI-step реализация сверяется с утвержденным storyboard из `ui-prototype/index.html` и связанных экранов.
+6. `complete-step` закрывает шаг, пишет semantic records и продвигает `currentImplementStep`.
+7. После успешного completion агент создает git commit.
 
 ## Canonical data model
 

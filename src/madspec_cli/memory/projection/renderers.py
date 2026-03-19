@@ -18,7 +18,11 @@ def render_project_context(
     plan_state: dict[str, Any],
     feature_init_state: dict[str, Any] | None,
     feature_plan_state: dict[str, Any] | None,
+    policy_summary: dict[str, Any],
     generated_at: str,
+    current_gate_summary: dict[str, Any] | None = None,
+    review_gate_summary: dict[str, Any] | None = None,
+    security_gate_summary: dict[str, Any] | None = None,
 ) -> str:
     planned_steps = progress.get("plannedSteps", [])
     completed_steps = progress.get("completedSteps", [])
@@ -69,6 +73,7 @@ def render_project_context(
             f"- `.madspec/{branch_name}/memory/working/decision-log.jsonl`",
             f"- `.madspec/{branch_name}/memory/episodes/events.jsonl`",
             f"- `.madspec/{branch_name}/memory/semantic/*.jsonl`",
+            f"- `.madspec/system/policy/state.json`",
             "",
             "## Generated Artifacts",
             f"- `.madspec/{branch_name}/concept.md` (generated from structured memory)",
@@ -107,8 +112,18 @@ def render_project_context(
                 f"- Planning inventory: `{len(plan_state.get('stepCatalog', []))}` catalog steps, "
                 f"`{len(plan_state.get('planningPrinciples', []))}` principles"
             ),
+            (
+                f"- Policy inventory: revision `{policy_summary.get('revision', 1)}`, "
+                f"`{policy_summary.get('activeCount', 0)}` active, "
+                f"`{policy_summary.get('deprecatedCount', 0)}` deprecated, "
+                f"`{policy_summary.get('pendingProposalsCount', 0)}` pending proposals"
+            ),
+            "- Global policy artifact: `.madspec/system/policy.md`",
         ]
     )
+    lines.extend(_render_gate_section("Current Gate Status", current_gate_summary))
+    lines.extend(_render_gate_section("Review Gates", review_gate_summary))
+    lines.extend(_render_gate_section("Security Gates", security_gate_summary))
     if feature_mode:
         lines.extend(
             [
@@ -158,6 +173,7 @@ def render_step_context(
     *,
     step_metadata: dict[str, Any] | None = None,
     status_info: dict[str, Any] | None = None,
+    gate_summary: dict[str, Any] | None = None,
 ) -> str:
     lines = [
         f"# {title}: {step_id}",
@@ -168,9 +184,15 @@ def render_step_context(
         f"- Step kind: `{(step_metadata or {}).get('kind', 'unknown')}`",
         f"- TDD policy: `{(step_metadata or {}).get('tddPolicy', 'unknown')}`",
         f"- TDD phase: `{(status_info or {}).get('tddPhase', 'unknown')}`",
+        f"- Gate status: `{(gate_summary or {}).get('overall_status', 'unknown')}`",
         "",
-        "## Records",
     ]
+    lines.extend(_render_gate_section("Gate Summary", gate_summary))
+    lines.extend(
+        [
+        "## Records",
+        ]
+    )
     lines.extend(format_record_lines(records))
     return "\n".join(lines) + "\n"
 
@@ -179,6 +201,9 @@ def render_review_artifacts(
     review_records: list[dict[str, Any]],
     improvement_records: list[dict[str, Any]],
     generated_at: str,
+    *,
+    change_context: dict[str, Any] | None = None,
+    gate_summary: dict[str, Any] | None = None,
 ) -> tuple[str, str]:
     review_lines = [
         "# Review",
@@ -189,6 +214,8 @@ def render_review_artifacts(
         "",
         "## Findings",
     ]
+    review_lines.extend(_render_change_context(change_context))
+    review_lines.extend(_render_gate_section("Gate Summary", gate_summary))
     review_lines.extend(format_record_lines(review_records))
     improvement_lines = [
         "# Improvements",
@@ -203,7 +230,13 @@ def render_review_artifacts(
     return "\n".join(review_lines) + "\n", "\n".join(improvement_lines) + "\n"
 
 
-def render_security_artifact(security_records: list[dict[str, Any]], generated_at: str) -> str:
+def render_security_artifact(
+    security_records: list[dict[str, Any]],
+    generated_at: str,
+    *,
+    change_context: dict[str, Any] | None = None,
+    gate_summary: dict[str, Any] | None = None,
+) -> str:
     lines = [
         "# Security Audit",
         "",
@@ -213,5 +246,43 @@ def render_security_artifact(security_records: list[dict[str, Any]], generated_a
         "",
         "## Findings And Notes",
     ]
+    lines.extend(_render_change_context(change_context))
+    lines.extend(_render_gate_section("Gate Summary", gate_summary))
     lines.extend(format_record_lines(security_records))
     return "\n".join(lines) + "\n"
+
+
+def _render_change_context(change_context: dict[str, Any] | None) -> list[str]:
+    if not change_context or not change_context.get("initialized") or not change_context.get("title"):
+        return []
+    return [
+        "",
+        "## Active Change Bundle",
+        f"- Bundle ID: `{change_context.get('bundle_id')}`",
+        f"- Title: {change_context.get('title')}",
+        f"- Base branch: `{change_context.get('base_branch')}`",
+        f"- Workflow mode: `{change_context.get('workflow_mode')}`",
+        f"- Summary: {change_context.get('summary') or 'No summary recorded.'}",
+        f"- Impacted steps: {', '.join(change_context.get('impacted_steps', [])) or 'none'}",
+        "",
+    ]
+
+
+def _render_gate_section(title: str, gate_summary: dict[str, Any] | None) -> list[str]:
+    if not gate_summary:
+        return []
+    lines = [
+        "",
+        f"## {title}",
+        f"- Overall: `{gate_summary.get('overall_status', 'unknown')}`",
+        f"- Blocking: `{gate_summary.get('blocking_count', 0)}`",
+        f"- Warnings: `{gate_summary.get('warning_count', 0)}`",
+        f"- Pending: `{gate_summary.get('pending_count', 0)}`",
+    ]
+    active_waivers = gate_summary.get("active_waivers", [])
+    if active_waivers:
+        lines.append(f"- Active waivers: `{len(active_waivers)}`")
+    for gate in gate_summary.get("gates", [])[:5]:
+        lines.append(f"- [{gate['status']}] {gate['message']}")
+    lines.append("")
+    return lines

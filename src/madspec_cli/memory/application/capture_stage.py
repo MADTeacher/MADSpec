@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from madspec_cli.memory import capture_stage_memory
 from madspec_cli.shared.kernel.result import PayloadResult
+
+from ..semantic.capture import capture_stage_memory
 
 
 @dataclass(frozen=True)

@@ -21,6 +21,7 @@ $ARGUMENTS
 - Источник истины: `.madspec/<BRANCH>/memory/`, runtime progress implementation stages и security-stage records.
 - `project-context.md` и `security-audit.md` считай generated views, а не canonical source of truth.
 - Перед началом аудита используй `madspec memory retrieve --stage security --json-output`.
+- Перед началом аудита дополнительно используй `madspec security status --json-output`, чтобы увидеть блокирующие, предупреждающие и ожидающие проверки, а также активные исключения.
 - Если в ветке есть implementation workflow, дополнительно используй `madspec memory retrieve --stage mvp.implement --json-output` или `madspec memory retrieve --stage feature.implement --json-output`.
 - После каждого подтвержденного security finding, remediation decision, limitation или compliance constraint используй `madspec memory capture --stage security ...`.
 - После завершения аудита ратифицируй этап через `madspec memory checkpoint --stage security --summary ...`.
@@ -96,6 +97,7 @@ $ARGUMENTS
 
 2. **Загрузи memory, implementation и branch context**
    - Сначала выполни `madspec memory retrieve --stage security --json-output`
+   - Затем выполни `madspec security status --json-output`
    - При наличии implementation workflow дополнительно изучи:
      - `.madspec/<BRANCH>/memory/progress.json`
      - `.madspec/<BRANCH>/memory/working/active-session.json`
@@ -159,6 +161,7 @@ $ARGUMENTS
    - Security/privacy constraints сохраняй через `--contract`
    - Незакрытые риски и спорные места сохраняй через `--question`
    - Конкретные действия по исправлению сохраняй через `--pending-action`
+   - Gate status из `madspec security status` используй как процедурное подтверждение: блокирующие и ожидающие результаты, а также активные исключения должны быть явно отражены в findings, limitations или compensating controls
 
 7. **Классифицируй риски по severity**
    - Используй severity buckets:

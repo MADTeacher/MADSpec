@@ -36,6 +36,7 @@
 ## Входы команды
 
 - `madspec memory retrieve --stage security --json-output`
+- `madspec security status --json-output`
 - при наличии implementation workflow: `madspec memory retrieve --stage mvp.implement|feature.implement --json-output`
 - код, manifests, tests, architecture artifacts
 - `madspec memory capture --stage security ...`
@@ -51,11 +52,12 @@
 ## Пошаговый runtime workflow
 
 1. Агент читает security context и implementation state.
-2. Определяет ограничения анализа: код, manifests, deployment context, tests.
-3. Выполняет audit по категориям: authn/authz, secrets, injection, dependencies, storage/transport/logging, external integrations.
-4. Отдельно проверяет privacy/data handling gaps.
-5. Сохраняет findings, remediation decisions, constraints и pending actions через `capture`.
-6. `checkpoint` пересобирает `security-audit.md`.
+2. Агент запускает `madspec security status --json-output` и фиксирует блокирующие, ожидающие и предупреждающие проверки, активные исключения и статус ратификации.
+3. Определяет ограничения анализа: код, manifests, deployment context, tests.
+4. Выполняет audit по категориям: authn/authz, secrets, injection, dependencies, storage/transport/logging, external integrations.
+5. Отдельно проверяет privacy/data handling gaps.
+6. Сохраняет findings, remediation decisions, constraints и pending actions через `capture`.
+7. `checkpoint` пересобирает `security-audit.md`.
 
 ## Canonical data model
 
@@ -78,6 +80,8 @@ Risk classification в output:
 
 - `security-audit.md`
 - `project-context.md`
+
+Generated view `security-audit.md` также показывает производную секцию `gate summary` и список активных исключений.
 
 ## Диаграммы
 

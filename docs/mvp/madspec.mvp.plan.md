@@ -4,6 +4,8 @@
 
 `madspec.mvp.plan` строит step catalog реализации и синхронизирует planning state с `progress.json`, step directories и generated planning views.
 
+Команда должна стремиться к минимально достаточному числу шагов: для простой задачи агент выбирает один полный шаг, а не несколько искусственно раздробленных.
+
 ## Когда запускать
 
 - после `mvp.architecture`
@@ -47,14 +49,26 @@
 - `madspec memory register-step --stage mvp.plan ...`
 - `madspec memory checkpoint --stage mvp.plan --summary ...`
 
+Из `retrieve` агент обязан прочитать `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`, потому что planning decisions теперь проходят через project-global policy layer.
+
 ## Пошаговый runtime workflow
 
 1. Агент читает `mvp.architecture` и затем `plan_status`.
-2. Фиксирует planning strategy через `capture`.
-3. Для каждого нового шага проверяет ID и зависимости через `next-step`.
-4. Регистрирует шаг через `register-step`, а не через ручное редактирование JSON.
-5. Runtime обновляет `mvp.plan.json`, `progress.json`, step metadata, dependency graph и progress metrics.
-6. После серии изменений агент ратифицирует stage через `checkpoint`.
+2. Агент читает `policy_context` и сверяет новый шаг с active policies текущей стадии.
+3. Определяет максимально крупный безопасный шаг для текущей итерации.
+4. Фиксирует planning strategy через `capture`.
+5. Для каждого нового шага проверяет ID и зависимости через `next-step`.
+6. Регистрирует шаг через `register-step`, а не через ручное редактирование JSON.
+7. Runtime обновляет `mvp.plan.json`, `progress.json`, step metadata, dependency graph и progress metrics.
+8. После серии изменений агент ратифицирует stage через `checkpoint`.
+
+## Правила гранулярности шага
+
+- Предпочитай максимально крупный безопасный шаг, который можно реализовать и проверить за один проход `mvp.implement`.
+- Если задача маленькая и имеет одну цель, создавай один шаг даже если он затрагивает код, тесты, конфигурацию и документацию одновременно.
+- Не выделяй отдельно шаги вида "подготовить", "дописать тесты", "обновить документацию" и "провести валидацию", если это части одной и той же поставки.
+- Делить работу на несколько шагов нужно только при реальных зависимостях, разных точках пользовательской проверки, заметно разных рисках или явной просьбе пользователя о более детальном плане.
+- Если есть сомнение между двумя и тремя шагами без явной причины, выбирай меньшее число шагов.
 
 ## Canonical data model
 

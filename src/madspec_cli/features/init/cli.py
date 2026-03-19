@@ -10,9 +10,13 @@ from rich.panel import Panel
 
 from ...config import AGENT_CONFIG, allowed_ai_values
 from ...shared.cli.banners import StepTracker, console, select_with_arrows, show_banner
-from ...shared.infra.system_tools import check_tool
+from .application.contracts import (
+    InitProgressEvent,
+    InitializeProjectPreflightRequest,
+    InitializeProjectRequest,
+)
 from .application.initialize_project import execute
-from .domain.models import InitializeProjectRequest
+from .application.preflight import execute as preflight_init
 
 
 def init(
@@ -85,37 +89,41 @@ def init(
         setup_lines.append(f"{'Target Path':<15} [dim]{project_path}[/dim]")
     console.print(Panel("\n".join(setup_lines), border_style="cyan", padding=(1, 2)))
 
-    should_init_git = False
-    if not no_git:
-        should_init_git = check_tool("git")
-        if not should_init_git:
-            console.print("[yellow]Git not found - will skip repository initialization[/yellow]")
-
     if ai_assistant:
-        if ai_assistant not in AGENT_CONFIG:
-            console.print(f"[red]Error:[/red] Invalid AI assistant '{ai_assistant}'. Choose from: {allowed_ai_values()}")
-            raise typer.Exit(1)
         selected_ai = ai_assistant
     else:
         ai_choices = {key: config.name for key, config in AGENT_CONFIG.items()}
         selected_ai = select_with_arrows(ai_choices, "Choose your AI assistant:", "cursor-agent")
 
-    if not ignore_agent_tools:
-        agent_config = AGENT_CONFIG[selected_ai]
-        if agent_config.requires_cli and not check_tool(selected_ai):
-            console.print()
-            console.print(
-                Panel(
-                    f"[cyan]{selected_ai}[/cyan] not found\n"
-                    f"Install from: [cyan]{agent_config.install_url}[/cyan]\n"
-                    f"{agent_config.name} is required to continue with this project type.\n\n"
-                    "Tip: Use [cyan]--ignore-agent-tools[/cyan] to skip this check",
-                    title="[red]Agent Detection Error[/red]",
-                    border_style="red",
-                    padding=(1, 2),
-                )
+    try:
+        preflight = preflight_init(
+            InitializeProjectPreflightRequest(
+                selected_ai=selected_ai,
+                no_git=no_git,
+                ignore_agent_tools=ignore_agent_tools,
             )
-            raise typer.Exit(1)
+        )
+    except ValueError:
+        console.print(f"[red]Error:[/red] Invalid AI assistant '{selected_ai}'. Choose from: {allowed_ai_values()}")
+        raise typer.Exit(1)
+
+    if preflight.git_warning_message:
+        console.print(f"[yellow]{preflight.git_warning_message}[/yellow]")
+
+    if preflight.missing_agent_tool:
+        console.print()
+        console.print(
+            Panel(
+                f"[cyan]{selected_ai}[/cyan] not found\n"
+                f"Install from: [cyan]{preflight.agent_install_url}[/cyan]\n"
+                f"{preflight.agent_display_name} is required to continue with this project type.\n\n"
+                "Tip: Use [cyan]--ignore-agent-tools[/cyan] to skip this check",
+                title="[red]Agent Detection Error[/red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+        )
+        raise typer.Exit(1)
 
     console.print(f"[cyan]Selected AI assistant:[/cyan] {selected_ai}")
 
@@ -131,21 +139,36 @@ def init(
         ("extracted-summary", "Extraction summary"),
         ("flatten", "Flatten nested directory"),
         ("cleanup", "Cleanup"),
+        ("madspec-config", "Create MADSpec config"),
         ("git", "Initialize git repository"),
         ("final", "Finalize"),
     ):
         tracker.add(key, label)
+
+    class TrackerProgressReporter:
+        def __init__(self, tracker_obj: StepTracker) -> None:
+            self._tracker = tracker_obj
+
+        def handle(self, event: InitProgressEvent) -> None:
+            if event.action == "start":
+                self._tracker.start(event.step, event.detail)
+            elif event.action == "complete":
+                self._tracker.complete(event.step, event.detail)
+            elif event.action == "skip":
+                self._tracker.skip(event.step, event.detail or "")
+            elif event.action == "error":
+                self._tracker.error(event.step, event.detail or "")
 
     request = InitializeProjectRequest(
         project_path=project_path,
         selected_ai=selected_ai,
         here=here,
         no_git=no_git,
-        should_init_git=should_init_git,
+        should_init_git=preflight.should_init_git,
         skip_tls=skip_tls,
         debug=debug,
         github_token=github_token,
-        tracker=tracker,
+        progress_reporter=TrackerProgressReporter(tracker),
     )
 
     result = None
@@ -220,6 +243,8 @@ def init(
     steps_lines.append("")
     steps_lines.append("   [bold]Общие команды:[/bold]")
     steps_lines.append("   2.10 [cyan]/madspec.deploy[/] - Plan deployment (environments, CI/CD, secrets, observability)")
+    steps_lines.append("   2.11 [cyan]/madspec.change[/] - Prepare and ratify a branch change bundle")
+    steps_lines.append("   2.12 [cyan]/madspec.gate[/] - Inspect quality gates, blockers, pending checks and waivers")
     console.print()
     console.print(Panel("\n".join(steps_lines), title="Next Steps", border_style="cyan", padding=(1, 2)))
 
@@ -230,6 +255,8 @@ def init(
                 [
                     "Optional commands for review and improvement [bright_black](recommended)[/bright_black]",
                     "",
+                    "○ [cyan]/madspec.change[/] [bright_black](optional)[/bright_black] - Prepare a branch change bundle before review or handoff",
+                    "○ [cyan]/madspec.gate[/] [bright_black](optional)[/bright_black] - Inspect blockers, gate status and waiver flow before state transitions",
                     "○ [cyan]/madspec.review[/] [bright_black](optional)[/bright_black] - Review implementation quality and capture improvements",
                 ]
             ),

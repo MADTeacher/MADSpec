@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..shared.text_lists import normalize_plain_text_list
+
 
 def normalize_text_list(values: list[str] | None) -> list[str]:
-    if not values:
-        return []
-    return [value.strip() for value in values if value and value.strip()]
+    return normalize_plain_text_list(values, normalize_item=lambda value: value.strip() if isinstance(value, str) else "")
 
 
 def snapshot_file(path: Path) -> str | None:

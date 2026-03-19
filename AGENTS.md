@@ -18,6 +18,7 @@ The framework supports multiple AI agents, allowing teams to use their preferred
 - Any CLI change that affects commands, arguments, output shape, workflow behavior, or generated project structure must update the CLI documentation in `docs/cli/` in the same change
 - If a `madspec.*` workflow command change also affects CLI usage or behavior, update both the workflow docs and the corresponding `docs/cli/` reference in the same change
 - Any CLI change that affects commands, arguments, workflow, generated project structure, or agent-facing troubleshooting must update `skills/madspec-cli-operator/SKILL.md` in the same change
+- Changes in `madspec agents ...` must keep `.madspec/system/agents/state.json` as profile state, `.madspec/system/agents/catalog.json` as project role catalog, and `.madspec/system/agents/bodies/` as the source of project-defined role bodies
 
 ## Adding New Agent Support
 
@@ -37,7 +38,7 @@ MADSpec supports multiple AI agents by generating agent-specific command files a
 | Agent                      | Directory              | Format   | CLI Tool        | Description                 |
 | -------------------------- | ---------------------- | -------- | --------------- | --------------------------- |
 | **Cursor**                 | `.cursor/commands/`    | Markdown | N/A (IDE-based) | Cursor IDE                  |
-| **opencode**               | `.opencode/command/`   | Markdown | `opencode`      | opencode CLI                |
+| **opencode**               | `.opencode/commands/`  | Markdown | `opencode`      | opencode CLI                |
 | **Kilo Code**              | `.kilocode/rules/`     | Markdown | N/A (IDE-based) | Kilo Code IDE               |
 | **Roo Code**               | `.roo/rules/`          | Markdown | N/A (IDE-based) | Roo Code IDE                |
 | **SourceCraft**            | `.codeassistant/commands/` | Markdown | N/A (IDE-based) | SourceCraft IDE         |
@@ -189,7 +190,7 @@ Command content with the agent-specific arguments placeholder.
 ## Directory Conventions
 
 - **Cursor**: `.cursor/commands/`
-- **opencode**: `.opencode/command/`
+- **opencode**: `.opencode/commands/`
 - **Kilo Code**: `.kilocode/rules/`
 - **Roo Code**: `.roo/rules/`
 - **SourceCraft**: `.codeassistant/commands/`
@@ -225,6 +226,16 @@ When adding new agents:
 - Document any special requirements or limitations
 - Update this guide with lessons learned
 - Verify the actual CLI tool name before adding to AGENT_CONFIG
+
+---
+
+## Language and Terminology
+
+- In documents written in a single language, do not mix in another language within the same narrative passage without clear justification.
+- Avoid language hybrids, calques, and half-translations such as `governance layer`, `workflow-first`, `branch discipline`, `memory depth`, and similar constructions. When a term is needed, use a proper equivalent in the document's language.
+- A second language is acceptable only in strictly justified cases: official names of projects and frameworks, commands, paths, file names, class and function names, APIs, exact quotations, and widely accepted technical identifiers that have no natural equivalent in the document's language.
+- When a foreign-language term must appear in explanatory text, provide the native-language equivalent or a brief explanation first, and render the term itself as an identifier rather than embedding it as part of a native-language phrase.
+- Before finishing work on any document or command, always perform a final language-consistency review and remove inappropriate foreign-language borrowings, mixed constructions, and stylistic calques.
 
 ---
 

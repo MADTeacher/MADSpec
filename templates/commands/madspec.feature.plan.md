@@ -23,6 +23,7 @@ $ARGUMENTS
 - Runtime state шагов хранится в `.madspec/<BRANCH>/memory/progress.json`.
 - `implementation-plan.md`, `planning-context-cache.md`, `steps/*/planning-context.md` и `project-context.md` являются generated views.
 - В обычных ходах сначала используй `madspec memory retrieve --stage feature.plan --json-output`.
+- Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`; feature planning должен учитывать active project-global policies.
 - Strategy-level изменения сохраняй через `madspec memory capture --stage feature.plan --plan-overview ... --planning-principle ... --next-action ...`.
 - Перед регистрацией шага обязательно проверь его через `madspec memory next-step --stage feature.plan --candidate-step ...`.
 - Новый planned step записывай только через `madspec memory register-step --stage feature.plan ...`.
@@ -39,6 +40,14 @@ $ARGUMENTS
 - TDD policy и metadata шага;
 - generated implementation plan без ручного редактирования markdown.
 
+## Правила гранулярности шага (обязательно)
+
+- Один запуск команды создает один новый шаг, но сам шаг должен быть максимально крупным и безопасным для одной итерации `madspec.feature.implement`.
+- Для небольшой feature или легкой задачи создавай один полный шаг, даже если он включает код, тесты, сопутствующие правки контрактов и документацию.
+- Не выноси отдельно подготовку, тесты, документацию, валидацию и мелкие сопутствующие правки, если они относятся к одному изменению.
+- Делить работу на несколько шагов можно только при реальных зависимостях, отдельных точках пользовательской проверки, заметно разных рисках или явной просьбе пользователя о более детальном плане.
+- Если нет убедительной причины дробить сильнее, выбирай меньшее число шагов.
+
 ## Предварительные условия
 
 - Существует `.madspec/<BRANCH>/memory/stages/feature.init.json`.
@@ -49,6 +58,7 @@ $ARGUMENTS
 
 1. Определи текущую ветку через `madspec git current-branch`.
 2. Запроси `madspec memory retrieve --stage feature.plan --json-output`.
+   - Используй `policy_context` из ответа как обязательный input для выбора `step-kind`, `tddPolicy` и candidate dependencies.
 3. Прочитай generated references:
    - `.madspec/<BRANCH>/project-analysis.md`
    - `.madspec/<BRANCH>/feature-context.md`

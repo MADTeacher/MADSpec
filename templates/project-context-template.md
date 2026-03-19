@@ -13,6 +13,8 @@
 - **Текущий этап**: [concept|design|tech|architecture|deploy|plan|implement|security|review]
 - **Текущий шаг реализации**: [step-NN-name или N/A]
 - **Прогресс реализации**: [X/Y шагов завершено]
+- **Policy revision**: [REVISION]
+- **Global policy artifact**: `.madspec/system/policy.md`
 
 ## Навигация по артефактам
 

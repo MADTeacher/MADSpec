@@ -34,6 +34,7 @@ $ARGUMENTS
 - Для архитектурного контекста сначала используй `madspec memory retrieve --stage mvp.architecture --json-output`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` считай generated views поверх canonical architecture-state.
 - `implementation-plan.md`, `planning-context-cache.md`, `planning-context.md` и `project-context.md` являются generated views.
 - В обычных ходах диалога сначала используй `madspec memory retrieve --stage mvp.plan --json-output` и опирайся на `plan_status`.
+- Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`; planning decisions и новые step metadata не должны противоречить active policies текущей стадии.
 - Полный `artifact_state.plan` запрашивай только перед финальной проверкой и `madspec memory checkpoint --stage mvp.plan`, используя `--full-artifact`.
 - Для planning-level state используй `madspec memory capture --stage mvp.plan --plan-overview ... --planning-principle ... --next-action ...`.
 - После обновления structured memory обязательно запускай `madspec memory consolidate` и `madspec memory validate`.
@@ -67,6 +68,14 @@ $ARGUMENTS
 - Включающим тесты для валидации
 - Покрывающим хотя бы одну функцию из концепции проекта
 - Явно классифицированным как `code` или `non-code`
+
+## Правила гранулярности шага (обязательно)
+
+- Один запуск команды создает один новый шаг, но сам шаг должен быть максимально крупным и безопасным для одной итерации `madspec.mvp.implement`.
+- Для легкой задачи создавай один полный шаг, даже если в нем нужно сделать код, тесты, конфигурацию и документацию как части одного результата.
+- Не дроби план на отдельные шаги вида "подготовка", "написание тестов", "обновление документации", "валидация", если это части одной и той же поставки.
+- Делить работу на несколько шагов можно только при реальных зависимостях, отдельных точках пользовательской проверки, заметно разных рисках или явной просьбе пользователя получить более подробный план.
+- Если нет убедительной причины дробить сильнее, выбирай меньшее число шагов.
 
 ## TDD policy (обязательно)
 
@@ -141,7 +150,7 @@ $ARGUMENTS
    
    - Загрузи все предыдущие артефакты:
      - `.madspec/<BRANCH>/concept.md` (для понимания функций и приоритетов)
-     - `madspec memory retrieve --stage mvp.architecture --json-output` (как основной summary архитектуры)
+     - `madspec memory retrieve --stage mvp.architecture --json-output` (как основной summary архитектуры; из ответа также прочитай `policy_context`)
      - `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/ui-design.md`, `.madspec/<BRANCH>/tech-stack.md`, `.madspec/<BRANCH>/data-model.md` (как generated views, если нужны детали)
      - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его и учитывай ограничения деплоя при планировании шагов
    
@@ -208,6 +217,7 @@ $ARGUMENTS
    
    - Загрузи только необходимый контекст:
      - `.madspec/<BRANCH>/concept.md` (для понимания функций и приоритетов)
+     - `policy_context` из `madspec memory retrieve --stage mvp.plan --json-output` (обязательный policy layer для текущей стадии)
      - `.madspec/<BRANCH>/planning-context-cache.md` (для понимания структуры - используется вместо полного `architecture.md` для экономии контекста)
        - Если кэш не существует, сначала загрузи `madspec memory retrieve --stage mvp.architecture --json-output --full-artifact`, затем используй `architecture.md` и `data-model.md` как generated detail views и создай кэш
        - Если кэш существует, но дата последнего обновления старше даты последнего изменения generated architecture artifacts, обнови кэш

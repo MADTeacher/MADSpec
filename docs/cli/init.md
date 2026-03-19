@@ -43,6 +43,11 @@ madspec init --here [OPTIONS]
 - загружается последний релиз шаблона MADSpec
 - шаблон распаковывается в целевую директорию
 - создаются файлы команд и навыки для выбранного агента
+- в `.madspec/config.json` записывается выбранная среда `agentEnvironment`
+- создается проектное хранилище памяти в `.madspec/system/memory/` (`memory.sqlite`, `lancedb/`, `schema-version.json`)
+- создается проектный слой субагентов в `.madspec/system/agents/` (`state.json`, `proposals.jsonl`, `history.jsonl`, `agents.md`)
+- создается структура памяти ветки в `.madspec/<branch>/memory/` и начальные производные представления
+- для сред с native subagents также создаются agent/subagent-файлы проекта; для остальных подготавливаются fallback-артефакты
 - при наличии `git` и без `--no-git` выполняется инициализация репозитория
 - выводятся рекомендуемые следующие команды для MVP и Feature режимов
 

@@ -5,178 +5,16 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from madspec_cli.shared.infra.system_tools import check_tool, run_command
+from madspec_cli.shared.infra.subprocess_tools import (
+    DEFAULT_COMMAND_TIMEOUT_SECONDS,
+    CommandExecutionError,
+    run_subprocess,
+)
 
-GITIGNORE_SECTIONS: dict[str, list[str]] = {
-    "Secrets and credentials": [
-        ".env",
-        ".env.local",
-        ".env.production",
-        ".env.development",
-        ".env.test",
-        ".env.*.local",
-        "*.env",
-        "*.secret",
-        "*.key",
-        "*.pem",
-        "*.p12",
-        "*.pfx",
-        "*.cer",
-        "*.crt",
-        "config/secrets.json",
-        "secrets.yaml",
-        "secrets.yml",
-        "credentials.json",
-        "credentials.yaml",
-        "*.token",
-        "*.password",
-        "*.passwd",
-        "*.auth",
-    ],
-    "Node.js": [
-        "node_modules/",
-        "npm-debug.log*",
-        "yarn-error.log*",
-        ".pnpm-debug.log*",
-        ".yarn/",
-        ".pnp.*",
-        ".yarn-integrity",
-        "yarn.lock",
-        ".npm/",
-        ".node_repl_history",
-        "package-lock.json",
-    ],
-    "Python": [
-        "venv/",
-        ".venv/",
-        "env/",
-        "ENV/",
-        "env.bak/",
-        "venv.bak/",
-        "__pycache__/",
-        "*.py[cod]",
-        "*$py.class",
-        "*.so",
-        ".Python",
-        "pip-log.txt",
-        "pip-delete-this-directory.txt",
-        ".pytest_cache/",
-        "*.egg-info/",
-        "dist/",
-        "build/",
-        "eggs/",
-        "wheels/",
-    ],
-    "Java and JVM": [
-        "target/",
-        "*.class",
-        "*.jar",
-        "*.war",
-        "*.ear",
-        "*.nar",
-        ".gradle/",
-        ".mvn/",
-        "mvnw",
-        "mvnw.cmd",
-        ".settings/",
-        "*.iml",
-        "*.ipr",
-        "*.iws",
-        "*.classpath",
-        ".project",
-    ],
-    "Go": [
-        "vendor/",
-        "*.exe",
-        "*.exe~",
-        "*.dll",
-        "*.test",
-        "*.out",
-        "go.work",
-        "go.work.sum",
-    ],
-    "Rust": [
-        "target/",
-        "Cargo.lock",
-    ],
-    "Dart and Flutter": [
-        ".dart_tool/",
-        ".flutter-plugins",
-        ".flutter-plugins-dependencies",
-        ".packages",
-        "pubspec.lock",
-        ".pub-cache/",
-        "build/",
-    ],
-    "PHP": [
-        "vendor/",
-        "composer.lock",
-    ],
-    ".NET": [
-        "bin/",
-        "obj/",
-        "*.user",
-        "*.suo",
-        "*.cache",
-        "*.dll",
-        ".vs/",
-        ".vscode/",
-        "*.sln.docstates",
-    ],
-    "Temporary files": [
-        ".DS_Store",
-        "Thumbs.db",
-        "ehthumbs.db",
-        "Desktop.ini",
-        "*.log",
-        "*.tmp",
-        "*.temp",
-        "*.swp",
-        "*.swo",
-        "*~",
-        "*.bak",
-        ".DS_Store?",
-        "._*",
-        ".Spotlight-V100",
-        ".Trashes",
-        "$RECYCLE.BIN/",
-        ".fseventsd/",
-        ".Spotlight-V100/",
-        ".TemporaryItems/",
-    ],
-    "Editors and IDEs": [
-        ".idea/",
-        ".fleet/",
-        ".cursor/",
-        ".history/",
-        "*.sublime-*",
-        "*.code-workspace",
-        ".vscode-test/",
-    ],
-    "Build outputs and caches": [
-        "out/",
-        ".next/",
-        ".nuxt/",
-        ".output/",
-        "*.o",
-        "*.a",
-        "*.lib",
-        "*.dylib",
-        ".cache/",
-        ".temp/",
-        ".tmp/",
-        ".parcel-cache/",
-        ".turbo/",
-        ".vuepress/dist/",
-    ],
-    "Databases": [
-        "*.db",
-        "*.sqlite",
-        "*.sqlite3",
-        "*.db-shm",
-        "*.db-wal",
-    ],
-}
+from ..domain.constants import GITIGNORE_SECTIONS
+
+
+GIT_COMMAND_TIMEOUT_SECONDS = DEFAULT_COMMAND_TIMEOUT_SECONDS
 
 
 @dataclass(frozen=True)
@@ -268,21 +106,21 @@ class BranchListResult:
 
 
 def _run_git(project_path: Path, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=project_path,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if check and result.returncode != 0:
-        raise GitOperationError(
-            command=["git", *args],
-            returncode=result.returncode,
-            stderr=result.stderr.strip(),
-            stdout=result.stdout.strip(),
+    command = ["git", *args]
+    try:
+        return run_subprocess(
+            command,
+            cwd=project_path,
+            timeout=GIT_COMMAND_TIMEOUT_SECONDS,
+            check=check,
         )
-    return result
+    except CommandExecutionError as exc:
+        raise GitOperationError(
+            command=exc.command,
+            returncode=exc.returncode or 1,
+            stderr=exc.stderr,
+            stdout=exc.stdout,
+        ) from exc
 
 
 def is_git_repo(path: Path | None = None) -> bool:

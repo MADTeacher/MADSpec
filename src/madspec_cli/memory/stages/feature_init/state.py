@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from ...shared.text_lists import normalize_plain_text_list
 from ...shared.storage import PRIORITIES, now_iso, read_json, write_json
 
 FEATURE_INIT_STAGE = "feature.init"
@@ -49,14 +50,7 @@ def _normalize_string(value: Any) -> str:
 
 
 def _normalize_string_list(values: Any) -> list[str]:
-    if not isinstance(values, list):
-        return []
-    normalized: list[str] = []
-    for value in values:
-        item = _normalize_string(value)
-        if item and item not in normalized:
-            normalized.append(item)
-    return normalized
+    return normalize_plain_text_list(values, normalize_item=_normalize_string)
 
 
 def _normalize_feature_list(values: Any) -> list[dict[str, str]]:

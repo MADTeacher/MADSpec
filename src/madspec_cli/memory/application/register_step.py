@@ -3,9 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from madspec_cli.memory import consolidate_branch_memory, ensure_memory_layout, register_planned_step, validate_branch_memory
-from madspec_cli.memory.shared.storage import get_memory_paths
+from madspec_cli.features.gates.application.common import evaluate_gate_context, gate_failure_messages
 from madspec_cli.shared.kernel.result import PayloadResult
+
+from ..projection.materialize import consolidate_branch_memory
+from ..shared.storage import ensure_memory_layout, get_memory_paths
+from ..shared.validation import validate_branch_memory
+from ..workflow.planning import register_planned_step
 
 
 @dataclass(frozen=True)
@@ -34,7 +38,32 @@ class RegisterStepResult(PayloadResult):
 
 
 def execute(request: RegisterStepRequest) -> RegisterStepResult:
-    ensure_memory_layout(request.project_path, request.branch_name)
+    ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
+    gate_payload = evaluate_gate_context(
+        request.project_path,
+        request.branch_name,
+        stage=request.stage,
+        operation="register-step",
+        step_id=request.step_id,
+        overrides={
+            "step_kind": request.step_kind,
+            "tdd_policy": request.tdd_policy,
+            "waiver_reason": request.waiver_reason,
+            "depends_on": request.depends_on,
+            "covers": request.covers,
+        },
+        include_ratification=False,
+        record_history=False,
+    )
+    if gate_payload["overall_status"] == "blocked":
+        return RegisterStepResult(
+            payload={
+                "accepted": False,
+                "step_id": request.step_id,
+                "errors": gate_failure_messages(gate_payload),
+                "gate_summary": gate_payload,
+            }
+        )
     paths = get_memory_paths(request.project_path, request.branch_name)
     branch_dir = paths.branch_dir
     snapshot_targets = [
@@ -76,8 +105,8 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
         complexity=request.complexity,
     )
     if payload.get("accepted"):
-        consolidate_branch_memory(request.project_path, request.branch_name)
-        validation_errors = validate_branch_memory(request.project_path, request.branch_name)
+        consolidate_branch_memory(request.project_path, request.branch_name, stage=request.stage)
+        validation_errors = validate_branch_memory(request.project_path, request.branch_name, stage=request.stage)
         if validation_errors:
             for path, content in snapshots.items():
                 if content is None:

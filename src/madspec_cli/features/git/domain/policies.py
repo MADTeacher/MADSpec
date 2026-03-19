@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..infrastructure.operations import GITIGNORE_SECTIONS
+from .constants import GITIGNORE_SECTIONS
 
 
 def gitignore_sections() -> dict[str, list[str]]:

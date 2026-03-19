@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from madspec_cli.features.policy.application.common import evaluate_branch_policies
+
+from ..domain.progress import explain_next_executable_step
 from ..shared.records import STEP_ID_PATTERN, make_record
 from ..shared.storage import (
     _default_active_session,
@@ -20,7 +23,7 @@ from ..shared.storage import (
     now_iso,
     write_json,
 )
-from ..projection.views import consolidate_branch_memory
+from ..projection.materialize import consolidate_branch_memory
 from ..stages.concept.state import is_empty_concept_state, load_concept_state, migrate_legacy_concept_markdown
 from ..stages.feature_init.state import (
     is_empty_feature_init_state,
@@ -181,12 +184,7 @@ def determine_next_step(
     progress = read_json(paths.progress, _default_progress_state())
     planned_steps = progress.get("plannedSteps", [])
     completed_steps = set(progress.get("completedSteps", []))
-    step_status = progress.get("stepStatus", {})
     step_dependencies = progress.get("planningMetadata", {}).get("stepDependencies", {})
-    stage_lower = stage.lower()
-
-    def _step_ready(step_id: str) -> bool:
-        return all(dependency in completed_steps for dependency in step_dependencies.get(step_id, []))
 
     if candidate_step:
         errors: list[str] = []
@@ -207,6 +205,17 @@ def determine_next_step(
         if candidate_step in normalized_dependencies:
             errors.append("candidate step cannot depend on itself")
 
+        policy_payload = evaluate_branch_policies(
+            project_path,
+            branch_name,
+            stage=stage,
+            operation="determine-next-step",
+            step_id=candidate_step,
+            overrides={},
+            include_system_policies=False,
+        )
+        errors.extend(item["message"] for item in policy_payload["violations"])
+
         decision = NextStepDecision(
             branch=branch_name,
             stage=stage,
@@ -218,24 +227,10 @@ def determine_next_step(
         )
         return decision.to_payload()
 
-    executable_steps = []
-    for step_id in planned_steps:
-        status = step_status.get(step_id, {}).get("status")
-        if step_id in completed_steps or status == "completed":
-            continue
-        if _step_ready(step_id):
-            executable_steps.append(step_id)
-
-    selected_step = executable_steps[0] if executable_steps else None
-    reason = (
-        "next executable planned step for reference"
-        if "plan" in stage_lower and selected_step
-        else "next executable implementation step"
-        if selected_step
-        else "no executable planned step found"
-        if "plan" in stage_lower
-        else "no executable implementation step found"
-    )
+    analysis = explain_next_executable_step(progress)
+    executable_steps = analysis["executable_steps"]
+    selected_step = analysis["selected_step"]
+    reason = analysis["reason"]
 
     decision = NextStepDecision(
         branch=branch_name,
@@ -268,7 +263,7 @@ def register_planned_step(
     size: str | None = None,
     complexity: str | None = None,
 ) -> dict[str, Any]:
-    ensure_memory_layout(project_path, branch_name)
+    ensure_memory_layout(project_path, branch_name, stage=stage)
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
     if isinstance(progress, dict):
@@ -358,6 +353,27 @@ def register_planned_step(
             accepted=False,
             step_id=step_id,
             errors=[f"no functions catalog found in {catalog_source} for the target stage"],
+        ).to_payload()
+
+    policy_payload = evaluate_branch_policies(
+        project_path,
+        branch_name,
+        stage=stage,
+        operation="register-step",
+        step_id=step_id,
+        overrides={
+            "step_kind": step_kind,
+            "tdd_policy": effective_tdd_policy,
+            "waiver_reason": waiver_reason,
+            "status": "planned",
+        },
+        include_system_policies=False,
+    )
+    if policy_payload["violations"]:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=[item["message"] for item in policy_payload["violations"]],
         ).to_payload()
 
     unknown = [item for item in normalized_covers if item not in known_functions]
@@ -460,7 +476,7 @@ def register_planned_step(
             )
         ],
     )
-    consolidate_branch_memory(project_path, branch_name)
+    consolidate_branch_memory(project_path, branch_name, stage=stage)
 
     return RegisterStepResult(
         accepted=True,

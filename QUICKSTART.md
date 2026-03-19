@@ -1,6 +1,6 @@
 # Быстрый старт с MADSpec
 
-MADSpec — фреймворк для быстрой разработки MVP и добавления новых фич в проект. Основа workflow: branch-aware structured memory в `.madspec/<branch>/memory/` и generated artifacts, которые пересобираются из canonical state.
+MADSpec — фреймворк для быстрой разработки MVP и добавления новых фич в проект. Основа workflow: project-local memory backend в `.madspec/system/memory/`, branch-aware compatibility artifacts в `.madspec/<branch>/memory/` и generated artifacts, которые пересобираются из canonical state.
 
 Все сгенерированные команды `madspec.*` должны начинаться с чтения и применения skill `madspec-cli-operator`. Для `madspec.mvp.design` дополнительно обязателен skill `frontend-design`.
 
@@ -56,7 +56,7 @@ madspec --help
 madspec.feature.init "система платежей через Stripe"
 ```
 
-Что происходит: анализ структуры проекта → запись canonical feature-init state → автогенерация `project-analysis.md`, `feature-context.md`, `tech-stack.md`, `architecture.md`
+Что происходит: анализ структуры проекта → запись канонического состояния `feature.init` → автогенерация `project-analysis.md`, `feature-context.md`, `tech-stack.md`, `architecture.md` и сводки ветки. Несвязанные MVP- и review/security-артефакты на этом шаге не создаются заранее.
 
 **Шаг 2: Спланируйте шаги**
 ```bash

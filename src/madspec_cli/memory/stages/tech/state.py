@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ...shared.text_lists import normalize_plain_text_list
 from ...shared.storage import now_iso, read_json, write_json
 
 TECH_STAGE = "mvp.tech"
@@ -35,14 +36,7 @@ def _normalize_identifier(value: Any) -> str:
 
 
 def _normalize_string_list(values: Any) -> list[str]:
-    if not isinstance(values, list):
-        return []
-    result: list[str] = []
-    for value in values:
-        normalized = _normalize_string(value)
-        if normalized and normalized not in result:
-            result.append(normalized)
-    return result
+    return normalize_plain_text_list(values, normalize_item=_normalize_string)
 
 
 def _normalize_components(values: Any) -> list[dict[str, str]]:

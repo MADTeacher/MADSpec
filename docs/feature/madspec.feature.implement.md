@@ -45,13 +45,16 @@
 - `madspec memory complete-step --stage feature.implement`
 - `madspec git commit --message ...`
 
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и policy validations. При спорном состоянии можно дополнительно выполнить `madspec policy validate --stage feature.implement --step-id <step-id> --json-output`.
+
 ## Пошаговый runtime workflow
 
 1. Агент читает implement context и current feature step.
-2. Запускает шаг через `start-step`.
-3. Фиксирует TDD cycle через `checkpoint-step`.
-4. Завершает шаг через `complete-step`, записывая устойчивые facts/decisions/contracts.
-5. Повторно читает `retrieve` и двигается к следующему executable step.
+2. Агент сверяет шаг с active policies из `policy_context`.
+3. Запускает шаг через `start-step`.
+4. Фиксирует TDD cycle через `checkpoint-step`.
+5. Завершает шаг через `complete-step`, записывая устойчивые facts/decisions/contracts.
+6. Повторно читает `retrieve` и двигается к следующему executable step.
 
 ## Canonical data model
 

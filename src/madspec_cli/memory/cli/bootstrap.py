@@ -4,7 +4,6 @@ from pathlib import Path
 
 import typer
 
-from madspec_cli.memory import get_memory_paths, read_jsonl
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 
@@ -12,6 +11,8 @@ from ..application.bootstrap_branch_memory import BootstrapBranchMemoryRequest, 
 from ..application.consolidate_memory import ConsolidateMemoryRequest, execute as consolidate_memory
 from ..application.validate_memory import ValidateMemoryRequest, execute as validate_memory
 from ..domain.branch_layout import resolve_target_branch
+from ..shared.storage import get_memory_paths, read_jsonl
+from ..shared.system_store import build_db_status, run_reindex
 
 
 def memory_init(
@@ -53,6 +54,7 @@ def memory_status(
             "decisions": len(read_jsonl(paths.decisions)),
             "contracts": len(read_jsonl(paths.contracts)),
         },
+        "db": build_db_status(project_path, target_branch),
     }
     if json_output:
         emit_json(payload)
@@ -70,6 +72,9 @@ def memory_status(
         f"decisions={payload['semantic_records']['decisions']}, "
         f"contracts={payload['semantic_records']['contracts']}"
     )
+    console.print(f"[cyan]SQLite records:[/cyan] {payload['db']['records']}")
+    console.print(f"[cyan]Stage snapshots:[/cyan] {payload['db']['stage_snapshots']}")
+    console.print(f"[cyan]Pending index jobs:[/cyan] {payload['db']['pending_index_jobs']}")
 
 
 def memory_consolidate(
@@ -108,8 +113,57 @@ def memory_validate(
         raise typer.Exit(1)
 
 
+def memory_db_status(
+    branch_name: str = typer.Option(None, "--branch", help="Optional branch name to scope counts"),
+    json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+) -> None:
+    """Show project-level SQLite/vector memory backend status."""
+    project_path = Path.cwd()
+    target_branch = resolve_target_branch(project_path, branch_name) if branch_name else None
+    payload = build_db_status(project_path, target_branch)
+    if json_output:
+        emit_json(payload)
+        return
+
+    show_banner()
+    if target_branch:
+        console.print(f"[cyan]Branch:[/cyan] {target_branch}")
+    console.print(f"[cyan]SQLite:[/cyan] {payload['sqlite_path']}")
+    console.print(f"[cyan]Vector dir:[/cyan] {payload['vector_dir']}")
+    console.print(f"[cyan]Vector backend:[/cyan] {payload['vector_backend']}")
+    console.print(f"[cyan]Records:[/cyan] {payload['records']}")
+    console.print(f"[cyan]Stage snapshots:[/cyan] {payload['stage_snapshots']}")
+    console.print(f"[cyan]Sessions:[/cyan] {payload['sessions']}")
+    console.print(f"[cyan]Artifacts:[/cyan] {payload['artifacts']}")
+    console.print(f"[cyan]Pending index jobs:[/cyan] {payload['pending_index_jobs']}")
+    console.print(f"[cyan]Indexed jobs:[/cyan] {payload['indexed_jobs']}")
+
+
+def memory_reindex(
+    branch_name: str = typer.Option(None, "--branch", help="Optional branch name to reindex"),
+    limit: int = typer.Option(200, "--limit", help="Max index jobs to process"),
+    json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+) -> None:
+    """Process pending index jobs for the project-local memory backend."""
+    project_path = Path.cwd()
+    target_branch = resolve_target_branch(project_path, branch_name) if branch_name else None
+    payload = run_reindex(project_path, target_branch, limit=limit)
+    if json_output:
+        emit_json(payload)
+        return
+
+    show_banner()
+    if target_branch:
+        console.print(f"[cyan]Branch:[/cyan] {target_branch}")
+    console.print(f"[cyan]Lease acquired:[/cyan] {'yes' if payload['lease_acquired'] else 'no'}")
+    console.print(f"[cyan]Processed jobs:[/cyan] {payload['processed']}")
+    console.print(f"[cyan]Failed jobs:[/cyan] {payload['failed']}")
+
+
 def register(memory_app: typer.Typer) -> None:
     memory_app.command("init")(memory_init)
     memory_app.command("status")(memory_status)
+    memory_app.command("db-status")(memory_db_status)
+    memory_app.command("reindex")(memory_reindex)
     memory_app.command("consolidate")(memory_consolidate)
     memory_app.command("validate")(memory_validate)

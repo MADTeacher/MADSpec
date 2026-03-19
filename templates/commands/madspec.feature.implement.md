@@ -19,6 +19,7 @@ $ARGUMENTS
 - `decision-log.jsonl`, `events.jsonl` и `semantic/*.jsonl` являются каноническими record streams реализации.
 - `implementation-context.md` и `project-context.md` являются generated views.
 - В начале каждой сессии сначала используй `madspec memory retrieve --stage feature.implement --json-output`.
+- Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory` и policy validations для текущего шага.
 - Для запуска шага используй `madspec memory start-step --stage feature.implement`.
 - Для TDD checkpoint используй `madspec memory checkpoint-step --stage feature.implement`.
 - Для завершения шага используй `madspec memory complete-step --stage feature.implement`.
@@ -39,6 +40,8 @@ $ARGUMENTS
    - `workflow.nextExecutableStep`
    - `step.metadata`
    - `step.status`
+   - `policy_context.required`
+   - `policy_context.advisory`
 4. Прочитай generated references:
    - `.madspec/<BRANCH>/project-analysis.md`
    - `.madspec/<BRANCH>/feature-context.md`
@@ -54,6 +57,7 @@ $ARGUMENTS
 7. Выполни шаг:
    - для `code` шага следуй циклу `red -> green -> refactor`
    - для `non-code` шага используй только путь waiver/not-applicable
+   - не нарушай active required policies; если шаг конфликтует с policy_context, сначала скорректируй step intent или policy set
 8. Сохраняй промежуточное состояние через:
    - `madspec memory checkpoint-step --stage feature.implement --tdd-phase red ...`
    - `madspec memory checkpoint-step --stage feature.implement --tdd-phase green ...`
@@ -62,6 +66,7 @@ $ARGUMENTS
    - `madspec memory complete-step --stage feature.implement --step-id <step-id> --summary ...`
    - при необходимости добавь `--fact`, `--decision`, `--contract`
 10. Повтори `madspec memory retrieve --stage feature.implement --json-output` и проверь следующий executable step.
+    - При сомнении дополнительно выполни `madspec policy validate --stage feature.implement --step-id <step-id> --json-output`.
 11. После успешного `complete-step` создай git commit через `madspec git commit --message "..."`
 
 ## Важные запреты

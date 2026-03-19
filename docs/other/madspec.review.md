@@ -38,18 +38,24 @@
 ## Входы команды
 
 - `madspec memory retrieve --stage review --json-output`
+- `madspec review status --json-output`
+- `madspec policy validate --stage review --json-output`
 - код, тесты и branch artifacts
 - `madspec memory capture --stage review ...`
 - `madspec memory checkpoint --stage review --summary ...`
 
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory`, `policy_context.violations` и `policy_context.confirmations`, а `madspec review status` использовать как сводку блокирующих, ожидающих и предупреждающих проверок, а также активных исключений.
+
 ## Пошаговый runtime workflow
 
 1. Агент читает `review` memory context.
-2. Определяет актуальный implementation workflow: `mvp.implement` или `feature.implement`.
-3. Загружает progress, implementation plan, step contexts и branch artifacts.
-4. Проводит fit-gap review, code/test review, architecture/integration review и improvement triage.
-5. Сохраняет findings, decisions, questions и pending actions через `capture`.
-6. `checkpoint` пересобирает `review.md` и `improvements.md`.
+2. Агент запускает `madspec review status --json-output` и фиксирует блокирующие, ожидающие и предупреждающие проверки, активные исключения и статус ратификации.
+3. Агент запускает `madspec policy validate --stage review --json-output` и подмешивает violations, advisories и confirmations в review evidence.
+4. Определяет актуальный implementation workflow: `mvp.implement` или `feature.implement`.
+5. Загружает progress, implementation plan, step contexts и branch artifacts.
+6. Проводит fit-gap review, code/test review, architecture/integration review и improvement triage.
+7. Сохраняет findings, decisions, questions и pending actions через `capture`, включая наблюдения по контрольным проверкам и правилам проекта.
+8. `checkpoint` пересобирает `review.md` и `improvements.md`.
 
 ## Canonical data model
 
@@ -70,6 +76,8 @@ Checkpoint требует:
 - `review.md`
 - `improvements.md`
 - `project-context.md`
+
+Generated view `review.md` также показывает производную секцию `gate summary` и список активных исключений.
 
 ## Диаграммы
 

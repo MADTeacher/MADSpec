@@ -29,6 +29,7 @@ $ARGUMENTS
 - `decision-log.jsonl`, `events.jsonl` и `semantic/*.jsonl` — канонические записи о ходе реализации, знаниях и результатах.
 - `implementation-context.md` и `project-context.md` являются generated views поверх structured memory и **не редактируются вручную как primary source**.
 - Перед началом работы сначала получай контекст через `madspec memory retrieve --stage mvp.implement --json-output`.
+- Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory` и связанные validations; текущий шаг и TDD state должны соответствовать active policies стадии.
 - Для старта шага используй `madspec memory start-step --stage mvp.implement`, а не ручную установку `currentImplementStep`.
 - Для промежуточных TDD checkpoint используй `madspec memory checkpoint-step --stage mvp.implement`.
 - Для завершения шага, продвижения workflow и записи step-level knowledge используй `madspec memory complete-step --stage mvp.implement`.
@@ -69,7 +70,7 @@ $ARGUMENTS
 
 1. **Загрузка контекста**:
    - **Сначала выполни** `madspec memory retrieve --stage mvp.implement --json-output`.
-   - Используй JSON-ответ как основной источник workflow state: `workflow.currentImplementStep`, `workflow.nextExecutableStep`, `step.status`, `step.metadata`, `step.dependencies`, `semantic.*`, `stage_memory.*`.
+   - Используй JSON-ответ как основной источник workflow state: `workflow.currentImplementStep`, `workflow.nextExecutableStep`, `step.status`, `step.metadata`, `step.dependencies`, `semantic.*`, `stage_memory.*`, `policy_context.*`.
    - Прочитай `.madspec/<BRANCH>/implementation-plan.md` как generated plan overview.
    - Прочитай предыдущие stage artifacts из `.madspec/<BRANCH>/` для product и architecture context: `concept.md`, `ui-design.md`, `tech-stack.md`, `architecture.md`, `data-model.md`, `contracts/openapi.yaml`.
    - Прочитай source artifacts текущего шага:
@@ -91,6 +92,7 @@ $ARGUMENTS
    - Определи `step kind` и `tddPolicy` через `step.metadata`:
      - `code + required` -> шаг выполняется строго по циклу `red -> green -> refactor`.
      - `non-code + waived|not-applicable` -> кодовые TDD gates не применяются, но `waiverReason` должен быть сохранен в metadata шага.
+   - Сверь шаг с `policy_context.required` и `policy_context.advisory`; если active required policy конфликтует с планом шага, остановись и сначала исправь canonical workflow state или policy set.
    - Если step source artifacts противоречат structured memory, доверяй memory как workflow state, а source artifacts используй как задающий intent и acceptance criteria.
 
 4. **Выполнение шага**:
@@ -161,6 +163,7 @@ $ARGUMENTS
 
    **Отдельно проверь structured memory:**
    - Выполни `madspec memory retrieve --stage mvp.implement --step-id <step-id> --json-output`.
+   - Убедись, что `policy_context.violations` пуст или содержит только advisory observations; required policy violations блокируют completion.
    - Для `code + required` после `complete-step` должны быть выполнены условия:
      - `step.status.tddPhase = completed`
      - `step.status.redEvidence` заполнен
@@ -211,6 +214,7 @@ $ARGUMENTS
 
 9. **Проверка результата после completion**:
    - Повтори `madspec memory retrieve --stage mvp.implement --step-id <step-id> --json-output` и проверь итоговый статус шага.
+   - Если workflow validation выглядит неочевидной, дополнительно выполни `madspec policy validate --stage mvp.implement --step-id <step-id> --json-output` и используй результат как policy-specific explanation.
    - Используй generated `implementation-context.md` и `project-context.md` как read-only подтверждение того, что consolidated views обновились.
    - Если generated views расходятся с фактами, исправляй memory/records и повторяй `madspec memory consolidate` + `madspec memory validate`, а не редактируй markdown вручную.
 

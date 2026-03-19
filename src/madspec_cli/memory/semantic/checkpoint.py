@@ -63,7 +63,7 @@ from ..shared.storage import (
     write_json,
 )
 from ..shared.validation import validate_branch_memory
-from ..views import consolidate_branch_memory
+from ..projection.materialize import consolidate_branch_memory
 
 CHECKPOINT_STAGES = {
     "mvp.concept",
@@ -129,7 +129,7 @@ def checkpoint_stage_memory(
         )
     if not normalized_summary:
         errors.append("summary must not be empty")
-    ensure_memory_layout(project_path, branch_name)
+    ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
     paths = get_memory_paths(project_path, branch_name)
     existing_stage_facts = [
         record
@@ -373,9 +373,9 @@ def checkpoint_stage_memory(
         append_jsonl(paths.decisions, decision_records)
         append_jsonl(paths.contracts, contract_records)
 
-        generated = consolidate_branch_memory(project_path, branch_name)
-        ensure_memory_layout(project_path, branch_name)
-        validation_errors = validate_branch_memory(project_path, branch_name)
+        generated = consolidate_branch_memory(project_path, branch_name, stage=normalized_stage)
+        ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
+        validation_errors = validate_branch_memory(project_path, branch_name, stage=normalized_stage)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
     except Exception as exc:

@@ -4,6 +4,8 @@
 
 `madspec.feature.plan` строит step catalog для feature-ветки и синхронизирует его с `progress.json`, используя feature IDs и integration analysis из `feature.init`.
 
+Команда должна стремиться к минимально достаточному числу шагов: для небольшой feature или легкого изменения агент выбирает один полный шаг, а не серию микро-шагов без реальной необходимости.
+
 ## Когда запускать
 
 - после завершения `feature.init`
@@ -46,14 +48,27 @@
 - `madspec memory register-step --stage feature.plan ...`
 - `madspec memory checkpoint --stage feature.plan --summary ...`
 
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`, чтобы feature plan не расходился с project-global active policies.
+
 ## Пошаговый runtime workflow
 
 1. Агент читает `feature.init_status` и `feature_plan_status`.
-2. Фиксирует planning strategy для feature.
-3. Проверяет candidate step через `next-step`.
-4. Регистрирует шаг через `register-step`, связывая `covers` с feature IDs.
-5. Runtime обновляет `feature.plan.json`, `progress.json` и generated planning views.
-6. `checkpoint` ратифицирует feature plan.
+   Первый вход в стадию лениво материализует `feature.plan.json`, `implementation-plan.md`, `planning-context-cache.md` и `project-context.md`, если их еще нет.
+2. Агент читает `policy_context` и учитывает active policies при выборе `stepKind`, `tddPolicy` и зависимостей.
+3. Определяет максимально крупный безопасный шаг для текущей feature-итерации.
+4. Фиксирует planning strategy для feature.
+5. Проверяет candidate step через `next-step`.
+6. Регистрирует шаг через `register-step`, связывая `covers` с feature IDs.
+7. Runtime обновляет `feature.plan.json`, `progress.json` и generated planning views.
+8. `checkpoint` ратифицирует feature plan.
+
+## Правила гранулярности шага
+
+- Предпочитай максимально крупный безопасный шаг, который можно реализовать и проверить за один проход `feature.implement`.
+- Если изменение маленькое и ведет к одному результату, оформляй его одним шагом даже при затрагивании нескольких файлов и видов работ.
+- Не выделяй в отдельные шаги подготовку, тесты, документацию, мелкие правки контрактов и валидацию, если они нужны только для завершения того же самого изменения.
+- Делить feature на несколько шагов нужно только при реальных зависимостях, отдельных пользовательских проверках, заметно разных рисках или явной просьбе пользователя получить подробный план.
+- Если нет убедительной причины дробить, выбирай меньшее число шагов.
 
 ## Canonical data model
 
@@ -83,6 +98,12 @@ Reference rules:
 - `planning-context-cache.md`
 - `steps/<step-id>/planning-context.md`
 - `project-context.md`
+
+## Stage-aware materialization
+
+- До первого реального входа в `feature.plan` файлы `feature.plan.json`, `implementation-plan.md` и `planning-context-cache.md` могут отсутствовать.
+- Их отсутствие после `feature.init` не считается drift.
+- `madspec memory init`, `madspec memory consolidate` и `madspec memory validate` по-прежнему могут собрать полный набор артефактов ветки.
 
 ## Диаграммы
 

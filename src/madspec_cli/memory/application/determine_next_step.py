@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from madspec_cli.memory import determine_next_step, ensure_memory_layout
 from madspec_cli.shared.kernel.result import PayloadResult
+
+from ..shared.storage import ensure_memory_layout
+from ..workflow.planning import determine_next_step
 
 
 @dataclass(frozen=True)
@@ -24,7 +26,7 @@ class DetermineNextStepResult(PayloadResult):
 
 
 def execute(request: DetermineNextStepRequest) -> DetermineNextStepResult:
-    ensure_memory_layout(request.project_path, request.branch_name)
+    ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
     payload = determine_next_step(
         request.project_path,
         request.branch_name,

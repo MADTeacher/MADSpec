@@ -3,6 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from madspec_cli.features.gates.application.common import evaluate_gate_context, gate_failure_messages
+from madspec_cli.features.policy.application.common import evaluate_branch_policies
+
 from ..domain.progress import select_next_executable_step
 from .implementation_records import (
     build_checkpoint_event,
@@ -31,7 +34,7 @@ from ..shared.storage import (
     write_json,
 )
 from ..shared.validation import validate_branch_memory
-from ..views import consolidate_branch_memory
+from ..projection.materialize import consolidate_branch_memory
 
 
 def start_implementation_step(
@@ -51,7 +54,26 @@ def start_implementation_step(
     normalized_summary = (summary or "").strip()
     normalized_evidence = normalize_text_list(evidence)
 
-    ensure_memory_layout(project_path, branch_name)
+    ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
+    gate_payload = evaluate_gate_context(
+        project_path,
+        branch_name,
+        stage=normalized_stage,
+        operation="start-step",
+        step_id=step_id,
+        overrides={"summary": normalized_summary, "evidence": normalized_evidence},
+        include_ratification=False,
+        record_history=False,
+    )
+    if gate_payload["overall_status"] == "blocked":
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "step_id": gate_payload.get("step_id"),
+            "errors": gate_failure_messages(gate_payload),
+            "gate_summary": gate_payload,
+        }
     paths = get_memory_paths(project_path, branch_name)
     snapshots = {
         paths.progress: snapshot_file(paths.progress),
@@ -77,6 +99,23 @@ def start_implementation_step(
             "stage": normalized_stage,
             "step_id": selected_step,
             "errors": errors,
+        }
+
+    policy_payload = evaluate_branch_policies(
+        project_path,
+        branch_name,
+        stage=normalized_stage,
+        operation="start-step",
+        step_id=selected_step,
+        include_system_policies=False,
+    )
+    if policy_payload["violations"]:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "step_id": selected_step,
+            "errors": [item["message"] for item in policy_payload["violations"]],
         }
 
     ts = now_iso()
@@ -105,8 +144,8 @@ def start_implementation_step(
             ),
         )
 
-        generated = consolidate_branch_memory(project_path, branch_name)
-        validation_errors = validate_branch_memory(project_path, branch_name)
+        generated = consolidate_branch_memory(project_path, branch_name, stage=normalized_stage)
+        validation_errors = validate_branch_memory(project_path, branch_name, stage=normalized_stage)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
     except Exception as exc:
@@ -156,14 +195,58 @@ def checkpoint_implementation_step(
     normalized_phase = tdd_phase.strip().lower() if tdd_phase else None
 
     if not any([normalized_summary, normalized_phase, normalized_red, normalized_green, normalized_refactor_note]):
+        gate_payload = evaluate_gate_context(
+            project_path,
+            branch_name,
+            stage=normalized_stage,
+            operation="checkpoint-step",
+            step_id=step_id,
+            overrides={
+                "summary": normalized_summary,
+                "tdd_phase": normalized_phase,
+                "red_evidence": normalized_red,
+                "green_evidence": normalized_green,
+                "refactor_note": normalized_refactor_note,
+                "evidence": normalized_evidence,
+            },
+            include_ratification=False,
+            record_history=False,
+        )
         return {
             "accepted": False,
             "branch": branch_name,
             "stage": normalized_stage,
-            "errors": ["checkpoint must include summary, tdd phase, evidence, or refactor note"],
+            "errors": gate_failure_messages(gate_payload) or ["checkpoint must include summary, tdd phase, evidence, or refactor note"],
+            "gate_summary": gate_payload,
         }
 
-    ensure_memory_layout(project_path, branch_name)
+    ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
+    gate_payload = evaluate_gate_context(
+        project_path,
+        branch_name,
+        stage=normalized_stage,
+        operation="checkpoint-step",
+        step_id=step_id,
+        overrides={
+            "summary": normalized_summary,
+            "tdd_phase": normalized_phase,
+            "red_evidence": normalized_red,
+            "green_evidence": normalized_green,
+            "refactor_note": normalized_refactor_note,
+            "evidence": normalized_evidence,
+        },
+        include_ratification=False,
+        record_history=False,
+    )
+    if gate_payload["overall_status"] == "blocked":
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "step_id": gate_payload.get("step_id"),
+            "errors": gate_failure_messages(gate_payload),
+            "gate_summary": gate_payload,
+        }
     paths = get_memory_paths(project_path, branch_name)
     snapshots = {
         paths.progress: snapshot_file(paths.progress),
@@ -215,6 +298,32 @@ def checkpoint_implementation_step(
             ],
         }
 
+    policy_payload = evaluate_branch_policies(
+        project_path,
+        branch_name,
+        stage=normalized_stage,
+        operation="checkpoint-step",
+        step_id=selected_step,
+        overrides={
+            "step_kind": metadata.get("kind"),
+            "tdd_policy": tdd_policy,
+            "tdd_phase": normalized_phase or status_info.get("tddPhase"),
+            "status": "in_progress",
+            "red_evidence": append_unique(status_info.get("redEvidence", []), normalized_red),
+            "green_evidence": append_unique(status_info.get("greenEvidence", []), normalized_green),
+            "refactor_note": normalized_refactor_note if normalized_refactor_note is not None else status_info.get("refactorNote"),
+        },
+        include_system_policies=False,
+    )
+    if policy_payload["violations"]:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "step_id": selected_step,
+            "errors": [item["message"] for item in policy_payload["violations"]],
+        }
+
     ts = now_iso()
     try:
         set_active_step(progress, selected_step)
@@ -252,8 +361,8 @@ def checkpoint_implementation_step(
             ),
         )
 
-        generated = consolidate_branch_memory(project_path, branch_name)
-        validation_errors = validate_branch_memory(project_path, branch_name)
+        generated = consolidate_branch_memory(project_path, branch_name, stage=normalized_stage)
+        validation_errors = validate_branch_memory(project_path, branch_name, stage=normalized_stage)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
     except Exception as exc:
@@ -314,7 +423,33 @@ def complete_implementation_step(
     normalized_contracts = normalize_text_list(contracts)
     normalized_refactor_note = refactor_note.strip() if refactor_note else None
 
-    ensure_memory_layout(project_path, branch_name)
+    gate_payload = evaluate_gate_context(
+        project_path,
+        branch_name,
+        stage=normalized_stage,
+        operation="complete-step",
+        step_id=step_id,
+        overrides={
+            "summary": normalized_summary,
+            "red_evidence": normalized_red,
+            "green_evidence": normalized_green,
+            "refactor_note": normalized_refactor_note,
+            "evidence": normalized_evidence,
+        },
+        include_ratification=False,
+        record_history=False,
+    )
+    if gate_payload["overall_status"] == "blocked":
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "step_id": gate_payload.get("step_id"),
+            "errors": gate_failure_messages(gate_payload),
+            "gate_summary": gate_payload,
+        }
+
+    ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
     paths = get_memory_paths(project_path, branch_name)
     snapshots = {
         paths.progress: snapshot_file(paths.progress),
@@ -401,6 +536,26 @@ def complete_implementation_step(
                 if candidate != selected_step and candidate_status.get("status") == "in_progress":
                     candidate_status["status"] = "planned"
 
+        policy_payload = evaluate_branch_policies(
+            project_path,
+            branch_name,
+            stage=normalized_stage,
+            operation="complete-step",
+            step_id=selected_step,
+            overrides={
+                "step_kind": metadata.get("kind"),
+                "tdd_policy": metadata.get("tddPolicy"),
+                "tdd_phase": status_info.get("tddPhase"),
+                "status": "completed",
+                "red_evidence": status_info.get("redEvidence", []),
+                "green_evidence": status_info.get("greenEvidence", []),
+                "refactor_note": status_info.get("refactorNote"),
+            },
+            include_system_policies=False,
+        )
+        if policy_payload["violations"]:
+            raise ValueError("; ".join(item["message"] for item in policy_payload["violations"]))
+
         write_json(paths.progress, progress)
 
         active_session["stage"] = normalized_stage
@@ -465,8 +620,8 @@ def complete_implementation_step(
             ),
         )
 
-        generated = consolidate_branch_memory(project_path, branch_name)
-        validation_errors = validate_branch_memory(project_path, branch_name)
+        generated = consolidate_branch_memory(project_path, branch_name, stage=normalized_stage)
+        validation_errors = validate_branch_memory(project_path, branch_name, stage=normalized_stage)
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
     except Exception as exc:

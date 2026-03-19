@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from ...shared.text_lists import normalize_plain_text_list
 from ...shared.storage import PRIORITIES
 
 FLOW_DATA_KINDS = {"displayed", "input"}
@@ -31,14 +32,7 @@ def normalize_path(value: Any) -> str:
 
 
 def normalize_string_list(values: Any) -> list[str]:
-    if not isinstance(values, list):
-        return []
-    result: list[str] = []
-    for value in values:
-        normalized = normalize_string(value)
-        if normalized and normalized not in result:
-            result.append(normalized)
-    return result
+    return normalize_plain_text_list(values, normalize_item=normalize_string)
 
 
 def default_screen_coverage() -> dict[str, list[str]]:

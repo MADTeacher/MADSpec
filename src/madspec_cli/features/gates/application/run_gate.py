@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from madspec_cli.shared.kernel.result import PayloadResult
+
+from .common import evaluate_gate_context
+
+
+@dataclass(frozen=True)
+class RunGateRequest:
+    project_path: Path
+    branch_name: str
+    stage: str | None
+    operation: str | None
+    step_id: str | None
+    overrides: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RunGateResult(PayloadResult):
+    pass
+
+
+def execute(request: RunGateRequest) -> RunGateResult:
+    payload = evaluate_gate_context(
+        request.project_path,
+        request.branch_name,
+        stage=request.stage,
+        operation=request.operation,
+        step_id=request.step_id,
+        overrides=request.overrides,
+        include_ratification=True,
+        record_history=True,
+    )
+    return RunGateResult(payload=payload)

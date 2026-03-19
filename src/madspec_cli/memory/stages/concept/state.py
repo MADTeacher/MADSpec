@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from ...shared.text_lists import normalize_plain_text_list
 from ...shared.storage import PRIORITIES, now_iso, read_json, write_json
 
 CONCEPT_STAGE = "mvp.concept"
@@ -33,16 +34,7 @@ def default_concept_state() -> dict[str, Any]:
 
 
 def _normalize_string_list(values: Any) -> list[str]:
-    if not isinstance(values, list):
-        return []
-    result: list[str] = []
-    for value in values:
-        if not isinstance(value, str):
-            continue
-        normalized = re.sub(r"\s+", " ", value).strip()
-        if normalized and normalized not in result:
-            result.append(normalized)
-    return result
+    return normalize_plain_text_list(values, normalize_item=lambda value: re.sub(r"\s+", " ", value).strip() if isinstance(value, str) else "")
 
 
 def _normalize_feature_list(values: Any) -> list[dict[str, str]]:

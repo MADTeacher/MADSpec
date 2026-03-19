@@ -13,9 +13,15 @@ MADSpec - это фреймворк для разработки программ
 - MVP-процесс для разработки продукта с нуля: от концепции до реализации
 - Feature-процесс для добавления функциональности в существующий код
 - Отдельные артефакты по веткам в `.madspec/<branch>/` вместо одного общего состояния проекта
-- Структурированную память в `.madspec/<branch>/memory/` и автоматически собираемые Markdown-файлы поверх нее
-- Процессы review и security для проверки качества после реализации
-- Подготовленную структуру команд и файлов для поддерживаемых AI-сред
+- Проектное хранилище памяти в `.madspec/system/memory/`, артефакты памяти ветки в `.madspec/<branch>/memory/` и автоматически собираемые Markdown-файлы поверх них
+- Слой объяснения и диагностики для структурированной памяти: `doctor`, `explain`, `timeline`, `why-next-step`, `conflicts`, `inspect-record`
+- Контролируемое сравнение и слияние памяти между ветками с циклом `compare/propose/preview/apply` и продвижением подтвержденных знаний на уровень проекта
+- Единый слой правил проекта в `.madspec/system/policy/` с циклом предложения и применения и автоматически собираемым `policy.md`
+- Слой управления изменениями в `.madspec/<branch>/change/` с фиксированной базовой точкой сравнения, предложениями, ратифицированным пакетом изменений и переносимым пакетом экспорта
+- Слой контрольных проверок в `.madspec/<branch>/gates/` с единым статусом переходов, предложениями на исключения и журналом аудита
+- Слой субагентных профилей в `.madspec/system/agents/` с каноническим состоянием ролей, рекомендациями, историей изменений и role-scoped context
+- Процессы `review` и `security` для проверки качества после реализации
+- Подготовленную структуру команд и файлов для поддерживаемых сред с AI-агентами
 
 ## Установка
 
@@ -56,19 +62,19 @@ uvx --from git+https://github.com/MADTeacher/MADSpec.git madspec init <PROJECT_N
 
 ## Поддерживаемые AI-Агенты
 
-| Агент | Тип | Директория | Нужен CLI |
-| --- | --- | --- | --- |
-| [Cursor](https://cursor.sh/) | IDE | `.cursor/commands/` | Нет |
-| [opencode](https://opencode.ai/) | CLI | `.opencode/command/` | Да |
-| [Kilo Code](https://github.com/Kilo-Org/kilocode) | IDE | `.kilocode/rules/` | Нет |
-| [Roo Code](https://roocode.com/) | IDE | `.roo/rules/` | Нет |
-| [SourceCraft](https://sourcecraft.dev/) | IDE | `.codeassistant/commands/` | Нет |
-| [Qwen Code](https://github.com/QwenLM/qwen-code) | CLI | `.qwen/commands/` | Да |
-| [GitHub Copilot](https://github.com/features/copilot) | IDE | `.github/agents/` | Нет |
+| Агент | Тип | Директория | Нужен CLI | Субагенты |
+| --- | --- | --- | --- | --- |
+| [Cursor](https://cursor.sh/) | IDE | `.cursor/commands/` | Нет | Да, native (`.cursor/agents/`) |
+| [opencode](https://opencode.ai/) | CLI | `.opencode/commands/` | Да | Да, native (`.opencode/agents/`) |
+| [Kilo Code](https://github.com/Kilo-Org/kilocode) | IDE | `.kilocode/rules/` | Нет | Fallback через rules/skills |
+| [Roo Code](https://roocode.com/) | IDE | `.roo/rules/` | Нет | Fallback через rules/skills |
+| [SourceCraft](https://sourcecraft.dev/) | IDE | `.codeassistant/commands/` | Нет | Fallback через commands/skills |
+| [Qwen Code](https://github.com/QwenLM/qwen-code) | CLI | `.qwen/commands/` | Да | Да, native (`.qwen/agents/`) |
+| [GitHub Copilot](https://github.com/features/copilot) | IDE | `.github/agents/` | Нет | Да, native (`.github/agents/`) |
 
 ## Как Работать С MADSpec
 
-Все сгенерированные slash-команды `madspec.*` должны начинаться с чтения и применения skill `madspec-cli-operator`. Для `madspec.mvp.design` дополнительно обязателен skill `frontend-design`.
+Все сгенерированные команды со слешем `madspec.*` должны начинаться с чтения и применения навыка `madspec-cli-operator`. Для `madspec.mvp.design` дополнительно обязателен навык `frontend-design`.
 
 ### MVP-Процесс
 
@@ -79,11 +85,13 @@ uvx --from git+https://github.com/MADTeacher/MADSpec.git madspec init <PROJECT_N
 1. Если хотите сразу создать новый проект вместе с MADSpec, используйте `madspec init <PROJECT_NAME> --ai <agent>`.
 2. Если директория проекта уже существует, используйте `madspec init .`; при необходимости AI-среду можно передать через `--ai <agent>` или выбрать вручную во время запуска.
 3. `/madspec.mvp.concept` - зафиксировать идею проекта, целевую аудиторию, сценарии и ключевые функции.
-4. `/madspec.mvp.design` - описать пользовательский опыт, экраны и прототипы интерфейса; на этой стадии агент обязан использовать оба skill: `madspec-cli-operator` как workflow/CLI skill и `frontend-design` для visual/UI/UX design.
+4. `/madspec.mvp.design` - описать пользовательский опыт, экраны и прототипы интерфейса; на этой стадии агент обязан использовать оба навыка: `madspec-cli-operator` как базовый навык процесса и CLI, а `frontend-design` - для визуального проектирования интерфейса.
 5. `/madspec.mvp.tech` - выбрать стек технологий и зафиксировать технические решения.
 6. `/madspec.mvp.architecture` - формализовать структуру проекта, модель данных и контракты.
 
 После этого можно работать по одному из двух сценариев.
+
+Для легкой задачи или маленькой MVP-итерации агент должен предпочитать один полный planning-step, а не дробить работу на искусственные микро-шаги. Отдельные шаги нужны только там, где есть реальные зависимости, разные риски, самостоятельные точки проверки или явная просьба пользователя идти подробнее.
 
 #### Вариант 1: сначала полностью допланировать, потом реализовывать
 
@@ -133,6 +141,8 @@ madspec init .
 
 После `feature.init` тоже возможны два сценария работы.
 
+Для небольшой feature агент должен предпочитать один полный planning-step, если изменение можно реализовать и проверить как единое целое. Не нужно разносить код, тесты, документацию и валидацию по отдельным шагам без реальной зависимости между ними.
+
 #### Вариант 1: сначала полностью допланировать feature, потом реализовывать
 
 1. Повторять `/madspec.feature.plan`, пока feature-план не будет готов полностью.
@@ -179,13 +189,19 @@ MADSpec не предполагает слепого выполнения все
 Эти команды можно запускать после заметных изменений в любом режиме:
 
 ```bash
+/madspec.memory
+/madspec.merge
+/madspec.policy
+/madspec.change
+/madspec.gate
+/madspec.agents
 /madspec.review
 /madspec.security
 ```
 
 ## Структурированная Память
 
-MADSpec хранит основное состояние проекта в `.madspec/<branch>/memory/`. Файлы вроде `concept.md`, `tech-stack.md`, `architecture.md` и `implementation-plan.md` собираются из этого состояния автоматически и не являются основным источником истины.
+MADSpec хранит основное проектное состояние в `.madspec/system/memory/`, `.madspec/system/policy/` и `.madspec/system/agents/`, а артефакты процесса, привязанные к ветке, — в `.madspec/<branch>/memory/`, `.madspec/<branch>/change/` и `.madspec/<branch>/gates/`. Файлы вроде `concept.md`, `tech-stack.md`, `architecture.md`, `implementation-plan.md`, `change-summary.md`, `.madspec/system/policy.md` и `.madspec/system/agents.md` собираются автоматически и не являются основным источником истины. Производные артефакты ветки теперь материализуются по стадиям: feature- и MVP-стадии создают только релевантный минимум, а полный набор пересобирается через `madspec memory init`, `madspec memory consolidate` и `madspec memory validate`.
 
 Такой подход упрощает возобновление длинной работы и отделяет контекст разных веток друг от друга.
 
@@ -195,13 +211,40 @@ MADSpec хранит основное состояние проекта в `.mad
 
 Во время инициализации MADSpec также копирует навыки агента в целевую среду из каталога `skills/`, включая:
 
-- [`madspec-cli-operator`](skills/madspec-cli-operator/SKILL.md) — базовый operational skill, который должны читать все команды `madspec.*`
+- [`madspec-cli-operator`](skills/madspec-cli-operator/SKILL.md) — базовый операторский навык, который должны читать все команды `madspec.*`
+- [`memory-explain`](skills/memory-explain/SKILL.md) — навык объяснения и диагностики для `madspec.memory` и навигации по структурированной памяти
+- [`merge-assistant`](skills/merge-assistant/SKILL.md) — навык для межветочного сравнения памяти, подготовки предложений на слияние и продвижения подтвержденных знаний на уровень проекта
+- [`change-engine`](skills/change-engine/SKILL.md) — навык для жизненного цикла `madspec change ...` и разговорной команды `/madspec.change`
+- [`gate-orchestrator`](skills/gate-orchestrator/SKILL.md) — навык для `madspec gate ...`, блокировок, исключений и статуса ратификации
+- [`subagent-role-advisor`](skills/subagent-role-advisor/SKILL.md) — навык для `madspec agents ...`, профилей субагентов и role-scoped context
 - [`frontend-design`](skills/frontend-design/SKILL.md)
 - [`generate-agents-md`](skills/generate-agents-md/SKILL.md)
 
 ### Субагенты
 
-Субагенты не поставляются вместе с MADSpec. MADSpec CLI создает структуру проекта и команды, но сами субагенты нужно устанавливать и настраивать отдельно в целевой AI-среде.
+MADSpec хранит каноническое состояние субагентных ролей в `.madspec/system/agents/` и экспортирует role-scoped context через `madspec agents subagents context`.
+
+Основные файлы:
+
+- `.madspec/system/agents/state.json` — активная среда, профиль и `enabledSubagentIds`
+- `.madspec/system/agents/catalog.json` — project-defined роли и project overrides встроенных ролей
+- `.madspec/system/agents/bodies/` — Markdown-тела project roles и overrides
+
+Через `madspec agents subagents create/update/remove` можно добавлять собственные проектные роли, не меняя built-in каталог фреймворка напрямую.
+
+Во встроенный starter set входят роли:
+
+- `architecture`
+- `developer`
+- `contracts-data`
+- `testing`
+- `security`
+- `research`
+- `docs`
+
+- Для Cursor, GitHub Copilot, OpenCode и Qwen Code MADSpec генерирует native agent/subagent-файлы в средовые директории проекта.
+- Для Kilo Code, Roo Code и SourceCraft v1 использует fallback-адаптеры на базе rules/commands/skills без собственного runtime.
+- Сам MADSpec не является scheduler-ом субагентов: параллельность и последовательность остаются возможностями целевой агентной среды.
 
 ## Документация
 

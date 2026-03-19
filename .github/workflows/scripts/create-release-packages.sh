@@ -59,6 +59,341 @@ EOF
   done
 }
 
+render_subagent_frontmatter() {
+  local agent=$1 role=$2
+  case $agent in
+    cursor-agent)
+      case $role in
+        architecture)
+          cat <<EOF
+---
+description: Designs architecture, boundaries, contracts, and tradeoffs for the current product and repository.
+execution_mode_hint: sequential
+---
+EOF
+          ;;
+        developer)
+          cat <<EOF
+---
+description: Implements planned code changes, integrates solutions, and validates development steps in the current repository.
+execution_mode_hint: parallel
+dependencies: ["architecture"]
+---
+EOF
+          ;;
+        contracts-data)
+          cat <<EOF
+---
+description: Owns API contracts, data structures, schema boundaries, and integration-facing data consistency.
+execution_mode_hint: sequential
+dependencies: ["architecture"]
+---
+EOF
+          ;;
+        testing)
+          cat <<EOF
+---
+description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.
+execution_mode_hint: parallel
+dependencies: ["architecture"]
+---
+EOF
+          ;;
+        security)
+          cat <<EOF
+---
+description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.
+execution_mode_hint: parallel
+---
+EOF
+          ;;
+        research)
+          cat <<EOF
+---
+description: Explores repository context, unknowns, and supporting evidence for the current product and codebase.
+execution_mode_hint: parallel
+---
+EOF
+          ;;
+        docs)
+          cat <<EOF
+---
+description: Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.
+execution_mode_hint: parallel
+---
+EOF
+          ;;
+      esac
+      ;;
+    opencode)
+      case $role in
+        architecture)
+          cat <<EOF
+---
+name: Architecture Specialist
+description: Designs architecture, boundaries, contracts, and tradeoffs for the current product and repository.
+mode: subagent
+hidden: true
+tools:
+  edit: false
+  write: false
+  bash: false
+---
+EOF
+          ;;
+        developer)
+          cat <<EOF
+---
+name: Developer Specialist
+description: Implements planned code changes, integrates solutions, and validates development steps in the current repository.
+mode: subagent
+hidden: true
+tools:
+  edit: true
+  write: true
+  bash: true
+---
+EOF
+          ;;
+        contracts-data)
+          cat <<EOF
+---
+name: Contracts & Data Specialist
+description: Owns API contracts, data structures, schema boundaries, and integration-facing data consistency.
+mode: subagent
+hidden: true
+tools:
+  edit: false
+  write: false
+  bash: false
+---
+EOF
+          ;;
+        testing)
+          cat <<EOF
+---
+name: Testing Specialist
+description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.
+mode: subagent
+hidden: true
+tools:
+  edit: true
+  write: true
+  bash: true
+---
+EOF
+          ;;
+        security)
+          cat <<EOF
+---
+name: Security Specialist
+description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.
+mode: subagent
+hidden: true
+tools:
+  edit: false
+  write: false
+  bash: true
+---
+EOF
+          ;;
+        research)
+          cat <<EOF
+---
+name: Research Specialist
+description: Explores repository context, unknowns, and supporting evidence for the current product and codebase.
+mode: subagent
+hidden: true
+tools:
+  edit: false
+  write: false
+  bash: false
+---
+EOF
+          ;;
+        docs)
+          cat <<EOF
+---
+name: Documentation Specialist
+description: Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.
+mode: subagent
+hidden: true
+tools:
+  edit: true
+  write: true
+  bash: false
+---
+EOF
+          ;;
+      esac
+      ;;
+    qwen)
+      case $role in
+        architecture)
+          cat <<EOF
+---
+name: Architecture Specialist
+description: Designs architecture, boundaries, contracts, and tradeoffs for the current product and repository.
+tools: ["read_file", "glob", "grep_search"]
+---
+EOF
+          ;;
+        developer)
+          cat <<EOF
+---
+name: Developer Specialist
+description: Implements planned code changes, integrates solutions, and validates development steps in the current repository.
+tools: ["read_file", "glob", "grep_search", "edit", "write_file", "run_shell_command"]
+---
+EOF
+          ;;
+        contracts-data)
+          cat <<EOF
+---
+name: Contracts & Data Specialist
+description: Owns API contracts, data structures, schema boundaries, and integration-facing data consistency.
+tools: ["read_file", "glob", "grep_search"]
+---
+EOF
+          ;;
+        testing)
+          cat <<EOF
+---
+name: Testing Specialist
+description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.
+tools: ["read_file", "glob", "grep_search", "edit", "write_file", "run_shell_command"]
+---
+EOF
+          ;;
+        security)
+          cat <<EOF
+---
+name: Security Specialist
+description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.
+tools: ["read_file", "glob", "grep_search", "run_shell_command"]
+---
+EOF
+          ;;
+        research)
+          cat <<EOF
+---
+name: Research Specialist
+description: Explores repository context, unknowns, and supporting evidence for the current product and codebase.
+tools: ["read_file", "glob", "grep_search"]
+---
+EOF
+          ;;
+        docs)
+          cat <<EOF
+---
+name: Documentation Specialist
+description: Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.
+tools: ["read_file", "glob", "grep_search", "edit", "write_file"]
+---
+EOF
+          ;;
+      esac
+      ;;
+    copilot)
+      case $role in
+        architecture)
+          cat <<EOF
+---
+name: Architecture Specialist
+description: Designs architecture, boundaries, contracts, and tradeoffs for the current product and repository.
+target: vscode
+user-invocable: false
+tools: ["read", "search"]
+---
+EOF
+          ;;
+        developer)
+          cat <<EOF
+---
+name: Developer Specialist
+description: Implements planned code changes, integrates solutions, and validates development steps in the current repository.
+target: vscode
+user-invocable: false
+tools: ["read", "search", "edit", "terminal"]
+---
+EOF
+          ;;
+        contracts-data)
+          cat <<EOF
+---
+name: Contracts & Data Specialist
+description: Owns API contracts, data structures, schema boundaries, and integration-facing data consistency.
+target: vscode
+user-invocable: false
+tools: ["read", "search"]
+---
+EOF
+          ;;
+        testing)
+          cat <<EOF
+---
+name: Testing Specialist
+description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.
+target: vscode
+user-invocable: false
+tools: ["read", "search", "edit", "terminal"]
+---
+EOF
+          ;;
+        security)
+          cat <<EOF
+---
+name: Security Specialist
+description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.
+target: vscode
+user-invocable: false
+tools: ["read", "search", "terminal"]
+---
+EOF
+          ;;
+        research)
+          cat <<EOF
+---
+name: Research Specialist
+description: Explores repository context, unknowns, and supporting evidence for the current product and codebase.
+target: vscode
+user-invocable: false
+tools: ["read", "search"]
+---
+EOF
+          ;;
+        docs)
+          cat <<EOF
+---
+name: Documentation Specialist
+description: Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.
+target: vscode
+user-invocable: false
+tools: ["read", "search", "edit"]
+---
+EOF
+          ;;
+      esac
+      ;;
+  esac
+}
+
+generate_subagents() {
+  local agent=$1 output_dir=$2 ext=$3
+  mkdir -p "$output_dir"
+  for template in templates/subagents/*.md; do
+    [[ -f "$template" ]] || continue
+    local role body file_name
+    role=$(basename "$template" .md)
+    body=$(tr -d '\r' < "$template" | rewrite_paths)
+    file_name="madspec-${role}.${ext}"
+    {
+      render_subagent_frontmatter "$agent" "$role"
+      printf '\n%s\n' "$body"
+    } > "$output_dir/$file_name"
+  done
+}
+
 generate_commands() {
   local agent=$1 ext=$2 arg_format=$3 output_dir=$4
   mkdir -p "$output_dir"
@@ -108,11 +443,15 @@ build_variant() {
     cursor-agent)
       mkdir -p "$base_dir/.cursor/commands"
       generate_commands cursor-agent md "\$ARGUMENTS" "$base_dir/.cursor/commands"
+      mkdir -p "$base_dir/.cursor/agents"
+      generate_subagents cursor-agent "$base_dir/.cursor/agents" "md"
       [[ -d skills ]] && { mkdir -p "$base_dir/.cursor/skills"; cp -r skills/* "$base_dir/.cursor/skills/"; echo "Copied skills -> .cursor/skills"; }
       ;;
     opencode)
-      mkdir -p "$base_dir/.opencode/command"
-      generate_commands opencode md "\$ARGUMENTS" "$base_dir/.opencode/command"
+      mkdir -p "$base_dir/.opencode/commands"
+      generate_commands opencode md "\$ARGUMENTS" "$base_dir/.opencode/commands"
+      mkdir -p "$base_dir/.opencode/agents"
+      generate_subagents opencode "$base_dir/.opencode/agents" "md"
       [[ -d skills ]] && { mkdir -p "$base_dir/.opencode/skills"; cp -r skills/* "$base_dir/.opencode/skills/"; echo "Copied skills -> .opencode/skills"; }
       ;;
     kilocode)
@@ -133,11 +472,14 @@ build_variant() {
     qwen)
       mkdir -p "$base_dir/.qwen/commands"
       generate_commands qwen md "{{args}}" "$base_dir/.qwen/commands"
+      mkdir -p "$base_dir/.qwen/agents"
+      generate_subagents qwen "$base_dir/.qwen/agents" "md"
       [[ -d skills ]] && { mkdir -p "$base_dir/.qwen/skills"; cp -r skills/* "$base_dir/.qwen/skills/"; echo "Copied skills -> .qwen/skills"; }
       ;;
     copilot)
       mkdir -p "$base_dir/.github/agents"
       generate_commands copilot agent.md "\$ARGUMENTS" "$base_dir/.github/agents"
+      generate_subagents copilot "$base_dir/.github/agents" "agent.md"
       # Generate companion prompt files
       generate_copilot_prompts "$base_dir/.github/agents" "$base_dir/.github/prompts"
       # Create VS Code workspace settings

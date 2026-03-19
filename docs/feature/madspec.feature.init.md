@@ -27,6 +27,7 @@
 
 - `active-session.json`
 - semantic stage records
+- минимальный runtime-набор ветки: `progress.json`, `decision-log.jsonl`, `events.jsonl`, `semantic/*.jsonl`
 
 ### Generated views
 
@@ -34,6 +35,7 @@
 - `.madspec/<BRANCH>/feature-context.md`
 - `.madspec/<BRANCH>/tech-stack.md`
 - `.madspec/<BRANCH>/architecture.md`
+- `.madspec/<BRANCH>/project-context.md`
 
 ## Входы команды
 
@@ -48,7 +50,7 @@
 2. Анализирует текущий проект, модифицируемые файлы, новые файлы, зависимости и risks.
 3. Сохраняет результат через `capture`.
 4. Повторно читает short status и, при необходимости, `--full-artifact`.
-5. `checkpoint` ратифицирует `feature.init.json` и пересобирает derived artifacts.
+5. `checkpoint` ратифицирует `feature.init.json` и пересобирает только производные артефакты `feature.init` и сводку ветки.
 
 ## Canonical data model
 
@@ -84,8 +86,15 @@
 
 - `project-analysis.md`
 - `feature-context.md`
-- feature-derived `tech-stack.md`
-- feature-derived `architecture.md`
+- `tech-stack.md`, собранный из `feature.init`
+- `architecture.md`, собранный из `feature.init`
+- `project-context.md`
+
+## Stage-aware materialization
+
+- `feature.init` создает только минимальный runtime-набор ветки, `feature.init.json` и свои производные представления.
+- `concept.md`, `ui-design.md`, `data-model.md`, `contracts/openapi.yaml`, `implementation-plan.md`, `planning-context-cache.md`, `review.md` и `security-audit.md` не должны появляться только из-за `feature.init`.
+- Артефакты других стадий материализуются лениво при первом входе в соответствующую стадию или через команды полной пересборки `madspec memory init`, `madspec memory consolidate`, `madspec memory validate`.
 
 ## Диаграммы
 
@@ -97,7 +106,8 @@ flowchart TD
     A --> K["checkpoint"]
     S --> P["project-analysis.md"]
     S --> F["feature-context.md"]
-    S --> D["derived tech-stack.md / architecture.md"]
+    S --> D["tech-stack.md / architecture.md"]
+    S --> X["project-context.md"]
 ```
 
 ```mermaid
@@ -138,7 +148,7 @@ flowchart LR
 
 - feature IDs не используются дальше в planning
 - изменяемые файлы обсуждены, но не записаны в `modifiedFiles/newFiles`
-- derived `tech-stack.md` принимается за canonical source
+- `tech-stack.md` принимается за основной источник истины
 
 ## Соседние команды и handoff
 
@@ -149,4 +159,4 @@ flowchart LR
 
 - `.madspec/<BRANCH>/project-analysis.md`
 - `.madspec/<BRANCH>/feature-context.md`
-- derived `tech-stack.md` и `architecture.md`
+- `tech-stack.md` и `architecture.md`

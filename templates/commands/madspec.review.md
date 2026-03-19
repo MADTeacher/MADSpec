@@ -29,7 +29,10 @@ $ARGUMENTS
 - Источник истины: `.madspec/<BRANCH>/memory/`, runtime progress implementation stages и stage records.
 - `review.md`, `improvements.md` и `project-context.md` считаются generated views, а не canonical source of truth.
 - Перед началом анализа используй `madspec memory retrieve --stage review --json-output`.
+- Перед началом анализа дополнительно используй `madspec review status --json-output`, чтобы увидеть блокирующие, предупреждающие и ожидающие проверки, а также активные исключения.
+- Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory`, `policy_context.violations` и `policy_context.confirmations`.
 - Для дополнительного runtime-контекста используй `madspec memory retrieve --stage mvp.implement --json-output` или `madspec memory retrieve --stage feature.implement --json-output`, если в ветке есть соответствующий workflow.
+- В начале review дополнительно выполни `madspec policy validate --stage review --json-output`, чтобы собрать явные policy violations, advisories и confirmations для review capture flow.
 - После каждого подтвержденного finding, decision, open question или improvement используй `madspec memory capture --stage review ...`.
 - После завершения анализа ратифицируй этап через `madspec memory checkpoint --stage review --summary ...`.
 - `madspec memory capture` и `madspec memory checkpoint` сами запускают `madspec memory consolidate` и `madspec memory validate`.
@@ -71,6 +74,8 @@ $ARGUMENTS
 
 1. **Загрузи memory и runtime context**
    - Сначала выполни `madspec memory retrieve --stage review --json-output`
+   - Затем выполни `madspec review status --json-output`
+   - Затем выполни `madspec policy validate --stage review --json-output`
    - Затем проверь, какой implementation workflow актуален для ветки:
      - `mvp.implement`
      - `feature.implement`
@@ -124,6 +129,8 @@ $ARGUMENTS
    - Decisions о направлении исправления, refactor strategy или accepted tradeoff сохраняй через `--decision`
    - Спорные места и неясности сохраняй через `--question`
    - Конкретные действия по улучшению сохраняй через `--pending-action`
+   - Policy violations и policy confirmations из `madspec policy validate` **обязательно** маппируй в review capture: required violations как findings/limitations, confirmations как validated facts, advisory results как improvement candidates или open questions
+   - Gate status из `madspec review status` используй как процедурное подтверждение: блокирующие и ожидающие результаты, а также активные исключения должны быть явно отражены в findings, limitations или accepted tradeoffs
    - Если improvement уже подтвержден как направление работ, можно дополнительно сохранить его через `--decision`
 
 5. **Финализируй review**

@@ -21,6 +21,9 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
 
     qwen_archive = archive_dir / f"madspec-template-qwen-{tag}.zip"
     assert qwen_archive.exists()
+    cursor_archive = archive_dir / f"madspec-template-cursor-agent-{tag}.zip"
+    opencode_archive = archive_dir / f"madspec-template-opencode-{tag}.zip"
+    copilot_archive = archive_dir / f"madspec-template-copilot-{tag}.zip"
 
     with zipfile.ZipFile(archives[0]) as zf:
         names = set(zf.namelist())
@@ -31,7 +34,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert ".madspec/templates/index-prototype-template.html" not in names
         assert not any(name.startswith(".madspec/scripts/") for name in names)
         assert any(name.endswith("madspec.mvp.plan.md") or name.endswith("madspec.mvp.plan.agent.md") for name in names)
-        assert any(name.startswith(".cursor/commands/") or name.startswith(".opencode/command/") or name.startswith(".github/agents/") for name in names)
+        assert any(name.startswith(".cursor/commands/") or name.startswith(".opencode/commands/") or name.startswith(".github/agents/") for name in names)
 
         command_name = next(
             name
@@ -47,13 +50,84 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         command_files = [
             name
             for name in names
-            if name.startswith((".cursor/commands/", ".opencode/command/", ".kilocode/rules/", ".roo/rules/", ".codeassistant/commands/", ".github/agents/"))
+            if name.startswith((".cursor/commands/", ".opencode/commands/", ".kilocode/rules/", ".roo/rules/", ".codeassistant/commands/", ".github/agents/"))
+            and "/madspec." in name
             and (name.endswith(".md") or name.endswith(".agent.md"))
         ]
         assert command_files
         for packaged_command in command_files:
             packaged_body = zf.read(packaged_command).decode("utf-8")
             assert "madspec-cli-operator" in packaged_body
+
+        policy_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.policy.md") or name.endswith("madspec.policy.agent.md")
+        )
+        policy_body = zf.read(policy_command).decode("utf-8")
+        assert "policy-engine" in policy_body
+        assert "madspec policy propose" in policy_body
+        assert "madspec policy apply" in policy_body
+        assert any(name.endswith("policy-engine/SKILL.md") for name in names)
+
+        change_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.change.md") or name.endswith("madspec.change.agent.md")
+        )
+        change_body = zf.read(change_command).decode("utf-8")
+        assert "change-engine" in change_body
+        assert "madspec change preview" in change_body
+        assert "madspec change apply" in change_body
+        assert "madspec change verify" in change_body
+        assert any(name.endswith("change-engine/SKILL.md") for name in names)
+
+        gate_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.gate.md") or name.endswith("madspec.gate.agent.md")
+        )
+        gate_body = zf.read(gate_command).decode("utf-8")
+        assert "gate-orchestrator" in gate_body
+        assert "madspec gate status" in gate_body
+        assert "madspec gate apply-waiver" in gate_body
+        assert any(name.endswith("gate-orchestrator/SKILL.md") for name in names)
+
+        memory_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.memory.md") or name.endswith("madspec.memory.agent.md")
+        )
+        memory_body = zf.read(memory_command).decode("utf-8")
+        assert "memory-explain" in memory_body
+        assert "madspec memory doctor" in memory_body
+        assert "madspec memory explain" in memory_body
+        assert any(name.endswith("memory-explain/SKILL.md") for name in names)
+
+        merge_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.merge.md") or name.endswith("madspec.merge.agent.md")
+        )
+        merge_body = zf.read(merge_command).decode("utf-8")
+        assert "merge-assistant" in merge_body
+        assert "madspec memory compare-branches" in merge_body
+        assert "madspec memory merge-branches" in merge_body
+        assert any(name.endswith("merge-assistant/SKILL.md") for name in names)
+
+        agents_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.agents.md") or name.endswith("madspec.agents.agent.md")
+        )
+        agents_body = zf.read(agents_command).decode("utf-8")
+        assert "subagent-role-advisor" in agents_body
+        assert "madspec agents profile" in agents_body
+        assert "madspec agents subagents create" in agents_body
+        assert "madspec agents subagents update" in agents_body
+        assert "madspec agents subagents remove" in agents_body
+        assert "madspec agents subagents context" in agents_body
+        assert any(name.endswith("subagent-role-advisor/SKILL.md") for name in names)
 
         for stage_name in (
             "madspec.mvp.concept",
@@ -138,8 +212,58 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
     with zipfile.ZipFile(qwen_archive) as zf:
         names = set(zf.namelist())
         assert any(name.startswith(".qwen/commands/") for name in names)
+        assert any(name.startswith(".qwen/agents/") for name in names)
+        assert ".qwen/agents/madspec-developer.md" in names
+        assert ".qwen/agents/madspec-contracts-data.md" in names
+        assert ".qwen/agents/madspec-docs.md" in names
         qwen_command = next(name for name in names if name.endswith("madspec.mvp.concept.md"))
         qwen_body = zf.read(qwen_command).decode("utf-8")
         assert "{{args}}" in qwen_body
         assert "$ARGUMENTS" not in qwen_body
         assert "madspec-cli-operator" in qwen_body
+        qwen_subagent = zf.read(".qwen/agents/madspec-security.md").decode("utf-8")
+        assert "name: Security Specialist" in qwen_subagent
+        assert 'tools: ["read_file", "glob", "grep_search", "run_shell_command"]' in qwen_subagent
+        assert "madspec agents subagents context --subagent-id security" in qwen_subagent
+        qwen_developer = zf.read(".qwen/agents/madspec-developer.md").decode("utf-8")
+        assert "name: Developer Specialist" in qwen_developer
+        assert 'tools: ["read_file", "glob", "grep_search", "edit", "write_file", "run_shell_command"]' in qwen_developer
+
+    with zipfile.ZipFile(cursor_archive) as zf:
+        names = set(zf.namelist())
+        assert any(name.startswith(".cursor/agents/") for name in names)
+        cursor_subagent = zf.read(".cursor/agents/madspec-architecture.md").decode("utf-8")
+        assert "execution_mode_hint: sequential" in cursor_subagent
+        assert "tools:" not in cursor_subagent
+        assert "madspec agents subagents context --subagent-id architecture" in cursor_subagent
+        cursor_developer = zf.read(".cursor/agents/madspec-developer.md").decode("utf-8")
+        assert 'dependencies: ["architecture"]' in cursor_developer
+
+    with zipfile.ZipFile(opencode_archive) as zf:
+        names = set(zf.namelist())
+        assert any(name.startswith(".opencode/commands/") for name in names)
+        assert not any(name.startswith(".opencode/command/") for name in names)
+        assert any(name.startswith(".opencode/agents/") for name in names)
+        opencode_subagent = zf.read(".opencode/agents/madspec-testing.md").decode("utf-8")
+        assert "mode: subagent" in opencode_subagent
+        assert "hidden: true" in opencode_subagent
+        assert "  edit: true" in opencode_subagent
+        assert "  write: true" in opencode_subagent
+        assert "  bash: true" in opencode_subagent
+        opencode_docs = zf.read(".opencode/agents/madspec-docs.md").decode("utf-8")
+        assert "name: Documentation Specialist" in opencode_docs
+        assert "  edit: true" in opencode_docs
+        assert "  write: true" in opencode_docs
+        assert "  bash: false" in opencode_docs
+
+    with zipfile.ZipFile(copilot_archive) as zf:
+        names = set(zf.namelist())
+        assert any(name.startswith(".github/agents/madspec-") for name in names)
+        copilot_subagent = zf.read(".github/agents/madspec-security.agent.md").decode("utf-8")
+        assert "target: vscode" in copilot_subagent
+        assert "user-invocable: false" in copilot_subagent
+        assert 'tools: ["read", "search", "terminal"]' in copilot_subagent
+        copilot_contracts = zf.read(".github/agents/madspec-contracts-data.agent.md").decode("utf-8")
+        assert "name: Contracts & Data Specialist" in copilot_contracts
+        assert 'tools: ["read", "search"]' in copilot_contracts
+        assert any(name.startswith(".github/prompts/madspec-security.prompt.md") for name in names)

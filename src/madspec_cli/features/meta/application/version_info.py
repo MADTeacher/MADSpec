@@ -3,12 +3,19 @@ from __future__ import annotations
 import importlib.metadata
 import platform
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 
 from madspec_cli.shared.infra.github_client import create_http_client, fetch_latest_release_info
+from madspec_cli.shared.kernel.result import PayloadResult
 
 
-def execute() -> dict[str, str]:
+@dataclass(frozen=True)
+class VersionInfoResult(PayloadResult):
+    pass
+
+
+def execute() -> VersionInfoResult:
     cli_version = "unknown"
     try:
         cli_version = importlib.metadata.version("madspec-cli")
@@ -35,12 +42,14 @@ def execute() -> dict[str, str]:
     except Exception:
         pass
 
-    return {
-        "cli_version": cli_version,
-        "template_version": template_version,
-        "release_date": release_date,
-        "python": platform.python_version(),
-        "platform": platform.system(),
-        "architecture": platform.machine(),
-        "os_version": platform.version(),
-    }
+    return VersionInfoResult(
+        payload={
+            "cli_version": cli_version,
+            "template_version": template_version,
+            "release_date": release_date,
+            "python": platform.python_version(),
+            "platform": platform.system(),
+            "architecture": platform.machine(),
+            "os_version": platform.version(),
+        }
+    )

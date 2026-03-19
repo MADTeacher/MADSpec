@@ -37,6 +37,20 @@ def test_memory_package_re_exports_compatibility_surface() -> None:
     assert callable(exported_register_planned_step)
 
 
+def test_memory_internal_modules_do_not_import_memory_root() -> None:
+    memory_dir = Path(__file__).resolve().parents[1] / "src" / "madspec_cli" / "memory"
+    offenders: list[str] = []
+
+    for path in sorted(memory_dir.rglob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        content = path.read_text(encoding="utf-8")
+        if "from madspec_cli.memory import" in content or "import madspec_cli.memory" in content:
+            offenders.append(str(path.relative_to(memory_dir.parents[2])))
+
+    assert offenders == []
+
+
 def test_rate_limit_headers_are_parsed_and_formatted() -> None:
     headers = httpx.Headers(
         {

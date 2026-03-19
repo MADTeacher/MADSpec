@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from madspec_cli.memory import ensure_memory_layout, validate_branch_memory
+from ..shared.storage import ensure_memory_layout
+from ..shared.validation import validate_branch_memory
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,6 @@ class ValidateMemoryResult:
 
 
 def execute(request: ValidateMemoryRequest) -> ValidateMemoryResult:
-    ensure_memory_layout(request.project_path, request.branch_name)
-    errors = validate_branch_memory(request.project_path, request.branch_name)
+    ensure_memory_layout(request.project_path, request.branch_name, full=True)
+    errors = validate_branch_memory(request.project_path, request.branch_name, full=True)
     return ValidateMemoryResult(branch=request.branch_name, valid=not errors, errors=errors)

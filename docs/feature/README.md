@@ -12,9 +12,15 @@
 
 ## Общие stage-state и артефакты
 
-- `feature.init` — `.madspec/<BRANCH>/memory/stages/feature.init.json`, generated `project-analysis.md`, `feature-context.md`, feature-derived `tech-stack.md`, `architecture.md`
+- `feature.init` — `.madspec/<BRANCH>/memory/stages/feature.init.json`, производные `project-analysis.md`, `feature-context.md`, `tech-stack.md`, `architecture.md`
 - `feature.plan` — `.madspec/<BRANCH>/memory/stages/feature.plan.json` + `progress.json`, generated `implementation-plan.md`, `planning-context-cache.md`
 - `feature.implement` — runtime-state в `progress.json` и `working/active-session.json`, generated step contexts и branch context
+
+## Ленивая материализация
+
+- Feature workflow больше не материализует весь набор артефактов ветки заранее.
+- `feature.init` создает только свое каноническое состояние, минимальный runtime-набор ветки и связанные производные представления.
+- Артефакты `feature.plan`, review/security и несвязанных MVP-стадий появляются только при первом входе в соответствующую стадию или через команды полной пересборки `madspec memory init`, `madspec memory consolidate`, `madspec memory validate`.
 
 ## Особенности режима
 

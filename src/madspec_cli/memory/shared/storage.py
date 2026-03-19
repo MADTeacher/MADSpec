@@ -8,6 +8,7 @@ from typing import Any, Iterator
 
 from ...features.git.infrastructure.operations import get_current_branch
 from .records import PROCEDURE_FILES
+from .stage_scope import resolve_stage_scope
 
 STEP_KINDS = {"code", "non-code"}
 TDD_POLICIES = {"required", "waived", "not-applicable"}
@@ -310,6 +311,9 @@ def write_json(path: Path, data: Any) -> None:
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+    from .system_store import sync_json_path_to_store
+
+    sync_json_path_to_store(path, data)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -331,6 +335,9 @@ def append_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
     with path.open("a", encoding="utf-8") as fh:
         for record in records:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    from .system_store import sync_jsonl_path_to_store
+
+    sync_jsonl_path_to_store(path, records)
 
 
 def ensure_procedures_layout(project_path: Path) -> list[Path]:
@@ -345,7 +352,13 @@ def ensure_procedures_layout(project_path: Path) -> list[Path]:
     return created
 
 
-def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
+def ensure_memory_layout(
+    project_path: Path,
+    branch_name: str,
+    *,
+    stage: str | None = None,
+    full: bool = False,
+) -> list[Path]:
     from ..workflow.planning import _compute_progress_metrics, extract_function_catalog
     from ..stages.concept.state import (
         default_concept_state,
@@ -379,7 +392,12 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
     )
 
     paths = get_memory_paths(project_path, branch_name)
+    scope = resolve_stage_scope(stage, full=full)
     created: list[Path] = []
+
+    from .system_store import ensure_system_memory_layout, sync_branch_memory_to_store
+
+    created.extend(ensure_system_memory_layout(project_path))
 
     paths.branch_dir.mkdir(parents=True, exist_ok=True)
     paths.stages_dir.mkdir(parents=True, exist_ok=True)
@@ -395,89 +413,96 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
         write_json(paths.active_session, _default_active_session(branch_name))
         created.append(paths.active_session)
 
-    if not paths.concept_state.exists():
-        legacy_concept_path = paths.branch_dir / "concept.md"
-        concept_state = (
-            migrate_legacy_concept_markdown(legacy_concept_path)
-            if legacy_concept_path.exists()
-            else default_concept_state()
-        )
-        save_concept_state(paths.concept_state, concept_state)
-        created.append(paths.concept_state)
-    else:
-        concept_state = load_concept_state(paths.concept_state)
-        legacy_concept_path = paths.branch_dir / "concept.md"
-        if legacy_concept_path.exists() and is_empty_concept_state(concept_state):
-            concept_state = migrate_legacy_concept_markdown(legacy_concept_path)
-        save_concept_state(paths.concept_state, concept_state)
-
-    if not paths.design_state.exists():
-        save_design_state(paths.design_state, default_design_state())
-        created.append(paths.design_state)
-    else:
-        design_state = load_design_state(paths.design_state)
-        save_design_state(paths.design_state, design_state)
-
-    if not paths.tech_state.exists():
-        save_tech_state(paths.tech_state, default_tech_state())
-        created.append(paths.tech_state)
-    else:
-        tech_state = load_tech_state(paths.tech_state)
-        save_tech_state(paths.tech_state, tech_state)
-
-    if not paths.architecture_state.exists():
-        save_architecture_state(paths.architecture_state, default_architecture_state())
-        created.append(paths.architecture_state)
-    else:
-        architecture_state = load_architecture_state(paths.architecture_state)
-        save_architecture_state(paths.architecture_state, architecture_state)
-
-    if not paths.plan_state.exists():
-        progress = read_json(paths.progress, _default_progress_state())
-        if isinstance(progress, dict):
-            progress, _ = normalize_progress_state(progress)
+    if "mvp.concept" in scope.stage_snapshot_keys:
+        if not paths.concept_state.exists():
+            legacy_concept_path = paths.branch_dir / "concept.md"
+            concept_state = (
+                migrate_legacy_concept_markdown(legacy_concept_path)
+                if legacy_concept_path.exists()
+                else default_concept_state()
+            )
+            save_concept_state(paths.concept_state, concept_state)
+            created.append(paths.concept_state)
         else:
-            progress = _default_progress_state()
-        plan_state = migrate_legacy_plan_state(
-            progress=progress,
-            implementation_plan_path=paths.branch_dir / "implementation-plan.md",
-            steps_dir=paths.branch_dir / "steps",
-        )
-        save_plan_state(paths.plan_state, plan_state)
-        created.append(paths.plan_state)
-    else:
-        plan_state = load_plan_state(paths.plan_state)
-        save_plan_state(paths.plan_state, plan_state)
+            concept_state = load_concept_state(paths.concept_state)
+            legacy_concept_path = paths.branch_dir / "concept.md"
+            if legacy_concept_path.exists() and is_empty_concept_state(concept_state):
+                concept_state = migrate_legacy_concept_markdown(legacy_concept_path)
+            save_concept_state(paths.concept_state, concept_state)
 
-    if not paths.feature_init_state.exists():
-        legacy_analysis_path = paths.branch_dir / "project-analysis.md"
-        feature_init_state = (
-            migrate_legacy_project_analysis_markdown(legacy_analysis_path)
-            if legacy_analysis_path.exists()
-            else default_feature_init_state()
-        )
-        save_feature_init_state(paths.feature_init_state, feature_init_state)
-        created.append(paths.feature_init_state)
-    else:
-        feature_init_state = load_feature_init_state(paths.feature_init_state)
-        save_feature_init_state(paths.feature_init_state, feature_init_state)
-
-    if not paths.feature_plan_state.exists():
-        progress = read_json(paths.progress, _default_progress_state())
-        if isinstance(progress, dict):
-            progress, _ = normalize_progress_state(progress)
+    if "mvp.design" in scope.stage_snapshot_keys:
+        if not paths.design_state.exists():
+            save_design_state(paths.design_state, default_design_state())
+            created.append(paths.design_state)
         else:
-            progress = _default_progress_state()
-        feature_plan_state = migrate_legacy_plan_state(
-            progress=progress,
-            implementation_plan_path=paths.branch_dir / "implementation-plan.md",
-            steps_dir=paths.branch_dir / "steps",
-        )
-        save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
-        created.append(paths.feature_plan_state)
-    else:
-        feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
-        save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
+            design_state = load_design_state(paths.design_state)
+            save_design_state(paths.design_state, design_state)
+
+    if "mvp.tech" in scope.stage_snapshot_keys:
+        if not paths.tech_state.exists():
+            save_tech_state(paths.tech_state, default_tech_state())
+            created.append(paths.tech_state)
+        else:
+            tech_state = load_tech_state(paths.tech_state)
+            save_tech_state(paths.tech_state, tech_state)
+
+    if "mvp.architecture" in scope.stage_snapshot_keys:
+        if not paths.architecture_state.exists():
+            save_architecture_state(paths.architecture_state, default_architecture_state())
+            created.append(paths.architecture_state)
+        else:
+            architecture_state = load_architecture_state(paths.architecture_state)
+            save_architecture_state(paths.architecture_state, architecture_state)
+
+    if "mvp.plan" in scope.stage_snapshot_keys:
+        if not paths.plan_state.exists():
+            progress = read_json(paths.progress, _default_progress_state())
+            if isinstance(progress, dict):
+                progress, _ = normalize_progress_state(progress)
+            else:
+                progress = _default_progress_state()
+            plan_state = migrate_legacy_plan_state(
+                progress=progress,
+                implementation_plan_path=paths.branch_dir / "implementation-plan.md",
+                steps_dir=paths.branch_dir / "steps",
+            )
+            save_plan_state(paths.plan_state, plan_state)
+            created.append(paths.plan_state)
+        else:
+            plan_state = load_plan_state(paths.plan_state)
+            save_plan_state(paths.plan_state, plan_state)
+
+    if "feature.init" in scope.stage_snapshot_keys:
+        if not paths.feature_init_state.exists():
+            legacy_analysis_path = paths.branch_dir / "project-analysis.md"
+            feature_init_state = (
+                migrate_legacy_project_analysis_markdown(legacy_analysis_path)
+                if legacy_analysis_path.exists()
+                else default_feature_init_state()
+            )
+            save_feature_init_state(paths.feature_init_state, feature_init_state)
+            created.append(paths.feature_init_state)
+        else:
+            feature_init_state = load_feature_init_state(paths.feature_init_state)
+            save_feature_init_state(paths.feature_init_state, feature_init_state)
+
+    if "feature.plan" in scope.stage_snapshot_keys:
+        if not paths.feature_plan_state.exists():
+            progress = read_json(paths.progress, _default_progress_state())
+            if isinstance(progress, dict):
+                progress, _ = normalize_progress_state(progress)
+            else:
+                progress = _default_progress_state()
+            feature_plan_state = migrate_legacy_plan_state(
+                progress=progress,
+                implementation_plan_path=paths.branch_dir / "implementation-plan.md",
+                steps_dir=paths.branch_dir / "steps",
+            )
+            save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
+            created.append(paths.feature_plan_state)
+        else:
+            feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
+            save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
 
     for path in (
         paths.decision_log,
@@ -511,4 +536,5 @@ def ensure_memory_layout(project_path: Path, branch_name: str) -> list[Path]:
             write_json(paths.progress, progress)
 
     created.extend(ensure_procedures_layout(project_path))
+    sync_branch_memory_to_store(project_path, branch_name)
     return created
