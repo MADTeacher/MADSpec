@@ -31,8 +31,8 @@ def load_subagent_template_body(subagent_id: str) -> str:
     if template_path.exists():
         return template_path.read_text(encoding="utf-8").strip() + "\n"
     return (
-        f"You are responsible for `{subagent_id}` concerns in the current product and repository.\n\n"
-        "Before taking action, retrieve the current role-specific context via "
+        f"Ты отвечаешь за область `{subagent_id}` в текущем продукте и репозитории.\n\n"
+        "Перед началом работы получи актуальный контекст для этой роли через "
         "`madspec agents subagents context --subagent-id "
         f"{subagent_id} --json-output`.\n"
     )
@@ -106,14 +106,14 @@ def render_native_subagent_file(environment_id: str, role: dict[str, Any], *, pr
 def render_fallback_guidance_file(environment_id: str, effective_roles: list[dict[str, Any]]) -> str:
     enabled = [item for item in effective_roles if item.get("enabled")]
     lines = [
-        "# MADSpec Subagent Guidance",
+        "# Подсказки по субагентам MADSpec",
         "",
-        f"Active environment: `{environment_id}`",
+        f"Активная среда: `{environment_id}`",
         "",
-        "This environment currently uses MADSpec fallback guidance instead of native subagent files.",
-        "Use `/madspec.agents` to inspect and adjust the active role set.",
+        "Эта среда сейчас использует запасной режим подсказок MADSpec вместо встроенных файлов субагентов.",
+        "Используй `/madspec.agents`, чтобы посмотреть и скорректировать активный набор ролей.",
         "",
-        "## Active Roles",
+        "## Активные роли",
         "",
     ]
     for item in enabled:
@@ -121,9 +121,9 @@ def render_fallback_guidance_file(environment_id: str, effective_roles: list[dic
     lines.extend(
         [
             "",
-            "## Canonical Context",
+            "## Канонический контекст",
             "",
-            "Each role must fetch role-scoped context through `madspec agents subagents context --subagent-id <role>`.",
+            "Каждая роль должна получать свой контекст через `madspec agents subagents context --subagent-id <role>`.",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"

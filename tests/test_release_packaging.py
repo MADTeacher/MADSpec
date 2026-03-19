@@ -222,11 +222,11 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "$ARGUMENTS" not in qwen_body
         assert "madspec-cli-operator" in qwen_body
         qwen_subagent = zf.read(".qwen/agents/madspec-security.md").decode("utf-8")
-        assert "name: Security Specialist" in qwen_subagent
+        assert "name: Специалист по безопасности" in qwen_subagent
         assert 'tools: ["read_file", "glob", "grep_search", "run_shell_command"]' in qwen_subagent
         assert "madspec agents subagents context --subagent-id security" in qwen_subagent
         qwen_developer = zf.read(".qwen/agents/madspec-developer.md").decode("utf-8")
-        assert "name: Developer Specialist" in qwen_developer
+        assert "name: Специалист по разработке" in qwen_developer
         assert 'tools: ["read_file", "glob", "grep_search", "edit", "write_file", "run_shell_command"]' in qwen_developer
 
     with zipfile.ZipFile(cursor_archive) as zf:
@@ -251,7 +251,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "  write: true" in opencode_subagent
         assert "  bash: true" in opencode_subagent
         opencode_docs = zf.read(".opencode/agents/madspec-docs.md").decode("utf-8")
-        assert "name: Documentation Specialist" in opencode_docs
+        assert "name: Специалист по документации" in opencode_docs
         assert "  edit: true" in opencode_docs
         assert "  write: true" in opencode_docs
         assert "  bash: false" in opencode_docs
@@ -264,6 +264,6 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "user-invocable: false" in copilot_subagent
         assert 'tools: ["read", "search", "terminal"]' in copilot_subagent
         copilot_contracts = zf.read(".github/agents/madspec-contracts-data.agent.md").decode("utf-8")
-        assert "name: Contracts & Data Specialist" in copilot_contracts
+        assert "name: Специалист по контрактам и данным" in copilot_contracts
         assert 'tools: ["read", "search"]' in copilot_contracts
         assert any(name.startswith(".github/prompts/madspec-security.prompt.md") for name in names)

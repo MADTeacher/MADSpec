@@ -49,7 +49,7 @@ def execute(request: CreateSubagentRequest) -> CreateSubagentResult:
             "eventId": str(uuid.uuid4()),
             "eventType": "subagent_created",
             "ts": now_iso(),
-            "summary": f"Created project-defined subagent {request.subagent_id}",
+            "summary": f"Создан проектный субагент {request.subagent_id}",
             "payload": {"subagentId": request.subagent_id, "catalog": catalog, "rendered": rendered},
         },
     )

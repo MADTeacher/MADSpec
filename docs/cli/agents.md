@@ -1,6 +1,6 @@
 # `madspec agents`
 
-`madspec agents` управляет каноническим слоем субагентов в MADSpec. Команда хранит активную среду, профиль ролей, проектный каталог субагентов, историю изменений и экспортирует role-scoped context для субагентов.
+`madspec agents` управляет каноническим слоем субагентов в MADSpec. Команда хранит активную среду, профиль ролей, проектный каталог субагентов, историю изменений и экспортирует контекст, подготовленный для конкретной роли.
 
 ## Когда Использовать
 
@@ -43,22 +43,22 @@ madspec agents subagents context --subagent-id <id> [OPTIONS]
 
 - активную среду `agentEnvironment`
 - текущий `profileId`
-- revision и timestamps
+- ревизию и временные метки
 - список `enabledSubagentIds`
 
-`catalog.json` задает project-defined роли и project overrides встроенных ролей.
+`catalog.json` задает проектные роли и проектные переопределения встроенных ролей.
 
-Каждая effective role получается как объединение:
+Каждая итоговая роль получается как объединение:
 
-- built-in каталога MADSpec
-- project catalog из `catalog.json`
-- текста роли из `.madspec/system/agents/bodies/<subagent-id>.md`, если для project role или override задан project body
+- встроенного каталога MADSpec
+- проектного каталога из `catalog.json`
+- текста роли из `.madspec/system/agents/bodies/<subagent-id>.md`, если для проектной роли или переопределения задан собственный текст
 
-`agentEnvironment` также определяет явный `subagentFrontmatterProfile` для нативных сред. Через этот профиль MADSpec:
+`agentEnvironment` также определяет явный `subagentFrontmatterProfile` для встроенных сред. Через этот профиль MADSpec:
 
-- выбирает допустимые YAML-поля для subagent/agent-файлов
+- выбирает допустимые YAML-поля для файлов агентов и субагентов
 - фиксирует стратегию модели для среды
-- строго переводит общий `toolPolicy` в environment-specific tools вместо копирования общих флагов как есть
+- строго переводит общий `toolPolicy` в набор инструментов, принятый в конкретной среде, вместо прямого копирования общих флагов
 
 ## Основные Команды
 
@@ -70,7 +70,7 @@ madspec agents subagents context --subagent-id <id> [OPTIONS]
 
 Возвращает рекомендованный базовый профиль ролей для текущего проекта.
 
-Во встроенный starter set сейчас входят:
+Во встроенный начальный набор сейчас входят:
 
 - `architecture`
 - `developer`
@@ -82,7 +82,7 @@ madspec agents subagents context --subagent-id <id> [OPTIONS]
 
 ### `madspec agents propose-profile`
 
-Создает proposal на изменение профиля ролей.
+Создает предложение на изменение профиля ролей.
 
 Основные опции:
 
@@ -92,19 +92,19 @@ madspec agents subagents context --subagent-id <id> [OPTIONS]
 
 ### `madspec agents apply-profile`
 
-Применяет pending proposal и перерендеривает средовые файлы.
+Применяет ожидающее предложение и заново формирует файлы выбранной среды.
 
 ### `madspec agents subagents list`
 
-Показывает effective catalog ролей. С `--enabled-only` выводит только активные.
+Показывает итоговый каталог ролей. С `--enabled-only` выводит только активные.
 
 ### `madspec agents subagents show`
 
-Показывает одну effective role вместе с `origin`, `enabled` и `bodySource`.
+Показывает одну итоговую роль вместе с `origin`, `enabled` и `bodySource`.
 
 ### `madspec agents subagents create`
 
-Создает новую project-defined роль.
+Создает новую проектную роль.
 
 Обязательные параметры:
 
@@ -125,7 +125,7 @@ JSON-файл должен содержать:
 
 ### `madspec agents subagents update`
 
-Обновляет project role или создает/обновляет project override встроенной роли.
+Обновляет проектную роль или создает либо обновляет проектное переопределение встроенной роли.
 
 Обязательные параметры:
 
@@ -134,14 +134,14 @@ JSON-файл должен содержать:
 
 Дополнительно:
 
-- `--body-file <md>` — если нужно обновить project body роли
+- `--body-file <md>` — если нужно обновить собственный текст роли
 
 ### `madspec agents subagents remove`
 
-Удаляет project-defined роль или project override.
+Удаляет проектную роль или проектное переопределение.
 
-- Для enabled project-defined роли нужен `--force`
-- Для built-in override удаление возвращает effective role к встроенному определению
+- Для включенной проектной роли нужен `--force`
+- Для переопределения встроенной роли удаление возвращает итоговую роль к встроенному определению
 
 ### `madspec agents subagents enable` / `disable`
 
@@ -149,7 +149,7 @@ JSON-файл должен содержать:
 
 ### `madspec agents subagents context`
 
-Экспортирует role-scoped context для конкретной роли.
+Экспортирует контекст, подготовленный для конкретной роли.
 
 Основные опции:
 
@@ -159,28 +159,28 @@ JSON-файл должен содержать:
 - `--step-id <id>`
 - `--json-output`
 
-Контекст собирается поверх:
+Контекст собирается на основе:
 
-- memory retrieve
-- policy context
-- gate status
-- active change summary
+- результата `madspec memory retrieve`
+- контекста правил
+- статуса gate-проверок
+- краткой сводки активного пакета изменений
 
-## Native И Fallback
+## Встроенные И Запасные Адаптеры
 
-В v1 MADSpec не реализует собственный scheduler субагентов. Он управляет только каноническим состоянием и средовыми адаптерами.
+В v1 MADSpec не реализует собственный диспетчер субагентов. Он управляет только каноническим состоянием и адаптерами среды.
 
-- Native adapters: Cursor, GitHub Copilot, OpenCode, Qwen Code
-- Fallback adapters: Kilo Code, Roo Code, SourceCraft
+- Встроенные адаптеры: Cursor, GitHub Copilot, OpenCode, Qwen Code
+- Запасные адаптеры: Kilo Code, Roo Code, SourceCraft
 
-Fallback означает, что MADSpec по-прежнему хранит роли канонически, но выражает их через rules/commands/skills вместо нативных project-level subagent files.
+Запасный режим означает, что MADSpec по-прежнему хранит роли канонически, но выражает их через `rules`, `commands` и `skills` вместо встроенных файлов субагентов уровня проекта.
 
-Для native-адаптеров frontmatter не является универсальным:
+Для встроенных адаптеров блок frontmatter не является универсальным:
 
 - Cursor использует минимальный профиль с `description`, `execution_mode_hint` и `dependencies`
-- OpenCode получает `mode: subagent`, `hidden: true` и строгую карту tools для поддерживаемых mutable/bash capabilities
-- Qwen получает список Qwen-specific tools
-- Copilot получает VS Code-specific tools и `user-invocable: false`
+- OpenCode получает `mode: subagent`, `hidden: true` и строгую карту `tools` для поддерживаемых изменяющих операций и команд оболочки
+- Qwen получает список инструментов, принятых в среде Qwen
+- Copilot получает инструменты, принятые в VS Code, и `user-invocable: false`
 
 ## Связанные Документы
 

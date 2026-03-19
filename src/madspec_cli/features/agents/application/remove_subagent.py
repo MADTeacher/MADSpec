@@ -44,7 +44,7 @@ def execute(request: RemoveSubagentRequest) -> RemoveSubagentResult:
             "eventId": str(uuid.uuid4()),
             "eventType": "subagent_removed",
             "ts": now_iso(),
-            "summary": f"Removed subagent {request.subagent_id}",
+            "summary": f"Удален субагент {request.subagent_id}",
             "payload": {"subagentId": request.subagent_id, "removed": removed, "rendered": rendered},
         },
     )

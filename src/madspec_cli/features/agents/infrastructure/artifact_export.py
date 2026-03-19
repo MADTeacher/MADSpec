@@ -11,14 +11,14 @@ def export_agents_artifact(project_path: Path, state: dict[str, object]) -> Path
     paths = get_agents_paths(project_path)
     effective_roles = load_effective_subagents(project_path, state=state)
     lines = [
-        "# Agents",
+        "# Субагенты",
         "",
-        f"- Environment: `{state.get('environmentId', 'unknown')}`",
-        f"- Profile: `{state.get('profileId', DEFAULT_PROFILE_ID)}`",
-        f"- Revision: `{state.get('revision', 1)}`",
-        f"- Catalog: `{paths.catalog_file.relative_to(project_path)}`",
+        f"- Среда: `{state.get('environmentId', 'unknown')}`",
+        f"- Профиль: `{state.get('profileId', DEFAULT_PROFILE_ID)}`",
+        f"- Ревизия: `{state.get('revision', 1)}`",
+        f"- Каталог: `{paths.catalog_file.relative_to(project_path)}`",
         "",
-        "## Subagents",
+        "## Роли",
         "",
     ]
     for item in effective_roles:

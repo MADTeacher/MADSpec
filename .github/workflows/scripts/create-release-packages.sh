@@ -93,7 +93,7 @@ EOF
         testing)
           cat <<EOF
 ---
-description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.
+description: Сосредоточен на пробелах в покрытии, проектировании тестов, стратегии проверки и подтверждении реализации.
 execution_mode_hint: parallel
 dependencies: ["architecture"]
 ---
@@ -102,7 +102,7 @@ EOF
         security)
           cat <<EOF
 ---
-description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.
+description: Проверяет безопасность, приватность, поверхность атаки, риски зависимостей и защитные меры.
 execution_mode_hint: parallel
 ---
 EOF
@@ -110,7 +110,7 @@ EOF
         research)
           cat <<EOF
 ---
-description: Explores repository context, unknowns, and supporting evidence for the current product and codebase.
+description: Исследует контекст репозитория, неизвестные факторы и подтверждающие данные по текущему продукту и кодовой базе.
 execution_mode_hint: parallel
 ---
 EOF
@@ -118,7 +118,7 @@ EOF
         docs)
           cat <<EOF
 ---
-description: Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.
+description: Поддерживает техническую и процессную документацию в соответствии с текущим состоянием репозитория и сгенерированных артефактов.
 execution_mode_hint: parallel
 ---
 EOF
@@ -130,8 +130,8 @@ EOF
         architecture)
           cat <<EOF
 ---
-name: Architecture Specialist
-description: Designs architecture, boundaries, contracts, and tradeoffs for the current product and repository.
+name: Архитектурный специалист
+description: Отвечает за архитектуру, границы системы, контракты и ключевые компромиссы текущего продукта и репозитория.
 mode: subagent
 hidden: true
 tools:
@@ -144,8 +144,8 @@ EOF
         developer)
           cat <<EOF
 ---
-name: Developer Specialist
-description: Implements planned code changes, integrates solutions, and validates development steps in the current repository.
+name: Специалист по разработке
+description: Реализует запланированные изменения в коде, встраивает решения и подтверждает шаги разработки в текущем репозитории.
 mode: subagent
 hidden: true
 tools:
@@ -158,8 +158,8 @@ EOF
         contracts-data)
           cat <<EOF
 ---
-name: Contracts & Data Specialist
-description: Owns API contracts, data structures, schema boundaries, and integration-facing data consistency.
+name: Специалист по контрактам и данным
+description: Отвечает за API-контракты, структуры данных, границы схем и согласованность данных на интеграциях.
 mode: subagent
 hidden: true
 tools:
@@ -172,8 +172,8 @@ EOF
         testing)
           cat <<EOF
 ---
-name: Testing Specialist
-description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.
+name: Специалист по тестированию
+description: Сосредоточен на пробелах в покрытии, проектировании тестов, стратегии проверки и подтверждении реализации.
 mode: subagent
 hidden: true
 tools:
@@ -186,8 +186,8 @@ EOF
         security)
           cat <<EOF
 ---
-name: Security Specialist
-description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.
+name: Специалист по безопасности
+description: Проверяет безопасность, приватность, поверхность атаки, риски зависимостей и защитные меры.
 mode: subagent
 hidden: true
 tools:
@@ -200,8 +200,8 @@ EOF
         research)
           cat <<EOF
 ---
-name: Research Specialist
-description: Explores repository context, unknowns, and supporting evidence for the current product and codebase.
+name: Исследователь репозитория
+description: Исследует контекст репозитория, неизвестные факторы и подтверждающие данные по текущему продукту и кодовой базе.
 mode: subagent
 hidden: true
 tools:
@@ -214,8 +214,8 @@ EOF
         docs)
           cat <<EOF
 ---
-name: Documentation Specialist
-description: Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.
+name: Специалист по документации
+description: Поддерживает техническую и процессную документацию в соответствии с текущим состоянием репозитория и сгенерированных артефактов.
 mode: subagent
 hidden: true
 tools:
@@ -232,8 +232,8 @@ EOF
         architecture)
           cat <<EOF
 ---
-name: Architecture Specialist
-description: Designs architecture, boundaries, contracts, and tradeoffs for the current product and repository.
+name: Архитектурный специалист
+description: Отвечает за архитектуру, границы системы, контракты и ключевые компромиссы текущего продукта и репозитория.
 tools: ["read_file", "glob", "grep_search"]
 ---
 EOF
@@ -241,8 +241,8 @@ EOF
         developer)
           cat <<EOF
 ---
-name: Developer Specialist
-description: Implements planned code changes, integrates solutions, and validates development steps in the current repository.
+name: Специалист по разработке
+description: Реализует запланированные изменения в коде, встраивает решения и подтверждает шаги разработки в текущем репозитории.
 tools: ["read_file", "glob", "grep_search", "edit", "write_file", "run_shell_command"]
 ---
 EOF
@@ -250,8 +250,8 @@ EOF
         contracts-data)
           cat <<EOF
 ---
-name: Contracts & Data Specialist
-description: Owns API contracts, data structures, schema boundaries, and integration-facing data consistency.
+name: Специалист по контрактам и данным
+description: Отвечает за API-контракты, структуры данных, границы схем и согласованность данных на интеграциях.
 tools: ["read_file", "glob", "grep_search"]
 ---
 EOF
@@ -259,8 +259,8 @@ EOF
         testing)
           cat <<EOF
 ---
-name: Testing Specialist
-description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.
+name: Специалист по тестированию
+description: Сосредоточен на пробелах в покрытии, проектировании тестов, стратегии проверки и подтверждении реализации.
 tools: ["read_file", "glob", "grep_search", "edit", "write_file", "run_shell_command"]
 ---
 EOF
@@ -268,8 +268,8 @@ EOF
         security)
           cat <<EOF
 ---
-name: Security Specialist
-description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.
+name: Специалист по безопасности
+description: Проверяет безопасность, приватность, поверхность атаки, риски зависимостей и защитные меры.
 tools: ["read_file", "glob", "grep_search", "run_shell_command"]
 ---
 EOF
@@ -277,8 +277,8 @@ EOF
         research)
           cat <<EOF
 ---
-name: Research Specialist
-description: Explores repository context, unknowns, and supporting evidence for the current product and codebase.
+name: Исследователь репозитория
+description: Исследует контекст репозитория, неизвестные факторы и подтверждающие данные по текущему продукту и кодовой базе.
 tools: ["read_file", "glob", "grep_search"]
 ---
 EOF
@@ -286,8 +286,8 @@ EOF
         docs)
           cat <<EOF
 ---
-name: Documentation Specialist
-description: Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.
+name: Специалист по документации
+description: Поддерживает техническую и процессную документацию в соответствии с текущим состоянием репозитория и сгенерированных артефактов.
 tools: ["read_file", "glob", "grep_search", "edit", "write_file"]
 ---
 EOF
@@ -299,8 +299,8 @@ EOF
         architecture)
           cat <<EOF
 ---
-name: Architecture Specialist
-description: Designs architecture, boundaries, contracts, and tradeoffs for the current product and repository.
+name: Архитектурный специалист
+description: Отвечает за архитектуру, границы системы, контракты и ключевые компромиссы текущего продукта и репозитория.
 target: vscode
 user-invocable: false
 tools: ["read", "search"]
@@ -310,8 +310,8 @@ EOF
         developer)
           cat <<EOF
 ---
-name: Developer Specialist
-description: Implements planned code changes, integrates solutions, and validates development steps in the current repository.
+name: Специалист по разработке
+description: Реализует запланированные изменения в коде, встраивает решения и подтверждает шаги разработки в текущем репозитории.
 target: vscode
 user-invocable: false
 tools: ["read", "search", "edit", "terminal"]
@@ -321,8 +321,8 @@ EOF
         contracts-data)
           cat <<EOF
 ---
-name: Contracts & Data Specialist
-description: Owns API contracts, data structures, schema boundaries, and integration-facing data consistency.
+name: Специалист по контрактам и данным
+description: Отвечает за API-контракты, структуры данных, границы схем и согласованность данных на интеграциях.
 target: vscode
 user-invocable: false
 tools: ["read", "search"]
@@ -332,8 +332,8 @@ EOF
         testing)
           cat <<EOF
 ---
-name: Testing Specialist
-description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.
+name: Специалист по тестированию
+description: Сосредоточен на пробелах в покрытии, проектировании тестов, стратегии проверки и подтверждении реализации.
 target: vscode
 user-invocable: false
 tools: ["read", "search", "edit", "terminal"]
@@ -343,8 +343,8 @@ EOF
         security)
           cat <<EOF
 ---
-name: Security Specialist
-description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.
+name: Специалист по безопасности
+description: Проверяет безопасность, приватность, поверхность атаки, риски зависимостей и защитные меры.
 target: vscode
 user-invocable: false
 tools: ["read", "search", "terminal"]
@@ -354,8 +354,8 @@ EOF
         research)
           cat <<EOF
 ---
-name: Research Specialist
-description: Explores repository context, unknowns, and supporting evidence for the current product and codebase.
+name: Исследователь репозитория
+description: Исследует контекст репозитория, неизвестные факторы и подтверждающие данные по текущему продукту и кодовой базе.
 target: vscode
 user-invocable: false
 tools: ["read", "search"]
@@ -365,8 +365,8 @@ EOF
         docs)
           cat <<EOF
 ---
-name: Documentation Specialist
-description: Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.
+name: Специалист по документации
+description: Поддерживает техническую и процессную документацию в соответствии с текущим состоянием репозитория и сгенерированных артефактов.
 target: vscode
 user-invocable: false
 tools: ["read", "search", "edit"]

@@ -38,7 +38,7 @@ def default_recommendation(project_path) -> dict[str, Any]:
     return {
         "environment": build_environment_profile(environment_id),
         "profileId": state.get("profileId", DEFAULT_PROFILE_ID),
-        "summary": "Recommended default profile enables the built-in starter set on top of the MADSpec memory core.",
+        "summary": "Рекомендуемый профиль по умолчанию включает встроенный начальный набор ролей поверх базового слоя памяти MADSpec.",
         "recommendedSubagents": recommended,
     }
 

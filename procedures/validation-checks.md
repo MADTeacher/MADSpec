@@ -1,6 +1,6 @@
-# Validation Checks
+# Проверки целостности
 
-- Validate `progress.json`, `active-session.json`, and all JSONL logs.
-- Reject broken step references and dependency cycles.
-- Run `madspec memory consolidate`.
-- Run `madspec memory validate`.
+- Проверь `progress.json`, `active-session.json` и все журналы JSONL.
+- Отклоняй битые ссылки на шаги и циклические зависимости.
+- Запусти `madspec memory consolidate`.
+- Запусти `madspec memory validate`.

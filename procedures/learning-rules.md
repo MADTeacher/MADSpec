@@ -1,6 +1,6 @@
-# Learning Rules
+# Правила обучения
 
-- Failed test -> episodic event.
-- Repeated failure -> semantic constraint candidate.
-- Review finding -> improvement candidate and open question.
-- Successful workaround -> procedural hint.
+- Упавший тест -> эпизодическое событие.
+- Повторяющийся сбой -> кандидат в семантическое ограничение.
+- Замечание из review -> кандидат на улучшение и открытый вопрос.
+- Успешный обходной путь -> процедурная подсказка.

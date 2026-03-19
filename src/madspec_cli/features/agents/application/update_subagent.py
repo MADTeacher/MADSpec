@@ -49,7 +49,7 @@ def execute(request: UpdateSubagentRequest) -> UpdateSubagentResult:
             "eventId": str(uuid.uuid4()),
             "eventType": "subagent_updated",
             "ts": now_iso(),
-            "summary": f"Updated subagent {request.subagent_id}",
+            "summary": f"Обновлен субагент {request.subagent_id}",
             "payload": {"subagentId": request.subagent_id, "catalog": catalog, "rendered": rendered},
         },
     )

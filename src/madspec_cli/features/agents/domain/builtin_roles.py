@@ -27,33 +27,33 @@ ROLE_METADATA_FIELDS = (
 )
 
 _ROLE_TITLES = {
-    "architecture": "Architecture Specialist",
-    "developer": "Developer Specialist",
-    "contracts-data": "Contracts & Data Specialist",
-    "testing": "Testing Specialist",
-    "security": "Security Specialist",
-    "research": "Research Specialist",
-    "docs": "Documentation Specialist",
+    "architecture": "Архитектурный специалист",
+    "developer": "Специалист по разработке",
+    "contracts-data": "Специалист по контрактам и данным",
+    "testing": "Специалист по тестированию",
+    "security": "Специалист по безопасности",
+    "research": "Исследователь репозитория",
+    "docs": "Специалист по документации",
 }
 
 _ROLE_DESCRIPTIONS = {
-    "architecture": "Designs architecture, boundaries, contracts, and tradeoffs for the current product and repository.",
-    "developer": "Implements planned code changes, integrates solutions, and validates development steps in the current repository.",
-    "contracts-data": "Owns API contracts, data structures, schema boundaries, and integration-facing data consistency.",
-    "testing": "Focuses on coverage gaps, test design, validation strategy, and implementation verification.",
-    "security": "Reviews security, privacy, threat surface, dependency risk, and defensive controls.",
-    "research": "Explores repository context, unknowns, and supporting evidence for the current product and codebase.",
-    "docs": "Maintains technical and workflow documentation so it stays aligned with the current repository and generated artifacts.",
+    "architecture": "Отвечает за архитектуру, границы системы, контракты и ключевые компромиссы текущего продукта и репозитория.",
+    "developer": "Реализует запланированные изменения в коде, встраивает решения и подтверждает шаги разработки в текущем репозитории.",
+    "contracts-data": "Отвечает за API-контракты, структуры данных, границы схем и согласованность данных на интеграциях.",
+    "testing": "Сосредоточен на пробелах в покрытии, проектировании тестов, стратегии проверки и подтверждении реализации.",
+    "security": "Проверяет безопасность, приватность, поверхность атаки, риски зависимостей и защитные меры.",
+    "research": "Исследует контекст репозитория, неизвестные факторы и подтверждающие данные по текущему продукту и кодовой базе.",
+    "docs": "Поддерживает техническую и процессную документацию в соответствии с текущим состоянием репозитория и сгенерированных артефактов.",
 }
 
 _ROLE_PURPOSES = {
-    "architecture": "Produce architecture-level decisions and constraints that fit the current product, repository, and project rules.",
-    "developer": "Implement agreed changes in code and tests without drifting from the current step, plan, or project constraints.",
-    "contracts-data": "Keep contracts, schemas, entities, and integration data models internally consistent and implementation-ready.",
-    "testing": "Improve confidence through actionable test plans, new tests, and verification notes.",
-    "security": "Identify meaningful security and privacy risks and suggest practical mitigations.",
-    "research": "Gather context, compare options, and summarize findings to unblock downstream work.",
-    "docs": "Keep user-facing and developer-facing documentation synchronized with the real workflow, codebase, and generated outputs.",
+    "architecture": "Формировать архитектурные решения и ограничения, которые соответствуют текущему продукту, репозиторию и правилам проекта.",
+    "developer": "Реализовывать согласованные изменения в коде и тестах, не выходя за рамки текущего шага, плана и проектных ограничений.",
+    "contracts-data": "Поддерживать внутреннюю согласованность контрактов, схем, сущностей и интеграционных моделей данных и доводить их до состояния, пригодного для реализации.",
+    "testing": "Повышать уверенность в результате через практические тест-планы, новые тесты и заметки о проверке.",
+    "security": "Выявлять значимые риски безопасности и приватности и предлагать практические меры снижения риска.",
+    "research": "Собирать контекст, сравнивать варианты и кратко формулировать выводы, чтобы разблокировать следующую работу.",
+    "docs": "Поддерживать пользовательскую и техническую документацию в синхронизации с реальным процессом, кодовой базой и сгенерированными результатами.",
 }
 
 _ROLE_DEFAULT_STAGES = {
@@ -97,13 +97,13 @@ _ROLE_TOOL_POLICY = {
 }
 
 _ROLE_OUTPUT_CONTRACT = {
-    "architecture": {"deliverable": "decisions, constraints, interfaces", "writeBack": "through canonical CLI only"},
-    "developer": {"deliverable": "code changes, tests, validation notes", "writeBack": "through canonical CLI only"},
-    "contracts-data": {"deliverable": "contracts, schemas, entity decisions", "writeBack": "through canonical CLI only"},
-    "testing": {"deliverable": "tests, validation notes, coverage recommendations", "writeBack": "through canonical CLI only"},
-    "security": {"deliverable": "risks, mitigations, priority guidance", "writeBack": "through canonical CLI only"},
-    "research": {"deliverable": "findings, options, evidence", "writeBack": "through canonical CLI only"},
-    "docs": {"deliverable": "documentation updates, drift findings, clarification notes", "writeBack": "through canonical CLI only"},
+    "architecture": {"deliverable": "решения, ограничения, интерфейсы", "writeBack": "только через канонические команды CLI"},
+    "developer": {"deliverable": "изменения в коде, тесты, заметки о проверке", "writeBack": "только через канонические команды CLI"},
+    "contracts-data": {"deliverable": "контракты, схемы, решения по сущностям", "writeBack": "только через канонические команды CLI"},
+    "testing": {"deliverable": "тесты, заметки о проверке, рекомендации по покрытию", "writeBack": "только через канонические команды CLI"},
+    "security": {"deliverable": "риски, меры снижения, рекомендации по приоритетам", "writeBack": "только через канонические команды CLI"},
+    "research": {"deliverable": "выводы, варианты, подтверждения", "writeBack": "только через канонические команды CLI"},
+    "docs": {"deliverable": "обновления документации, найденные расхождения, уточняющие заметки", "writeBack": "только через канонические команды CLI"},
 }
 
 

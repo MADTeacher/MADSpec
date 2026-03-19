@@ -39,7 +39,7 @@ def test_cursor_frontmatter_stays_minimal_and_role_specific() -> None:
     frontmatter = _frontmatter_block(render_native_subagent_file("cursor-agent", _role("cursor-agent", "testing")))
 
     assert frontmatter.splitlines() == [
-        "description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.",
+        "description: Сосредоточен на пробелах в покрытии, проектировании тестов, стратегии проверки и подтверждении реализации.",
         "execution_mode_hint: parallel",
         'dependencies: ["architecture"]',
     ]
@@ -49,8 +49,8 @@ def test_opencode_frontmatter_uses_native_profile_and_strict_tool_map() -> None:
     frontmatter = _frontmatter_block(render_native_subagent_file("opencode", _role("opencode", "security")))
 
     assert frontmatter.splitlines() == [
-        "name: Security Specialist",
-        "description: Reviews security, privacy, threat surface, dependency risk, and defensive controls.",
+        "name: Специалист по безопасности",
+        "description: Проверяет безопасность, приватность, поверхность атаки, риски зависимостей и защитные меры.",
         "mode: subagent",
         "hidden: true",
         "tools:",
@@ -64,8 +64,8 @@ def test_qwen_frontmatter_uses_qwen_tool_names() -> None:
     frontmatter = _frontmatter_block(render_native_subagent_file("qwen", _role("qwen", "testing")))
 
     assert frontmatter.splitlines() == [
-        "name: Testing Specialist",
-        "description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.",
+        "name: Специалист по тестированию",
+        "description: Сосредоточен на пробелах в покрытии, проектировании тестов, стратегии проверки и подтверждении реализации.",
         'tools: ["read_file", "glob", "grep_search", "edit", "write_file", "run_shell_command"]',
     ]
 
@@ -74,8 +74,8 @@ def test_copilot_frontmatter_uses_copilot_specific_tool_names() -> None:
     frontmatter = _frontmatter_block(render_native_subagent_file("copilot", _role("copilot", "testing")))
 
     assert frontmatter.splitlines() == [
-        "name: Testing Specialist",
-        "description: Focuses on coverage gaps, test design, validation strategy, and implementation verification.",
+        "name: Специалист по тестированию",
+        "description: Сосредоточен на пробелах в покрытии, проектировании тестов, стратегии проверки и подтверждении реализации.",
         "target: vscode",
         "user-invocable: false",
         'tools: ["read", "search", "edit", "terminal"]',
@@ -86,8 +86,8 @@ def test_copilot_frontmatter_for_developer_exposes_full_implementation_tools() -
     frontmatter = _frontmatter_block(render_native_subagent_file("copilot", _role("copilot", "developer")))
 
     assert frontmatter.splitlines() == [
-        "name: Developer Specialist",
-        "description: Implements planned code changes, integrates solutions, and validates development steps in the current repository.",
+        "name: Специалист по разработке",
+        "description: Реализует запланированные изменения в коде, встраивает решения и подтверждает шаги разработки в текущем репозитории.",
         "target: vscode",
         "user-invocable: false",
         'tools: ["read", "search", "edit", "terminal"]',

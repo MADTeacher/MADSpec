@@ -1,5 +1,5 @@
-# Promotion Guardrails
+# Ограничения на продвижение знаний
 
-- Promote only `validated` records.
-- Do not promote `obsolete` or `conflicted` records by default.
-- Semantic records must include `summary`, `source`, and `evidence`.
+- Продвигай только записи со статусом `validated`.
+- По умолчанию не продвигай записи со статусами `obsolete` и `conflicted`.
+- Семантические записи должны содержать `summary`, `source` и `evidence`.
