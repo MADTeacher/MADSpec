@@ -214,11 +214,12 @@ MADSpec хранит основное проектное состояние в `
 - [`madspec-cli-operator`](skills/madspec-cli-operator/SKILL.md) — базовый операторский навык, который должны читать все команды `madspec.*`
 - [`memory-explain`](skills/memory-explain/SKILL.md) — навык объяснения и диагностики для `madspec.memory` и навигации по структурированной памяти
 - [`merge-assistant`](skills/merge-assistant/SKILL.md) — навык для межветочного сравнения памяти, подготовки предложений на слияние и продвижения подтвержденных знаний на уровень проекта
+- [`policy-engine`](skills/policy-engine/SKILL.md) — навык для жизненного цикла проектных правил через `madspec policy ...`: просмотр, предложение, применение, вывод из действия и проверка влияния правил на процесс
 - [`change-engine`](skills/change-engine/SKILL.md) — навык для жизненного цикла `madspec change ...` и разговорной команды `/madspec.change`
 - [`gate-orchestrator`](skills/gate-orchestrator/SKILL.md) — навык для `madspec gate ...`, блокировок, исключений и статуса ратификации
 - [`subagent-role-advisor`](skills/subagent-role-advisor/SKILL.md) — навык для `madspec agents ...`, профилей субагентов и role-scoped context
-- [`frontend-design`](skills/frontend-design/SKILL.md)
-- [`generate-agents-md`](skills/generate-agents-md/SKILL.md)
+- [`frontend-design`](skills/frontend-design/SKILL.md) — навык для проектирования выразительных UI и frontend-артефактов с упором на сильное визуальное направление, рабочий код и отказ от шаблонной «AI-эстетики»
+- [`generate-agents-md`](skills/generate-agents-md/SKILL.md) — навык для создания и обновления `AGENTS.md` и родственных agent-instructions файлов как краткого операционного контракта для coding-агентов
 
 ### Субагенты
 
