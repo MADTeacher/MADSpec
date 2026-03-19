@@ -19,7 +19,7 @@ MADSpec - это фреймворк для разработки программ
 - Единый слой правил проекта в `.madspec/system/policy/` с циклом предложения и применения и автоматически собираемым `policy.md`
 - Слой управления изменениями в `.madspec/<branch>/change/` с фиксированной базовой точкой сравнения, предложениями, ратифицированным пакетом изменений и переносимым пакетом экспорта
 - Слой контрольных проверок в `.madspec/<branch>/gates/` с единым статусом переходов, предложениями на исключения и журналом аудита
-- Слой субагентных профилей в `.madspec/system/agents/` с каноническим состоянием ролей, рекомендациями, историей изменений и role-scoped context
+- Слой субагентных профилей в `.madspec/system/agents/` с каноническим состоянием ролей, рекомендациями, историей изменений и контекстом, подготовленным для каждой роли
 - Процессы `review` и `security` для проверки качества после реализации
 - Подготовленную структуру команд и файлов для поддерживаемых сред с AI-агентами
 
@@ -64,13 +64,13 @@ uvx --from git+https://github.com/MADTeacher/MADSpec.git madspec init <PROJECT_N
 
 | Агент | Тип | Директория | Нужен CLI | Субагенты |
 | --- | --- | --- | --- | --- |
-| [Cursor](https://cursor.sh/) | IDE | `.cursor/commands/` | Нет | Да, native (`.cursor/agents/`) |
-| [opencode](https://opencode.ai/) | CLI | `.opencode/commands/` | Да | Да, native (`.opencode/agents/`) |
-| [Kilo Code](https://github.com/Kilo-Org/kilocode) | IDE | `.kilocode/rules/` | Нет | Fallback через rules/skills |
-| [Roo Code](https://roocode.com/) | IDE | `.roo/rules/` | Нет | Fallback через rules/skills |
-| [SourceCraft](https://sourcecraft.dev/) | IDE | `.codeassistant/commands/` | Нет | Fallback через commands/skills |
-| [Qwen Code](https://github.com/QwenLM/qwen-code) | CLI | `.qwen/commands/` | Да | Да, native (`.qwen/agents/`) |
-| [GitHub Copilot](https://github.com/features/copilot) | IDE | `.github/agents/` | Нет | Да, native (`.github/agents/`) |
+| [Cursor](https://cursor.sh/) | IDE | `.cursor/commands/` | Нет | Да, через встроенные файлы (`.cursor/agents/`) |
+| [opencode](https://opencode.ai/) | CLI | `.opencode/commands/` | Да | Да, через встроенные файлы (`.opencode/agents/`) |
+| [Kilo Code](https://github.com/Kilo-Org/kilocode) | IDE | `.kilocode/rules/` | Нет | Через адаптеры на базе `rules/skills` |
+| [Roo Code](https://roocode.com/) | IDE | `.roo/rules/` | Нет | Через адаптеры на базе `rules/skills` |
+| [SourceCraft](https://sourcecraft.dev/) | IDE | `.codeassistant/commands/` | Нет | Через адаптеры на базе `commands/skills` |
+| [Qwen Code](https://github.com/QwenLM/qwen-code) | CLI | `.qwen/commands/` | Да | Да, через встроенные файлы (`.qwen/agents/`) |
+| [GitHub Copilot](https://github.com/features/copilot) | IDE | `.github/agents/` | Нет | Да, через встроенные файлы (`.github/agents/`) |
 
 ## Как Работать С MADSpec
 
@@ -217,23 +217,23 @@ MADSpec хранит основное проектное состояние в `
 - [`policy-engine`](skills/policy-engine/SKILL.md) — навык для жизненного цикла проектных правил через `madspec policy ...`: просмотр, предложение, применение, вывод из действия и проверка влияния правил на процесс
 - [`change-engine`](skills/change-engine/SKILL.md) — навык для жизненного цикла `madspec change ...` и разговорной команды `/madspec.change`
 - [`gate-orchestrator`](skills/gate-orchestrator/SKILL.md) — навык для `madspec gate ...`, блокировок, исключений и статуса ратификации
-- [`subagent-role-advisor`](skills/subagent-role-advisor/SKILL.md) — навык для `madspec agents ...`, профилей субагентов и role-scoped context
-- [`frontend-design`](skills/frontend-design/SKILL.md) — навык для проектирования выразительных UI и frontend-артефактов с упором на сильное визуальное направление, рабочий код и отказ от шаблонной «AI-эстетики»
-- [`generate-agents-md`](skills/generate-agents-md/SKILL.md) — навык для создания и обновления `AGENTS.md` и родственных agent-instructions файлов как краткого операционного контракта для coding-агентов
+- [`subagent-role-advisor`](skills/subagent-role-advisor/SKILL.md) — навык для `madspec agents ...`, профилей субагентов и контекста, подготовленного под конкретную роль
+- [`frontend-design`](skills/frontend-design/SKILL.md) — навык для проектирования выразительных интерфейсов и фронтенд-артефактов с сильным визуальным направлением, рабочим кодом и отказом от шаблонной «AI-эстетики»
+- [`generate-agents-md`](skills/generate-agents-md/SKILL.md) — навык для создания и обновления `AGENTS.md` и родственных файлов с инструкциями для агентов как краткого операционного контракта
 
 ### Субагенты
 
-MADSpec хранит каноническое состояние субагентных ролей в `.madspec/system/agents/` и экспортирует role-scoped context через `madspec agents subagents context`.
+MADSpec хранит каноническое состояние субагентных ролей в `.madspec/system/agents/` и экспортирует контекст, подготовленный для конкретной роли, через `madspec agents subagents context`.
 
 Основные файлы:
 
 - `.madspec/system/agents/state.json` — активная среда, профиль и `enabledSubagentIds`
-- `.madspec/system/agents/catalog.json` — project-defined роли и project overrides встроенных ролей
-- `.madspec/system/agents/bodies/` — Markdown-тела project roles и overrides
+- `.madspec/system/agents/catalog.json` — проектные роли и проектные переопределения встроенных ролей
+- `.madspec/system/agents/bodies/` — Markdown-описания проектных ролей и переопределений
 
-Через `madspec agents subagents create/update/remove` можно добавлять собственные проектные роли, не меняя built-in каталог фреймворка напрямую.
+Через `madspec agents subagents create/update/remove` можно добавлять собственные проектные роли, не меняя напрямую встроенный каталог фреймворка.
 
-Во встроенный starter set входят роли:
+Во встроенный начальный набор входят роли:
 
 - `architecture`
 - `developer`
@@ -243,9 +243,9 @@ MADSpec хранит каноническое состояние субаген�
 - `research`
 - `docs`
 
-- Для Cursor, GitHub Copilot, OpenCode и Qwen Code MADSpec генерирует native agent/subagent-файлы в средовые директории проекта.
-- Для Kilo Code, Roo Code и SourceCraft v1 использует fallback-адаптеры на базе rules/commands/skills без собственного runtime.
-- Сам MADSpec не является scheduler-ом субагентов: параллельность и последовательность остаются возможностями целевой агентной среды.
+- Для Cursor, GitHub Copilot, OpenCode и Qwen Code MADSpec генерирует встроенные файлы агентов и субагентов в директориях выбранной среды.
+- Для Kilo Code, Roo Code и SourceCraft v1 MADSpec использует запасные адаптеры на базе `rules`, `commands` и `skills` без собственного механизма исполнения.
+- Сам MADSpec не управляет расписанием субагентов: параллельность и последовательность остаются возможностями выбранной агентной среды.
 
 ## Документация
 
