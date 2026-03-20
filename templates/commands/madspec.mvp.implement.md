@@ -28,7 +28,7 @@ $ARGUMENTS
 - `progress.json` и `active-session.json` — канонический runtime-state этапа implement.
 - `decision-log.jsonl`, `events.jsonl` и `semantic/*.jsonl` — канонические записи о ходе реализации, знаниях и результатах.
 - `implementation-context.md` и `project-context.md` являются generated views поверх structured memory и **не редактируются вручную как primary source**.
-- Перед началом работы сначала получай контекст через `madspec memory retrieve --stage mvp.implement --json-output`.
+- Перед началом работы сначала получай контекст через `madspec memory retrieve --stage mvp.implement --toon-output`, если этот контекст читает агент.
 - Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory` и связанные validations; текущий шаг и TDD state должны соответствовать active policies стадии.
 - Для старта шага используй `madspec memory start-step --stage mvp.implement`, а не ручную установку `currentImplementStep`.
 - Для промежуточных TDD checkpoint используй `madspec memory checkpoint-step --stage mvp.implement`.
@@ -69,7 +69,7 @@ $ARGUMENTS
    - Если ни команда, ни файл недоступны, используй значение по умолчанию `main`.
 
 1. **Загрузка контекста**:
-   - **Сначала выполни** `madspec memory retrieve --stage mvp.implement --json-output`.
+   - **Сначала выполни** `madspec memory retrieve --stage mvp.implement --toon-output`, если этот вывод читает агент.
    - Используй JSON-ответ как основной источник workflow state: `workflow.currentImplementStep`, `workflow.nextExecutableStep`, `step.status`, `step.metadata`, `step.dependencies`, `semantic.*`, `stage_memory.*`, `policy_context.*`.
    - Прочитай `.madspec/<BRANCH>/implementation-plan.md` как generated plan overview.
    - Прочитай предыдущие stage artifacts из `.madspec/<BRANCH>/` для product и architecture context: `concept.md`, `ui-design.md`, `tech-stack.md`, `architecture.md`, `data-model.md`, `contracts/openapi.yaml`.
@@ -162,7 +162,7 @@ $ARGUMENTS
    - [ ] UI-реализация соответствует утвержденному storyboard-прототипу, если шаг касается интерфейса.
 
    **Отдельно проверь structured memory:**
-   - Выполни `madspec memory retrieve --stage mvp.implement --step-id <step-id> --json-output`.
+   - Выполни `madspec memory retrieve --stage mvp.implement --step-id <step-id> --toon-output`, если этот вывод читает агент.
    - Убедись, что `policy_context.violations` пуст или содержит только advisory observations; required policy violations блокируют completion.
    - Для `code + required` после `complete-step` должны быть выполнены условия:
      - `step.status.tddPhase = completed`
@@ -213,8 +213,8 @@ $ARGUMENTS
    - пересоберет generated views и завершится ошибкой, если state невалиден.
 
 9. **Проверка результата после completion**:
-   - Повтори `madspec memory retrieve --stage mvp.implement --step-id <step-id> --json-output` и проверь итоговый статус шага.
-   - Если workflow validation выглядит неочевидной, дополнительно выполни `madspec policy validate --stage mvp.implement --step-id <step-id> --json-output` и используй результат как policy-specific explanation.
+   - Повтори `madspec memory retrieve --stage mvp.implement --step-id <step-id> --toon-output` и проверь итоговый статус шага, если этот вывод читает агент.
+   - Если workflow validation выглядит неочевидной, дополнительно выполни `madspec policy validate --stage mvp.implement --step-id <step-id> --toon-output` и используй результат как policy-specific explanation, если этот вывод читает агент.
    - Используй generated `implementation-context.md` и `project-context.md` как read-only подтверждение того, что consolidated views обновились.
    - Если generated views расходятся с фактами, исправляй memory/records и повторяй `madspec memory consolidate` + `madspec memory validate`, а не редактируй markdown вручную.
 

@@ -59,6 +59,6 @@ madspec change summary --json-output
 
 ## Связь с памятью и качеством
 
-- `madspec memory retrieve --stage review|security --json-output` возвращает `change_context`
-- `madspec memory explain --stage ... --json-output` учитывает активный пакет изменений в объяснении контекста
+- `madspec memory retrieve --stage review|security --toon-output` возвращает `change_context`, если этот контекст читает агент
+- `madspec memory explain --stage ... --toon-output` учитывает активный пакет изменений в объяснении контекста, если вывод читает агент
 - `review.md` и `security-audit.md` используют активный пакет изменений как краткую сводку ратифицированных изменений

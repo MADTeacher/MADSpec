@@ -22,7 +22,7 @@ $ARGUMENTS
 - Каноническое состояние этапа хранится в `.madspec/<BRANCH>/memory/stages/feature.plan.json`.
 - Runtime state шагов хранится в `.madspec/<BRANCH>/memory/progress.json`.
 - `implementation-plan.md`, `planning-context-cache.md`, `steps/*/planning-context.md` и `project-context.md` являются generated views.
-- В обычных ходах сначала используй `madspec memory retrieve --stage feature.plan --json-output`.
+- В обычных ходах сначала используй `madspec memory retrieve --stage feature.plan --toon-output`, если этот контекст читает агент.
 - Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`; feature planning должен учитывать active project-global policies.
 - Strategy-level изменения сохраняй через `madspec memory capture --stage feature.plan --plan-overview ... --planning-principle ... --next-action ...`.
 - Перед регистрацией шага обязательно проверь его через `madspec memory next-step --stage feature.plan --candidate-step ...`.
@@ -51,13 +51,13 @@ $ARGUMENTS
 ## Предварительные условия
 
 - Существует `.madspec/<BRANCH>/memory/stages/feature.init.json`.
-- `madspec memory retrieve --stage feature.init --json-output` показывает достаточный `feature_init_status`.
+- `madspec memory retrieve --stage feature.init --toon-output` показывает достаточный `feature_init_status`, если этот вывод читает агент.
 - Если init ещё не завершён, направь пользователя на `/madspec.feature.init`.
 
 ## Порядок работы
 
 1. Определи текущую ветку через `madspec git current-branch`.
-2. Запроси `madspec memory retrieve --stage feature.plan --json-output`.
+2. Запроси `madspec memory retrieve --stage feature.plan --toon-output`, если этот вывод читает агент.
    - Используй `policy_context` из ответа как обязательный input для выбора `step-kind`, `tddPolicy` и candidate dependencies.
 3. Прочитай generated references:
    - `.madspec/<BRANCH>/project-analysis.md`
@@ -80,7 +80,7 @@ $ARGUMENTS
 8. Зарегистрируй шаг:
    - `madspec memory register-step --stage feature.plan --step-id <step-id> --step-kind <code|non-code> --title ... --summary ... --covers <Fxx> ... --depends-on ...`
    - для `non-code` шага обязательно передай `--tdd-policy waived|not-applicable` и `--waiver-reason`, если нужен waiver
-9. Повтори `madspec memory retrieve --stage feature.plan --json-output` и проверь `feature_plan_status`.
+9. Повтори `madspec memory retrieve --stage feature.plan --toon-output` и проверь `feature_plan_status`, если этот вывод читает агент.
 10. Когда стратегия и catalog шагов готовы, зафиксируй этап через `madspec memory checkpoint --stage feature.plan --summary "<validated summary>"`.
 
 ## Важные правила

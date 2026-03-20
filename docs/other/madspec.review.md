@@ -37,20 +37,20 @@
 
 ## Входы команды
 
-- `madspec memory retrieve --stage review --json-output`
-- `madspec review status --json-output`
-- `madspec policy validate --stage review --json-output`
+- `madspec memory retrieve --stage review --toon-output`, если этот контекст читает агент
+- `madspec review status --toon-output`, если этот вывод читает агент
+- `madspec policy validate --stage review --toon-output`, если этот вывод читает агент
 - код, тесты и branch artifacts
 - `madspec memory capture --stage review ...`
 - `madspec memory checkpoint --stage review --summary ...`
 
-Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory`, `policy_context.violations` и `policy_context.confirmations`, а `madspec review status` использовать как сводку блокирующих, ожидающих и предупреждающих проверок, а также активных исключений.
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory`, `policy_context.violations` и `policy_context.confirmations`, а `madspec review status` использовать как сводку блокирующих, ожидающих и предупреждающих проверок, а также активных исключений. Если этот вывод читает агент, используй `--toon-output`.
 
 ## Пошаговый runtime workflow
 
 1. Агент читает `review` memory context.
-2. Агент запускает `madspec review status --json-output` и фиксирует блокирующие, ожидающие и предупреждающие проверки, активные исключения и статус ратификации.
-3. Агент запускает `madspec policy validate --stage review --json-output` и подмешивает violations, advisories и confirmations в review evidence.
+2. Агент запускает `madspec review status --toon-output` и фиксирует блокирующие, ожидающие и предупреждающие проверки, активные исключения и статус ратификации.
+3. Агент запускает `madspec policy validate --stage review --toon-output` и подмешивает violations, advisories и confirmations в review evidence.
 4. Определяет актуальный implementation workflow: `mvp.implement` или `feature.implement`.
 5. Загружает progress, implementation plan, step contexts и branch artifacts.
 6. Проводит fit-gap review, code/test review, architecture/integration review и improvement triage.

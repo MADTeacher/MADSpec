@@ -23,7 +23,7 @@ description: Операционный навык для слоя контрол�
 
 ## Канонический порядок работы
 
-1. Сначала прочитай текущее состояние через `madspec gate status --json-output` или `madspec gate explain --json-output`.
+1. Сначала прочитай текущее состояние через `madspec gate status --toon-output` или `madspec gate explain --toon-output`, если результат будет читать агент; `--json-output` оставляй только для машинной интеграции.
 2. Для конкретного перехода используй `madspec gate run --stage ... --operation ... --json-output`.
 3. Если нужно исключение, сначала создай предложение через `madspec gate propose-waiver`.
 4. Покажи пользователю предварительное представление предложения и дождись явного подтверждения.
@@ -47,11 +47,11 @@ description: Операционный навык для слоя контрол�
 ## Полезные команды
 
 ```bash
-madspec gate status --stage mvp.implement --operation complete-step --json-output
+madspec gate status --stage mvp.implement --operation complete-step --toon-output
 madspec gate run --stage review --operation validate --json-output
-madspec gate explain --stage feature.plan --operation register-step --step-id step-02-auth --json-output
+madspec gate explain --stage feature.plan --operation register-step --step-id step-02-auth --toon-output
 madspec gate propose-waiver --stage review --gate-id <GATE_ID> --reason "..." --json-output
 madspec gate apply-waiver --proposal-id <PROPOSAL_ID> --json-output
-madspec review status --json-output
-madspec security status --json-output
+madspec review status --toon-output
+madspec security status --toon-output
 ```

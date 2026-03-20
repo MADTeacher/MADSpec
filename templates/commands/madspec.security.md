@@ -20,9 +20,9 @@ $ARGUMENTS
 - Security audit работает в branch-aware memory-first режиме.
 - Источник истины: `.madspec/<BRANCH>/memory/`, runtime progress implementation stages и security-stage records.
 - `project-context.md` и `security-audit.md` считай generated views, а не canonical source of truth.
-- Перед началом аудита используй `madspec memory retrieve --stage security --json-output`.
-- Перед началом аудита дополнительно используй `madspec security status --json-output`, чтобы увидеть блокирующие, предупреждающие и ожидающие проверки, а также активные исключения.
-- Если в ветке есть implementation workflow, дополнительно используй `madspec memory retrieve --stage mvp.implement --json-output` или `madspec memory retrieve --stage feature.implement --json-output`.
+- Перед началом аудита используй `madspec memory retrieve --stage security --toon-output`, если этот контекст читает агент.
+- Перед началом аудита дополнительно используй `madspec security status --toon-output`, если этот вывод читает агент, чтобы увидеть блокирующие, предупреждающие и ожидающие проверки, а также активные исключения.
+- Если в ветке есть implementation workflow, дополнительно используй `madspec memory retrieve --stage mvp.implement --toon-output` или `madspec memory retrieve --stage feature.implement --toon-output`, если этот контекст читает агент.
 - После каждого подтвержденного security finding, remediation decision, limitation или compliance constraint используй `madspec memory capture --stage security ...`.
 - После завершения аудита ратифицируй этап через `madspec memory checkpoint --stage security --summary ...`.
 - `madspec memory capture` и `madspec memory checkpoint` сами запускают `madspec memory consolidate` и `madspec memory validate`.
@@ -96,8 +96,8 @@ $ARGUMENTS
    - Не используй неописанные режимы и не ссылайся на `--jurisdiction`: privacy context всегда 152-ФЗ
 
 2. **Загрузи memory, implementation и branch context**
-   - Сначала выполни `madspec memory retrieve --stage security --json-output`
-   - Затем выполни `madspec security status --json-output`
+   - Сначала выполни `madspec memory retrieve --stage security --toon-output`, если этот вывод читает агент
+   - Затем выполни `madspec security status --toon-output`, если этот вывод читает агент
    - При наличии implementation workflow дополнительно изучи:
      - `.madspec/<BRANCH>/memory/progress.json`
      - `.madspec/<BRANCH>/memory/working/active-session.json`

@@ -18,7 +18,7 @@ $ARGUMENTS
 - Канонический runtime-state этапа implement хранится в `.madspec/<BRANCH>/memory/progress.json` и `.madspec/<BRANCH>/memory/working/active-session.json`.
 - `decision-log.jsonl`, `events.jsonl` и `semantic/*.jsonl` являются каноническими record streams реализации.
 - `implementation-context.md` и `project-context.md` являются generated views.
-- В начале каждой сессии сначала используй `madspec memory retrieve --stage feature.implement --json-output`.
+- В начале каждой сессии сначала используй `madspec memory retrieve --stage feature.implement --toon-output`, если этот контекст читает агент.
 - Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory` и policy validations для текущего шага.
 - Для запуска шага используй `madspec memory start-step --stage feature.implement`.
 - Для TDD checkpoint используй `madspec memory checkpoint-step --stage feature.implement`.
@@ -34,7 +34,7 @@ $ARGUMENTS
 ## Порядок работы
 
 1. Определи ветку через `madspec git current-branch`.
-2. Запроси `madspec memory retrieve --stage feature.implement --json-output`.
+2. Запроси `madspec memory retrieve --stage feature.implement --toon-output`, если этот вывод читает агент.
 3. Используй ответ как основной workflow state:
    - `workflow.currentImplementStep`
    - `workflow.nextExecutableStep`
@@ -65,8 +65,8 @@ $ARGUMENTS
 9. После валидации заверши шаг:
    - `madspec memory complete-step --stage feature.implement --step-id <step-id> --summary ...`
    - при необходимости добавь `--fact`, `--decision`, `--contract`
-10. Повтори `madspec memory retrieve --stage feature.implement --json-output` и проверь следующий executable step.
-    - При сомнении дополнительно выполни `madspec policy validate --stage feature.implement --step-id <step-id> --json-output`.
+10. Повтори `madspec memory retrieve --stage feature.implement --toon-output` и проверь следующий executable step, если этот вывод читает агент.
+    - При сомнении дополнительно выполни `madspec policy validate --stage feature.implement --step-id <step-id> --toon-output`, если этот вывод читает агент.
 11. После успешного `complete-step` создай git commit через `madspec git commit --message "..."`
 
 ## Важные запреты

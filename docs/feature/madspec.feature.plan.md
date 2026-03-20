@@ -42,7 +42,7 @@
 
 ## Входы команды
 
-- `madspec memory retrieve --stage feature.plan --json-output`
+- `madspec memory retrieve --stage feature.plan --toon-output`, если этот контекст читает агент
 - `madspec memory capture --stage feature.plan --plan-overview ... --planning-principle ...`
 - `madspec memory next-step --stage feature.plan --candidate-step ...`
 - `madspec memory register-step --stage feature.plan ...`

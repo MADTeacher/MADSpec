@@ -49,4 +49,4 @@ description: Навык выбора, объяснения и безопасно
 - Не редактируй `.madspec/system/agents/catalog.json` и `.madspec/system/agents/bodies/*.md` вручную, если изменение должно попасть в каноническую историю ролей.
 - Не подменяй `agentEnvironment` эвристикой по директориям, если явное состояние уже записано в конфиге.
 - Не обещай параллельное исполнение, если текущая среда использует fallback-адаптер.
-- Для любого role-specific анализа сначала извлекай контекст через `madspec agents subagents context --subagent-id ... --json-output`.
+- Для любого role-specific анализа сначала извлекай контекст через `madspec agents subagents context --subagent-id ... --toon-output`; `--json-output` оставляй только для машинной интеграции.

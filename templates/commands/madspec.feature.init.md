@@ -25,7 +25,7 @@ $ARGUMENTS
 
 - Каноническое состояние этапа init хранится в `.madspec/<BRANCH>/memory/stages/feature.init.json`.
 - `project-analysis.md`, `feature-context.md`, `tech-stack.md`, `architecture.md` и `project-context.md` являются generated views.
-- В обычных ходах диалога сначала используй `madspec memory retrieve --stage feature.init --json-output`.
+- В обычных ходах диалога сначала используй `madspec memory retrieve --stage feature.init --toon-output`, если этот контекст читает агент.
 - Для накопления состояния используй `madspec memory capture --stage feature.init ...`.
 - Для завершения этапа используй `madspec memory checkpoint --stage feature.init --summary ...`.
 - После любого изменения memory workflow views должны пересобираться через `madspec memory consolidate` и проходить `madspec memory validate`.
@@ -69,8 +69,8 @@ $ARGUMENTS
    - `--tech-note`
    - `--architecture-note`
    - `--next-action`
-7. Повтори `madspec memory retrieve --stage feature.init --json-output` и проверь `feature_init_status`.
-8. Перед завершением при необходимости запроси `madspec memory retrieve --stage feature.init --json-output --full-artifact`.
+7. Повтори `madspec memory retrieve --stage feature.init --toon-output` и проверь `feature_init_status`, если этот вывод читает агент.
+8. Перед завершением при необходимости запроси `madspec memory retrieve --stage feature.init --toon-output --full-artifact`, если этот вывод читает агент.
 9. Зафиксируй этап через `madspec memory checkpoint --stage feature.init --summary "<validated summary>"`.
 
 ## Что считается результатом

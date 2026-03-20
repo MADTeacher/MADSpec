@@ -40,7 +40,7 @@
 ## Входы команды
 
 - пользовательское описание новой функциональности
-- `madspec memory retrieve --stage feature.init --json-output`
+- `madspec memory retrieve --stage feature.init --toon-output`, если этот контекст читает агент
 - `madspec memory capture --stage feature.init ...`
 - `madspec memory checkpoint --stage feature.init --summary ...`
 

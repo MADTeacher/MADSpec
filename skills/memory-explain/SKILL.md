@@ -17,7 +17,7 @@ description: Операционный навык для объяснения и 
 
 ## Канонический порядок работы
 
-1. Прочитай текущее рабочее состояние через `madspec memory retrieve --stage ... --json-output`, если нужен контекст стадии.
+1. Прочитай текущее рабочее состояние через `madspec memory retrieve --stage ... --toon-output`, если этот контекст будет читать агент; `--json-output` оставляй только для машинной интеграции.
 2. Для общей диагностики запускай `madspec memory doctor --json-output`.
 3. Для объяснений используй только канонические команды:
    - `madspec memory explain`
@@ -50,7 +50,7 @@ description: Операционный навык для объяснения и 
 
 ```bash
 madspec memory doctor --json-output
-madspec memory explain --stage mvp.plan --json-output
+madspec memory explain --stage mvp.plan --toon-output
 madspec memory why-next-step --stage mvp.implement --json-output
 madspec memory timeline --stage mvp.plan --json-output
 madspec memory conflicts --json-output

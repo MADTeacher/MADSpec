@@ -34,7 +34,7 @@
 
 ## Входы команды
 
-- `madspec memory retrieve --stage mvp.tech --json-output`
+- `madspec memory retrieve --stage mvp.tech --toon-output`, если этот контекст читает агент
 - `madspec memory capture --stage mvp.tech ...`
 - `madspec memory checkpoint --stage mvp.tech --summary ...`
 

@@ -31,9 +31,9 @@ $ARGUMENTS
 
 - `progress.json`, `active-session.json`, decision log и episodes — канонический workflow state.
 - Каноническое состояние этапа plan хранится в `.madspec/<BRANCH>/memory/stages/mvp.plan.json`.
-- Для архитектурного контекста сначала используй `madspec memory retrieve --stage mvp.architecture --json-output`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` считай generated views поверх canonical architecture-state.
+- Для архитектурного контекста сначала используй `madspec memory retrieve --stage mvp.architecture --toon-output`, если этот контекст читает агент, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` считай generated views поверх canonical architecture-state.
 - `implementation-plan.md`, `planning-context-cache.md`, `planning-context.md` и `project-context.md` являются generated views.
-- В обычных ходах диалога сначала используй `madspec memory retrieve --stage mvp.plan --json-output` и опирайся на `plan_status`.
+- В обычных ходах диалога сначала используй `madspec memory retrieve --stage mvp.plan --toon-output`, если этот контекст читает агент, и опирайся на `plan_status`.
 - Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`; planning decisions и новые step metadata не должны противоречить active policies текущей стадии.
 - Полный `artifact_state.plan` запрашивай только перед финальной проверкой и `madspec memory checkpoint --stage mvp.plan`, используя `--full-artifact`.
 - Для planning-level state используй `madspec memory capture --stage mvp.plan --plan-overview ... --planning-principle ... --next-action ...`.
@@ -150,7 +150,7 @@ $ARGUMENTS
    
    - Загрузи все предыдущие артефакты:
      - `.madspec/<BRANCH>/concept.md` (для понимания функций и приоритетов)
-     - `madspec memory retrieve --stage mvp.architecture --json-output` (как основной summary архитектуры; из ответа также прочитай `policy_context`)
+     - `madspec memory retrieve --stage mvp.architecture --toon-output` (как основной summary архитектуры, если этот вывод читает агент; из ответа также прочитай `policy_context`)
      - `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/ui-design.md`, `.madspec/<BRANCH>/tech-stack.md`, `.madspec/<BRANCH>/data-model.md` (как generated views, если нужны детали)
      - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его и учитывай ограничения деплоя при планировании шагов
    
@@ -217,9 +217,9 @@ $ARGUMENTS
    
    - Загрузи только необходимый контекст:
      - `.madspec/<BRANCH>/concept.md` (для понимания функций и приоритетов)
-     - `policy_context` из `madspec memory retrieve --stage mvp.plan --json-output` (обязательный policy layer для текущей стадии)
+     - `policy_context` из `madspec memory retrieve --stage mvp.plan --toon-output` (обязательный policy layer для текущей стадии, если этот вывод читает агент)
      - `.madspec/<BRANCH>/planning-context-cache.md` (для понимания структуры - используется вместо полного `architecture.md` для экономии контекста)
-       - Если кэш не существует, сначала загрузи `madspec memory retrieve --stage mvp.architecture --json-output --full-artifact`, затем используй `architecture.md` и `data-model.md` как generated detail views и создай кэш
+       - Если кэш не существует, сначала загрузи `madspec memory retrieve --stage mvp.architecture --toon-output --full-artifact`, если этот вывод читает агент, затем используй `architecture.md` и `data-model.md` как generated detail views и создай кэш
        - Если кэш существует, но дата последнего обновления старше даты последнего изменения generated architecture artifacts, обнови кэш
      - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его полностью и учитывай ограничения деплоя при планировании каждого шага
      - `.madspec/<BRANCH>/implementation-plan.md` (для понимания уже запланированных шагов)

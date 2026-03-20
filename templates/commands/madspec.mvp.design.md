@@ -40,7 +40,7 @@ $ARGUMENTS
 - Каноническое состояние хранится в `.madspec/<BRANCH>/memory/`.
 - Реальные данные этапа design хранятся в `.madspec/<BRANCH>/memory/stages/mvp.design.json`.
 - `.madspec/<BRANCH>/ui-design.md` и `project-context.md` считаются generated views и не редактируются вручную как источник истины.
-- Перед началом и после каждого утвержденного блока по экрану, journey, навигации или платформенному ограничению используй `madspec memory retrieve --stage mvp.design --json-output` и `madspec memory capture --stage mvp.design ...`.
+- Перед началом и после каждого утвержденного блока по экрану, journey, навигации или платформенному ограничению используй `madspec memory retrieve --stage mvp.design --toon-output`, если этот контекст читает агент, и `madspec memory capture --stage mvp.design ...`.
 - Используй design-specific flags, когда меняется canonical state: `--design-overview`, `--platform`, `--zone`, `--screen`, `--screen-feature`, `--flow`, `--flow-step`, `--flow-alternative`, `--nav`, `--platform-constraint`, `--screen-data`, `--next-action`.
 - Приоритеты `P1/P2/P3` нужны для internal coverage через `--screen-feature`, но **не должны** появляться в user-facing prototype как бейджи или визуальные метки.
 - Для этапа design **обязательно** заверши работу командой `madspec memory checkpoint --stage mvp.design ...`.
@@ -49,13 +49,13 @@ $ARGUMENTS
   - `--fact/--decision` можно не дублировать, если они уже накоплены через `madspec memory capture --status validated`;
   - `--evidence` — ссылки на `.madspec/<BRANCH>/ui-design.md` и `.madspec/<BRANCH>/ui-prototype/index.html`.
 - В обычных ходах диалога опирайся на `design_status`: какие обязательные поля еще пусты, какие concept-функции еще не покрыты экранами, каких prototype-файлов не хватает.
-- Полный `artifact_state.design` запрашивай только перед финальной валидацией, итоговым обзором и `checkpoint`, используя `madspec memory retrieve --stage mvp.design --json-output --full-artifact`.
+- Полный `artifact_state.design` запрашивай только перед финальной валидацией, итоговым обзором и `checkpoint`, используя `madspec memory retrieve --stage mvp.design --toon-output --full-artifact`, если этот вывод читает агент.
 - **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `screens`, `flows`, `flow_steps`, `navigation`, `screen_data`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
 
 ## Работа в нескольких чатах (обязательно)
 
 - Для `mvp.design` многосессионная работа считается штатным сценарием.
-- В начале **каждой новой сессии** сначала выполни `madspec memory retrieve --stage mvp.design --json-output`.
+- В начале **каждой новой сессии** сначала выполни `madspec memory retrieve --stage mvp.design --toon-output`, если этот вывод читает агент.
 - После этого сверь:
   - `.madspec/<BRANCH>/ui-design.md`
   - `.madspec/<BRANCH>/ui-prototype/index.html`

@@ -28,11 +28,11 @@ $ARGUMENTS
 - Review работает в branch-aware memory-first режиме.
 - Источник истины: `.madspec/<BRANCH>/memory/`, runtime progress implementation stages и stage records.
 - `review.md`, `improvements.md` и `project-context.md` считаются generated views, а не canonical source of truth.
-- Перед началом анализа используй `madspec memory retrieve --stage review --json-output`.
-- Перед началом анализа дополнительно используй `madspec review status --json-output`, чтобы увидеть блокирующие, предупреждающие и ожидающие проверки, а также активные исключения.
+- Перед началом анализа используй `madspec memory retrieve --stage review --toon-output`, если этот контекст читает агент.
+- Перед началом анализа дополнительно используй `madspec review status --toon-output`, если этот вывод читает агент, чтобы увидеть блокирующие, предупреждающие и ожидающие проверки, а также активные исключения.
 - Из ответа `madspec memory retrieve` **обязательно** прочитай `policy_context.required`, `policy_context.advisory`, `policy_context.violations` и `policy_context.confirmations`.
-- Для дополнительного runtime-контекста используй `madspec memory retrieve --stage mvp.implement --json-output` или `madspec memory retrieve --stage feature.implement --json-output`, если в ветке есть соответствующий workflow.
-- В начале review дополнительно выполни `madspec policy validate --stage review --json-output`, чтобы собрать явные policy violations, advisories и confirmations для review capture flow.
+- Для дополнительного runtime-контекста используй `madspec memory retrieve --stage mvp.implement --toon-output` или `madspec memory retrieve --stage feature.implement --toon-output`, если этот контекст читает агент и в ветке есть соответствующий workflow.
+- В начале review дополнительно выполни `madspec policy validate --stage review --toon-output`, если этот вывод читает агент, чтобы собрать явные policy violations, advisories и confirmations для review capture flow.
 - После каждого подтвержденного finding, decision, open question или improvement используй `madspec memory capture --stage review ...`.
 - После завершения анализа ратифицируй этап через `madspec memory checkpoint --stage review --summary ...`.
 - `madspec memory capture` и `madspec memory checkpoint` сами запускают `madspec memory consolidate` и `madspec memory validate`.
@@ -73,9 +73,9 @@ $ARGUMENTS
    - Если ветку определить не удалось, используй `main` и явно отметь это как ограничение анализа
 
 1. **Загрузи memory и runtime context**
-   - Сначала выполни `madspec memory retrieve --stage review --json-output`
-   - Затем выполни `madspec review status --json-output`
-   - Затем выполни `madspec policy validate --stage review --json-output`
+   - Сначала выполни `madspec memory retrieve --stage review --toon-output`, если этот вывод читает агент
+   - Затем выполни `madspec review status --toon-output`, если этот вывод читает агент
+   - Затем выполни `madspec policy validate --stage review --toon-output`, если этот вывод читает агент
    - Затем проверь, какой implementation workflow актуален для ветки:
      - `mvp.implement`
      - `feature.implement`

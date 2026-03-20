@@ -35,9 +35,9 @@
 
 ## Входы команды
 
-- `madspec memory retrieve --stage security --json-output`
-- `madspec security status --json-output`
-- при наличии implementation workflow: `madspec memory retrieve --stage mvp.implement|feature.implement --json-output`
+- `madspec memory retrieve --stage security --toon-output`, если этот контекст читает агент
+- `madspec security status --toon-output`, если этот вывод читает агент
+- при наличии implementation workflow: `madspec memory retrieve --stage mvp.implement|feature.implement --toon-output`, если этот контекст читает агент
 - код, manifests, tests, architecture artifacts
 - `madspec memory capture --stage security ...`
 - `madspec memory checkpoint --stage security --summary ...`
@@ -52,7 +52,7 @@
 ## Пошаговый runtime workflow
 
 1. Агент читает security context и implementation state.
-2. Агент запускает `madspec security status --json-output` и фиксирует блокирующие, ожидающие и предупреждающие проверки, активные исключения и статус ратификации.
+2. Агент запускает `madspec security status --toon-output` и фиксирует блокирующие, ожидающие и предупреждающие проверки, активные исключения и статус ратификации.
 3. Определяет ограничения анализа: код, manifests, deployment context, tests.
 4. Выполняет audit по категориям: authn/authz, secrets, injection, dependencies, storage/transport/logging, external integrations.
 5. Отдельно проверяет privacy/data handling gaps.

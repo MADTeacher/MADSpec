@@ -43,7 +43,7 @@
 
 ## Входы команды
 
-- `madspec memory retrieve --stage mvp.plan --json-output`
+- `madspec memory retrieve --stage mvp.plan --toon-output`, если этот контекст читает агент
 - `madspec memory capture --stage mvp.plan --plan-overview ... --planning-principle ... --next-action ...`
 - `madspec memory next-step --stage mvp.plan --candidate-step ...`
 - `madspec memory register-step --stage mvp.plan ...`

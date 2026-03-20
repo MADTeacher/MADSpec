@@ -33,7 +33,7 @@ $ARGUMENTS
 - Для `mvp.concept` реальные данные этапа хранятся в `.madspec/<BRANCH>/memory/stages/mvp.concept.json`.
 - `.madspec/<BRANCH>/concept.md` является generated artifact, а не файлом для ручного редактирования.
 - Файлы `project-context.md`, `planning-context-cache.md`, `planning-context.md`, `implementation-context.md`, `review.md`, `improvements.md` считаются **generated views**, а не основными файлами данных.
-- Перед началом и после каждого подтвержденного смыслового блока используй краткий `madspec memory retrieve --stage mvp.concept --json-output` и `madspec memory capture --stage mvp.concept ...`.
+- Перед началом и после каждого подтвержденного смыслового блока используй краткий `madspec memory retrieve --stage mvp.concept --toon-output`, если этот контекст читает агент, и `madspec memory capture --stage mvp.concept ...`.
 - В `memory capture` фиксируй не только финальные выводы, но и подтвержденные по ходу диалога facts/decisions/questions/pending-actions.
 - Для полей концепции используй stage-specific flags:
   - `--project-name`
@@ -52,7 +52,7 @@ $ARGUMENTS
   - `--evidence` — ссылки на `.madspec/<BRANCH>/concept.md` и другие опорные артефакты
 - `madspec memory checkpoint` сам обновляет structured memory, затем запускает `madspec memory consolidate` и `madspec memory validate`.
 - В обычных ходах диалога опирайся на `concept_status`: какие обязательные поля еще пусты, какие уже заполнены и сколько элементов накоплено по каждому разделу.
-- Полный `artifact_state.concept` запрашивай только перед финальной валидацией, итоговым обзором для пользователя и `checkpoint`, используя `madspec memory retrieve --stage mvp.concept --json-output --full-artifact`.
+- Полный `artifact_state.concept` запрашивай только перед финальной валидацией, итоговым обзором для пользователя и `checkpoint`, используя `madspec memory retrieve --stage mvp.concept --toon-output --full-artifact`, если этот вывод читает агент.
 - Если нужного поля нет в кратком контексте или в полном `artifact_state.concept`, задай следующий вопрос пользователю и не синтезируй значение из "живого" контекста чата.
 - **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `facts`, `decisions`, `project_name`, `system_overview`, `audiences`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
 

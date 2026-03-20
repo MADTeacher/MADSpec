@@ -38,7 +38,7 @@
 ## Входы команды
 
 - пользовательский ввод с описанием идеи
-- `madspec memory retrieve --stage mvp.concept --json-output`
+- `madspec memory retrieve --stage mvp.concept --toon-output`, если этот контекст читает агент
 - `madspec memory capture --stage mvp.concept ...`
 - `madspec memory checkpoint --stage mvp.concept --summary ...`
 

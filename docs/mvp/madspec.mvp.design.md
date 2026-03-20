@@ -39,7 +39,7 @@
 ## Входы команды
 
 - пользовательские требования к UX/UI
-- `madspec memory retrieve --stage mvp.design --json-output`
+- `madspec memory retrieve --stage mvp.design --toon-output`, если этот контекст читает агент
 - `madspec memory capture --stage mvp.design ...`
 - `madspec memory checkpoint --stage mvp.design --summary ...`
 - `.madspec/templates/ui-storyboard-contract.md`

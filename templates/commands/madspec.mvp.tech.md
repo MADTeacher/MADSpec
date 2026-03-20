@@ -32,9 +32,9 @@ $ARGUMENTS
 - Каноническое состояние этапа хранится в `.madspec/<BRANCH>/memory/stages/mvp.tech.json`.
 - `.madspec/<BRANCH>/tech-stack.md` является **generated artifact**, а не primary source.
 - Нельзя редактировать `tech-stack.md` вручную и нельзя использовать его как источник истины.
-- Перед началом каждой сессии выполни `madspec memory retrieve --stage mvp.tech --json-output`.
+- Перед началом каждой сессии выполни `madspec memory retrieve --stage mvp.tech --toon-output`, если этот вывод читает агент.
 - В обычной работе опирайся на `tech_status`, а не на полный artifact state.
-- Полный `artifact_state.tech` запрашивай только перед итоговой валидацией и checkpoint через `madspec memory retrieve --stage mvp.tech --json-output --full-artifact`.
+- Полный `artifact_state.tech` запрашивай только перед итоговой валидацией и checkpoint через `madspec memory retrieve --stage mvp.tech --toon-output --full-artifact`, если этот вывод читает агент.
 - После каждого подтвержденного tech trade-off или ограничения сразу фиксируй его через `madspec memory capture --stage mvp.tech ...`.
 - Используй tech-specific flags:
   - `--project-type`
@@ -77,7 +77,7 @@ $ARGUMENTS
 1. **Восстанови контекст**:
    - Прочитай `.madspec/<BRANCH>/concept.md`.
    - Прочитай `.madspec/<BRANCH>/ui-design.md`.
-   - Выполни `madspec memory retrieve --stage mvp.tech --json-output`.
+   - Выполни `madspec memory retrieve --stage mvp.tech --toon-output`, если этот вывод читает агент.
    - Посмотри в `tech_status`, какие обязательные поля уже заполнены, а каких не хватает.
 
 2. **Собери требования и ограничения**:
@@ -96,7 +96,7 @@ $ARGUMENTS
    - После утверждения сохрани решение через `--code-organization`.
 
 5. **Валидация перед checkpoint**:
-   - Выполни `madspec memory retrieve --stage mvp.tech --json-output --full-artifact`.
+   - Выполни `madspec memory retrieve --stage mvp.tech --toon-output --full-artifact`, если этот вывод читает агент.
    - Проверь, что заполнены:
      - `projectType`
      - `stackOverview`

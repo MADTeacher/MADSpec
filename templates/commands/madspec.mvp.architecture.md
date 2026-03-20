@@ -31,9 +31,9 @@ $ARGUMENTS
 
 - Каноническое состояние этапа хранится в `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`.
 - `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/data-model.md`, `.madspec/<BRANCH>/contracts/openapi.yaml` и `project-context.md` являются generated artifacts/views и не редактируются вручную как primary source.
-- Перед началом и после каждого подтвержденного блока используй `madspec memory retrieve --stage mvp.architecture --json-output`.
+- Перед началом и после каждого подтвержденного блока используй `madspec memory retrieve --stage mvp.architecture --toon-output`, если этот контекст читает агент.
 - В обычных ходах диалога опирайся на `architecture_status`: каких обязательных полей не хватает, сколько уже есть директорий, сущностей, endpoint'ов и есть ли reference errors.
-- Полный `artifact_state.architecture` запрашивай только перед финальной валидацией, итоговым обзором и `checkpoint`, используя `madspec memory retrieve --stage mvp.architecture --json-output --full-artifact`.
+- Полный `artifact_state.architecture` запрашивай только перед финальной валидацией, итоговым обзором и `checkpoint`, используя `madspec memory retrieve --stage mvp.architecture --toon-output --full-artifact`, если этот вывод читает агент.
 - По мере согласования структуры проекта, модели данных, API-контрактов, интеграций и архитектурных принципов фиксируй их через `madspec memory capture --stage mvp.architecture ...`, а не откладывай в финальный checkpoint.
 - Считай `screen.data` из design-state списком логических field id: если нужно описать поле, держи описание в UI/design narrative или в `--endpoint-field`, а не в `--screen-data`.
 - Для architecture-specific canonical state используй stage-specific flags:

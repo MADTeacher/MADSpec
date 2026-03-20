@@ -143,6 +143,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             stage_body = zf.read(stage_command).decode("utf-8")
             assert "madspec memory checkpoint" in stage_body
             assert "madspec-cli-operator" in stage_body
+            assert "--toon-output" in stage_body
             if stage_name == "madspec.mvp.tech":
                 assert "mvp.tech.json" in stage_body
                 assert "tech_status" in stage_body
@@ -162,6 +163,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         )
         implement_body = zf.read(implement_command).decode("utf-8")
         assert "madspec memory retrieve --stage mvp.implement" in implement_body
+        assert "--toon-output" in implement_body
         assert "madspec memory start-step --stage mvp.implement" in implement_body
         assert "madspec memory checkpoint-step --stage mvp.implement" in implement_body
         assert "madspec memory complete-step --stage mvp.implement" in implement_body
@@ -178,6 +180,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         )
         feature_init_body = zf.read(feature_init_command).decode("utf-8")
         assert "madspec memory retrieve --stage feature.init" in feature_init_body
+        assert "--toon-output" in feature_init_body
         assert "madspec memory capture --stage feature.init" in feature_init_body
         assert "madspec memory checkpoint --stage feature.init" in feature_init_body
         assert "madspec-cli-operator" in feature_init_body
@@ -191,6 +194,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         )
         feature_plan_body = zf.read(feature_plan_command).decode("utf-8")
         assert "madspec memory retrieve --stage feature.plan" in feature_plan_body
+        assert "--toon-output" in feature_plan_body
         assert "madspec memory register-step --stage feature.plan" in feature_plan_body
         assert "madspec-cli-operator" in feature_plan_body
         assert ".madspec/<BRANCH>/memory/stages/feature.plan.json" in feature_plan_body
@@ -203,11 +207,31 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         )
         feature_implement_body = zf.read(feature_implement_command).decode("utf-8")
         assert "madspec memory retrieve --stage feature.implement" in feature_implement_body
+        assert "--toon-output" in feature_implement_body
         assert "madspec memory start-step --stage feature.implement" in feature_implement_body
         assert "madspec memory checkpoint-step --stage feature.implement" in feature_implement_body
         assert "madspec memory complete-step --stage feature.implement" in feature_implement_body
         assert "madspec-cli-operator" in feature_implement_body
         assert "implementation-context.md` и `project-context.md` являются generated views" in feature_implement_body
+
+        review_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.review.md") or name.endswith("madspec.review.agent.md")
+        )
+        review_body = zf.read(review_command).decode("utf-8")
+        assert "madspec memory retrieve --stage review --toon-output" in review_body
+        assert "madspec review status --toon-output" in review_body
+        assert "madspec policy validate --stage review --toon-output" in review_body
+
+        security_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.security.md") or name.endswith("madspec.security.agent.md")
+        )
+        security_body = zf.read(security_command).decode("utf-8")
+        assert "madspec memory retrieve --stage security --toon-output" in security_body
+        assert "madspec security status --toon-output" in security_body
 
     with zipfile.ZipFile(qwen_archive) as zf:
         names = set(zf.namelist())

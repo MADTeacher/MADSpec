@@ -39,13 +39,13 @@
 
 ## Входы команды
 
-- `madspec memory retrieve --stage feature.implement --json-output`
+- `madspec memory retrieve --stage feature.implement --toon-output`, если этот контекст читает агент
 - `madspec memory start-step --stage feature.implement`
 - `madspec memory checkpoint-step --stage feature.implement`
 - `madspec memory complete-step --stage feature.implement`
 - `madspec git commit --message ...`
 
-Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и policy validations. При спорном состоянии можно дополнительно выполнить `madspec policy validate --stage feature.implement --step-id <step-id> --json-output`.
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и policy validations. При спорном состоянии можно дополнительно выполнить `madspec policy validate --stage feature.implement --step-id <step-id> --toon-output`, если этот вывод читает агент.
 
 ## Пошаговый runtime workflow
 

@@ -40,13 +40,13 @@
 
 ## Входы команды
 
-- `madspec memory retrieve --stage mvp.implement --json-output`
+- `madspec memory retrieve --stage mvp.implement --toon-output`, если этот контекст читает агент
 - `madspec memory start-step --stage mvp.implement`
 - `madspec memory checkpoint-step --stage mvp.implement`
 - `madspec memory complete-step --stage mvp.implement`
 - `madspec git commit --message ...`
 
-Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и текущие policy validations. При неочевидных блокировках допускается отдельный `madspec policy validate --stage mvp.implement --step-id <step-id> --json-output`.
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и текущие policy validations. При неочевидных блокировках допускается отдельный `madspec policy validate --stage mvp.implement --step-id <step-id> --toon-output`, если этот вывод читает агент.
 
 ## Пошаговый runtime workflow
 

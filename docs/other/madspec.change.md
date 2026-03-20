@@ -28,6 +28,6 @@
 
 ## Связь с другими командами
 
-- для проверки влияния пакета изменений на `review` и `security` читай `change_context` через `madspec memory retrieve --stage review|security --json-output`
+- для проверки влияния пакета изменений на `review` и `security` читай `change_context` через `madspec memory retrieve --stage review|security --toon-output`, если этот контекст читает агент
 - для общего объяснения состояния можно использовать `madspec change summary --json-output`
 - для проверки расхождений без изменения состояния используй `madspec change verify --json-output`
