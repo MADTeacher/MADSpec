@@ -34,7 +34,7 @@ def load_subagent_template_body(subagent_id: str) -> str:
         f"Ты отвечаешь за область `{subagent_id}` в текущем продукте и репозитории.\n\n"
         "Перед началом работы получи актуальный контекст для этой роли через "
         "`madspec agents subagents context --subagent-id "
-        f"{subagent_id} --json-output`.\n"
+        f"{subagent_id} --toon-output`.\n"
     )
 
 
@@ -123,7 +123,7 @@ def render_fallback_guidance_file(environment_id: str, effective_roles: list[dic
             "",
             "## Канонический контекст",
             "",
-            "Каждая роль должна получать свой контекст через `madspec agents subagents context --subagent-id <role>`.",
+            "Каждая роль должна получать свой контекст через `madspec agents subagents context --subagent-id <role> --toon-output`.",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"

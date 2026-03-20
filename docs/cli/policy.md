@@ -57,9 +57,12 @@ madspec policy apply --proposal-id <ID>
 madspec policy validate --stage mvp.plan --json-output
 ```
 
+Если результат проверки нужен сразу агенту, можно использовать `--toon-output` вместо `--json-output`.
+
 ## Связь с `madspec memory`
 
 - `madspec memory retrieve --stage ... --json-output` теперь возвращает `policy_context`
+- `madspec policy validate --stage ... --toon-output` возвращает тот же канонический payload проверки в TOON-представлении для агентского чтения
 - `--full-artifact` дополнительно возвращает `artifact_state.policy`
 - `madspec memory validate` продолжает проверять согласованность рабочего состояния и представлений и теперь также учитывает слой правил
 

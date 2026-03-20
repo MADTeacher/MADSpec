@@ -14,7 +14,7 @@
 
 ### `mvp.concept`
 
-- В обычных ходах диалога используй краткий `madspec memory retrieve --json-output`.
+- В обычных ходах диалога, когда контекст читает агент, используй краткий `madspec memory retrieve --toon-output`; `--json-output` оставляй для машинной обработки.
 - При необходимости добавляй `--query` для смешанного поиска.
 - `--include-history` включай только при явной необходимости.
 - `--full-artifact` запрашивай только перед финальной валидацией, итоговым обзором и `checkpoint`.
@@ -22,7 +22,7 @@
 ### `mvp.design`
 
 - Для `mvp.design` считай нормой длинную итеративную работу через много независимых чатов: новый чат должен восстанавливать состояние из `.madspec/<branch>/memory/`, `ui-design.md` и `ui-prototype/`, а не из истории предыдущего разговора.
-- В начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.design --json-output`.
+- В начале каждой новой сессии выполняй `madspec memory retrieve --stage mvp.design --toon-output`.
 - Если видно, что детерминированного контекста недостаточно, используй `--query` или `madspec memory search`.
 - Затем сверяй `ui-design.md`, `.madspec/templates/ui-storyboard-contract.md` и файлы в `ui-prototype/`.
 - Не считай дизайн завершенным, пока пользователь явно не утвердил текущее состояние.
@@ -39,7 +39,7 @@
 
 ### `mvp.architecture`
 
-- В обычных ходах используй `madspec memory retrieve --stage mvp.architecture --json-output` и опирайся на `architecture_status`.
+- В обычных ходах используй `madspec memory retrieve --stage mvp.architecture --toon-output` и опирайся на `architecture_status`.
 - `--full-artifact` запрашивай только перед итоговой валидацией и `checkpoint`.
 - Источник истины — `.madspec/<branch>/memory/stages/mvp.architecture.json`, а `architecture.md`, `data-model.md` и `contracts/openapi.yaml` являются производными артефактами и не редактируются вручную.
 - У `--endpoint-field` секция `response` допустима как shorthand для `response:200`; если нужен конкретный статус ответа, используй `response:<status>`.
@@ -47,7 +47,7 @@
 
 ### `mvp.plan`
 
-- В обычных ходах используй `madspec memory retrieve --stage mvp.plan --json-output` и опирайся на `plan_status`.
+- В обычных ходах используй `madspec memory retrieve --stage mvp.plan --toon-output` и опирайся на `plan_status`.
 - `--full-artifact` запрашивай только перед итоговой валидацией и `checkpoint`.
 - Источник истины — `.madspec/<branch>/memory/stages/mvp.plan.json`, а `implementation-plan.md` и `planning-context-cache.md` являются производными артефактами и не редактируются вручную.
 - Вместе с `plan_status` всегда проверяй `policy_context`: план шага, `stepKind`, `tddPolicy` и зависимости не должны расходиться с активными обязательными правилами.
@@ -58,7 +58,7 @@
 
 ### `mvp.implement`
 
-- Перед каждой сессией запускай `madspec memory retrieve --stage mvp.implement --json-output`.
+- Перед каждой сессией запускай `madspec memory retrieve --stage mvp.implement --toon-output`.
 - Если не хватает контекста ветки, используй `--query` или `madspec memory search`.
 - Стартуй шаг через `madspec memory start-step`.
 - Фиксируй `red/green/refactor` через `madspec memory checkpoint-step`.
@@ -90,7 +90,7 @@
 
 ### `feature.implement`
 
-- Работай так же, как для `mvp.implement`: перед каждой сессией запускай `madspec memory retrieve --stage feature.implement --json-output`, затем `start-step -> checkpoint-step -> complete-step`.
+- Работай так же, как для `mvp.implement`: перед каждой сессией запускай `madspec memory retrieve --stage feature.implement --toon-output`, затем `start-step -> checkpoint-step -> complete-step`.
 
 ## Review и Security
 
@@ -99,9 +99,9 @@
 - Команда кросс-сценарная: она может запускаться после `mvp.implement` или `feature.implement`.
 - Нужно читать кодовую базу, `memory/progress.json`, `active-session.json`, `implementation-plan.md`, доступные контексты шагов и артефакты ветки.
 - Отсутствие части артефактов фиксируй как ограничение, а не как автоматический отказ.
-- Для `review` и `security` считывай `change_context` из `madspec memory retrieve --stage review|security --json-output`; если пакет изменений активен, сверяй вывод с его `title`, `summary` и списком затронутых шагов.
+- Для `review` и `security` считывай `change_context` из `madspec memory retrieve --stage review|security --toon-output`; если пакет изменений активен, сверяй вывод с его `title`, `summary` и списком затронутых шагов.
 - Перед выводами отдельно проверяй `madspec review status --json-output`: блокирующие и ожидающие проверки, а также активные исключения должны быть отражены в findings, limitations или принятых компромиссах.
-- После `madspec memory retrieve --stage review --json-output` отдельно запускай `madspec policy validate --stage review --json-output` и сопоставляй обязательные нарушения с замечаниями, подтверждения с фактами, а рекомендательные результаты — со списком улучшений или открытых вопросов.
+- После `madspec memory retrieve --stage review --toon-output` отдельно запускай `madspec policy validate --stage review --toon-output` и сопоставляй обязательные нарушения с замечаниями, подтверждения с фактами, а рекомендательные результаты — со списком улучшений или открытых вопросов.
 - Сохраняй замечания через `madspec memory capture --stage review` с сопоставлением: наблюдения и проблемы -> `--fact`, направления улучшения и компромиссы -> `--decision`, открытые вопросы -> `--question`, конкретные последующие действия -> `--pending-action`.
 
 ### `security`

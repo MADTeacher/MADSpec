@@ -7,6 +7,7 @@ import typer
 from madspec_cli.memory.domain.branch_layout import resolve_target_branch
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
+from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
 
 from .application.apply_policy import ApplyPolicyRequest, execute as apply_policy
 from .application.deprecate_policy import DeprecatePolicyRequest, execute as deprecate_policy
@@ -200,8 +201,10 @@ def validate(
     red_evidence: list[str] = typer.Option(None, "--red-evidence", help="Optional override for red evidence"),
     green_evidence: list[str] = typer.Option(None, "--green-evidence", help="Optional override for green evidence"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+    toon_output: bool = typer.Option(False, "--toon-output", help="Emit TOON for agent-oriented structured context"),
 ) -> None:
     """Validate the current branch state against effective policies."""
+    ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     payload = validate_policy(
@@ -228,6 +231,11 @@ def validate(
     ).to_payload()
     if json_output:
         emit_json(payload)
+        if not payload["valid"]:
+            raise typer.Exit(1)
+        return
+    if toon_output:
+        emit_toon(payload)
         if not payload["valid"]:
             raise typer.Exit(1)
         return

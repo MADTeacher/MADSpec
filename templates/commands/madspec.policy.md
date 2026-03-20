@@ -46,7 +46,7 @@ $ARGUMENTS
    - покажи `diff.changedFields`, предупреждения и влияние на процесс
    - дождись явного подтверждения
    - затем выполни `madspec policy apply --proposal-id <ID>` или `madspec policy set ...`
-4. После применения изменения при необходимости выполни `madspec policy validate --json-output`.
+4. После применения изменения при необходимости выполни `madspec policy validate --toon-output`, если результат должен читать агент напрямую.
 
 ## Правила
 

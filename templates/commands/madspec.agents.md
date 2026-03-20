@@ -39,7 +39,7 @@ $ARGUMENTS
 7. Для изменения набора активных ролей сначала создай proposal через `madspec agents propose-profile --json-output`.
 8. Применяй профиль только через `madspec agents apply-profile --proposal-id ... --json-output`.
 9. Для точечного включения и отключения ролей используй `madspec agents subagents enable` и `disable`.
-10. Для любой роли извлекай канонический контекст через `madspec agents subagents context --subagent-id ... --json-output`.
+10. Для любой роли извлекай канонический контекст через `madspec agents subagents context --subagent-id ... --toon-output`, а `--json-output` оставляй только для случаев, когда нужен именно JSON-контракт.
 
 ## Правила
 

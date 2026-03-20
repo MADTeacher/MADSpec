@@ -70,12 +70,15 @@ madspec gate propose-waiver \
 madspec gate apply-waiver --proposal-id <PROPOSAL_ID> --json-output
 ```
 
+Для агентского чтения статуса и объяснения можно использовать `--toon-output` вместо `--json-output`.
+
 `apply-waiver` меняет только состояние слоя проверок внутри ветки. Он не правит память, код, правила проекта и не завершает переход автоматически.
 
 ## Связь с `madspec memory`
 
 - `madspec memory register-step`, `start-step`, `checkpoint-step`, `complete-step` и `checkpoint --stage review|security` выполняют предварительную проверку через общий вычислитель контрольных проверок
 - `madspec memory explain` и `madspec memory why-next-step` возвращают `gate_summary`
+- `madspec gate status --toon-output` и `madspec gate explain --toon-output` выдают тот же payload в TOON-представлении для прямой передачи агенту
 - `project-context.md`, step contexts, `review.md` и `security-audit.md` теперь включают сводку проверок и активных исключений
 
 ## Связанные документы

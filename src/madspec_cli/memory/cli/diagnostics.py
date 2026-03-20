@@ -6,6 +6,7 @@ import typer
 
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
+from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
 
 from ..application.conflicts import MemoryConflictsRequest, execute as list_conflicts
 from ..application.doctor import MemoryDoctorRequest, execute as memory_doctor
@@ -57,8 +58,10 @@ def explain(
     include_conflicted: bool = typer.Option(False, "--include-conflicted", help="Include conflicted records"),
     include_history: bool = typer.Option(False, "--include-history", help="Include history layers in the explanation"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+    toon_output: bool = typer.Option(False, "--toon-output", help="Emit TOON for agent-oriented structured context"),
 ) -> None:
     """Explain the current stage context, policy effects, and recall influences."""
+    ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     payload = explain_state(
@@ -79,6 +82,9 @@ def explain(
     ).to_payload()
     if json_output:
         emit_json(payload)
+        return
+    if toon_output:
+        emit_toon(payload)
         return
 
     show_banner()

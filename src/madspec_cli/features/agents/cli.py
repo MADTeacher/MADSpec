@@ -8,6 +8,7 @@ from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.file_input import read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
+from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
 
 from .application.apply_profile import ApplyProfileRequest, execute as apply_profile
 from .application.create_subagent import CreateSubagentRequest, execute as create_subagent
@@ -110,7 +111,7 @@ def apply_profile_command(
             ApplyProfileRequest(project_path=Path.cwd(), proposal_id=proposal_id)
         ).to_payload()
     except Exception as exc:
-        emit_error(exc, json_output=json_output)
+        emit_error(exc, json_output=json_output, toon_output=toon_output)
         raise typer.Exit(1) from exc
     if json_output:
         emit_json(payload)
@@ -293,7 +294,9 @@ def context_command(
     stage: str = typer.Option(None, "--stage", help="Необязательная замена стадии"),
     step_id: str = typer.Option(None, "--step-id", help="Необязательный идентификатор шага"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
+    toon_output: bool = typer.Option(False, "--toon-output", help="Вывести TOON для агентского контекста"),
 ) -> None:
+    ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     try:
         payload = subagent_context(
             SubagentContextRequest(
@@ -309,6 +312,9 @@ def context_command(
         raise typer.Exit(1) from exc
     if json_output:
         emit_json(payload)
+        return
+    if toon_output:
+        emit_toon(payload)
         return
     show_banner()
     console.print(f"[cyan]Субагент:[/cyan] {payload['subagent']['subagentId']}")

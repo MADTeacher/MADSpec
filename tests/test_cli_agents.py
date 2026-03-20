@@ -140,6 +140,33 @@ def test_subagent_context_returns_role_scoped_payload(tmp_path, monkeypatch, inv
     assert "gates" in payload
 
 
+def test_subagent_context_supports_toon_output(tmp_path, monkeypatch, invoke_cli, init_memory_branch) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    from tests.support import write_madspec_config
+
+    write_madspec_config(project_path, branch="main", agent_environment="copilot")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    result = invoke_cli(
+        [
+            "agents",
+            "subagents",
+            "context",
+            "--subagent-id",
+            "security",
+            "--toon-output",
+        ]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "subagent:" in result.stdout
+    assert "branch: main" in result.stdout
+    assert "policy:" in result.stdout
+    assert "gates:" in result.stdout
+
+
 def test_agents_can_create_show_and_profile_custom_subagent(
     tmp_path,
     monkeypatch,

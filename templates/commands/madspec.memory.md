@@ -43,7 +43,7 @@ $ARGUMENTS
 
 1. Сначала определи, нужна ли общая проверка состояния, объяснение контекста стадии, история, конфликт или конкретная запись.
 2. Для общей диагностики запускай `madspec memory doctor --json-output`.
-3. Для объяснения текущего контекста стадии запускай `madspec memory explain --stage ... --json-output`.
+3. Для объяснения текущего контекста стадии запускай `madspec memory explain --stage ... --toon-output`, если вывод читает агент; `--json-output` оставляй для машинной интеграции.
 4. Для выбора следующего шага и блокировок используй `madspec memory why-next-step --stage ... --json-output`.
 5. Для истории используй `madspec memory timeline --json-output`.
 6. Для явных конфликтов используй `madspec memory conflicts --json-output`.

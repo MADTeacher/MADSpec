@@ -37,7 +37,7 @@
 
 ```bash
 madspec memory doctor --json-output
-madspec memory explain --stage mvp.plan --json-output
+madspec memory explain --stage mvp.plan --toon-output
 madspec memory why-next-step --stage mvp.implement --json-output
 madspec memory timeline --json-output
 madspec memory conflicts --json-output

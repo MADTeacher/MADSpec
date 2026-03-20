@@ -184,6 +184,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - `register-step`, `start-step`, `checkpoint-step`, `complete-step` и `checkpoint --stage review|security` сначала вычисляют общий `gate_summary`
 - если общий статус равен `blocked`, команда завершается ошибкой до изменения памяти
 - `madspec memory explain --json-output` возвращает top-level `gate_summary` и включает его в `context`
+- `madspec memory retrieve --toon-output` и `madspec memory explain --toon-output` возвращают тот же канонический payload в TOON-представлении для прямой передачи агенту
 - `madspec memory why-next-step --json-output` возвращает `gate_summary` для каждого шага вместо прежнего `policy_notes`
 - `project-context.md`, `implementation-context.md`, `review.md` и `security-audit.md` показывают производную сводку проверок и активных исключений
 
@@ -230,6 +231,12 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 ```bash
 madspec memory retrieve --stage mvp.plan --json-output
+```
+
+Если этот контекст должен читать агент, можно сразу использовать TOON:
+
+```bash
+madspec memory retrieve --stage mvp.plan --toon-output
 ```
 
 ### Посмотреть результаты поиска по явному запросу
@@ -309,6 +316,13 @@ madspec memory doctor --json-output
 madspec memory explain --stage mvp.plan --json-output
 madspec memory why-next-step --stage mvp.implement --json-output
 madspec gate status --stage mvp.implement --operation complete-step --json-output
+```
+
+Для агентского чтения того же контекста:
+
+```bash
+madspec memory explain --stage mvp.plan --toon-output
+madspec gate status --stage mvp.implement --operation complete-step --toon-output
 ```
 
 ### Посмотреть историю, конфликты и конкретную запись

@@ -150,6 +150,52 @@ def test_policy_validate_reports_required_system_rule_violations(make_madspec_pr
     assert any("must use tddPolicy='required'" in item["message"] for item in payload["violations"])
 
 
+def test_policy_validate_supports_toon_output(make_madspec_project, invoke_cli) -> None:
+    project_path = make_madspec_project()
+    ensure_memory_layout(project_path, "main")
+    paths = get_memory_paths(project_path, "main")
+    write_json(
+        paths.progress,
+        {
+            "currentImplementStep": None,
+            "completedSteps": [],
+            "plannedSteps": ["step-01-auth"],
+            "stepStatus": {"step-01-auth": {"status": "planned"}},
+            "stepMetadata": {"step-01-auth": {"kind": "code", "tddPolicy": "waived"}},
+            "coversFunctions": {"step-01-auth": {"p1": [], "p2": [], "p3": []}},
+            "planningMetadata": {
+                "lastPlannedStep": "step-01-auth",
+                "planningPhase": "initial",
+                "totalStepsEstimated": 1,
+                "stepDependencies": {},
+                "progressMetrics": {
+                    "p1Coverage": {"covered": 0, "total": 0, "percentage": 0},
+                    "p2Coverage": {"covered": 0, "total": 0, "percentage": 0},
+                    "p3Coverage": {"covered": 0, "total": 0, "percentage": 0},
+                    "overallProgress": 0,
+                },
+            },
+        },
+    )
+
+    result = invoke_cli(
+        [
+            "policy",
+            "validate",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--operation",
+            "validate",
+            "--toon-output",
+        ]
+    )
+    assert result.exit_code == 1, result.stdout
+    assert "valid: false" in result.stdout
+    assert "violations:" in result.stdout
+
+
 def test_memory_retrieve_includes_policy_context_and_policy_artifact(make_madspec_project, invoke_cli) -> None:
     project_path = make_madspec_project()
     ensure_memory_layout(project_path, "main")

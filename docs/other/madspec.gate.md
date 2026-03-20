@@ -28,8 +28,8 @@
 ## Порядок работы
 
 1. Агент определяет ветку через `madspec git current-branch`.
-2. Если нужен текущий статус, запускает `madspec gate status --json-output`.
-3. Если нужно понять причину блокировки или историю, запускает `madspec gate explain --json-output`.
+2. Если нужен текущий статус для чтения агентом, запускает `madspec gate status --toon-output`; `--json-output` оставляет для машинной интеграции.
+3. Если нужно понять причину блокировки или историю, запускает `madspec gate explain --toon-output`.
 4. Если нужно проверить конкретный переход, запускает `madspec gate run --stage ... --operation ... --step-id ... --json-output`.
 5. Если пользователь хочет смягчить допускающую исключение проверку:
    - агент создает предложение через `madspec gate propose-waiver`

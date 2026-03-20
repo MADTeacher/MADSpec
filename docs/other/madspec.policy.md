@@ -38,6 +38,6 @@
 madspec policy show --json-output
 madspec policy propose --policy-id ... --title ... --description ...
 madspec policy apply --proposal-id ...
-madspec policy validate --stage mvp.plan --json-output
+madspec policy validate --stage mvp.plan --toon-output
 madspec policy explain --policy-id ... --json-output
 ```

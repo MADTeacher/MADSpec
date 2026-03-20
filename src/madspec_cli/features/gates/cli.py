@@ -8,6 +8,7 @@ from madspec_cli.memory.domain.branch_layout import resolve_target_branch
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
+from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
 
 from .application.apply_waiver import ApplyWaiverRequest, execute as apply_waiver
 from .application.explain_gate import ExplainGateRequest, execute as explain_gate
@@ -42,8 +43,10 @@ def status(
     branch_name: str = typer.Option(None, "--branch", help="Branch name to inspect"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+    toon_output: bool = typer.Option(False, "--toon-output", help="Emit TOON for agent-oriented structured context"),
 ) -> None:
     """Show the current quality gate status without changing state."""
+    ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     try:
@@ -58,10 +61,13 @@ def status(
             )
         ).to_payload()
     except Exception as exc:
-        emit_error(exc, json_output=json_output)
+        emit_error(exc, json_output=json_output, toon_output=toon_output)
         raise typer.Exit(1) from exc
     if json_output:
         emit_json(payload)
+        return
+    if toon_output:
+        emit_toon(payload)
         return
     show_banner()
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
@@ -91,7 +97,7 @@ def run(
             )
         ).to_payload()
     except Exception as exc:
-        emit_error(exc, json_output=json_output)
+        emit_error(exc, json_output=json_output, toon_output=toon_output)
         raise typer.Exit(1) from exc
     if json_output:
         emit_json(payload)
@@ -113,8 +119,10 @@ def explain(
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier"),
     gate_id: str = typer.Option(None, "--gate-id", help="Optional gate identifier to explain"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+    toon_output: bool = typer.Option(False, "--toon-output", help="Emit TOON for agent-oriented structured context"),
 ) -> None:
     """Explain gate results together with relevant waiver and history context."""
+    ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     try:
@@ -133,6 +141,9 @@ def explain(
         raise typer.Exit(1) from exc
     if json_output:
         emit_json(payload)
+        return
+    if toon_output:
+        emit_toon(payload)
         return
     show_banner()
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
@@ -222,9 +233,17 @@ def review_status(
     branch_name: str = typer.Option(None, "--branch", help="Branch name to inspect"),
     operation: str = typer.Option("validate", "--operation", help="Transition or validation operation context"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+    toon_output: bool = typer.Option(False, "--toon-output", help="Emit TOON for agent-oriented structured context"),
 ) -> None:
     """Alias for `madspec gate status --stage review`."""
-    status(stage="review", operation=operation, branch_name=branch_name, step_id=None, json_output=json_output)
+    status(
+        stage="review",
+        operation=operation,
+        branch_name=branch_name,
+        step_id=None,
+        json_output=json_output,
+        toon_output=toon_output,
+    )
 
 
 @security_app.command("status")
@@ -232,9 +251,17 @@ def security_status(
     branch_name: str = typer.Option(None, "--branch", help="Branch name to inspect"),
     operation: str = typer.Option("validate", "--operation", help="Transition or validation operation context"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+    toon_output: bool = typer.Option(False, "--toon-output", help="Emit TOON for agent-oriented structured context"),
 ) -> None:
     """Alias for `madspec gate status --stage security`."""
-    status(stage="security", operation=operation, branch_name=branch_name, step_id=None, json_output=json_output)
+    status(
+        stage="security",
+        operation=operation,
+        branch_name=branch_name,
+        step_id=None,
+        json_output=json_output,
+        toon_output=toon_output,
+    )
 
 
 def register(app: typer.Typer) -> None:

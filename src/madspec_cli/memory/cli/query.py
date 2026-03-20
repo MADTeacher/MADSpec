@@ -6,6 +6,7 @@ import typer
 
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
+from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
 
 from ..application.retrieve_context import RetrieveMemoryContextRequest, execute as retrieve_context
 from ..domain.branch_layout import resolve_target_branch
@@ -27,8 +28,10 @@ def memory_retrieve(
     full_artifact: bool = typer.Option(False, "--full-artifact", help="Return full stage artifact state instead of summary-only context"),
     include_history: bool = typer.Option(False, "--include-history", help="Include episodes and decision log in the response"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
+    toon_output: bool = typer.Option(False, "--toon-output", help="Emit TOON for agent-oriented structured context"),
 ) -> None:
     """Retrieve minimal structured context for a stage."""
+    ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     resolved_limit = limit if limit is not None else (3 if stage.strip().lower() in {"mvp.concept", "mvp.design", "mvp.tech", "mvp.architecture", "mvp.plan", "feature.init", "feature.plan"} else 5)
@@ -52,6 +55,9 @@ def memory_retrieve(
     payload = result.to_payload()
     if json_output:
         emit_json(payload)
+        return
+    if toon_output:
+        emit_toon(payload)
         return
 
     show_banner()

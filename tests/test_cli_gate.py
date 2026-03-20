@@ -42,6 +42,21 @@ def test_gate_status_run_explain_and_stage_aliases(init_memory_branch, invoke_cl
     assert explain_payload["proposals"] == []
 
 
+def test_gate_status_and_explain_support_toon_output(init_memory_branch, invoke_cli) -> None:
+    init_memory_branch(branch="main")
+
+    status_result = invoke_cli(["gate", "status", "--branch", "main", "--stage", "review", "--toon-output"])
+    assert status_result.exit_code == 0, status_result.stdout
+    assert "stage: review" in status_result.stdout
+    assert "overall_status: pending" in status_result.stdout
+    assert "gates:" in status_result.stdout
+
+    explain_result = invoke_cli(["gate", "explain", "--branch", "main", "--stage", "review", "--toon-output"])
+    assert explain_result.exit_code == 0, explain_result.stdout
+    assert "history[0]:" in explain_result.stdout
+    assert "proposals[0]:" in explain_result.stdout
+
+
 def test_gate_waiver_flow_marks_gate_as_waived(init_memory_branch, invoke_cli) -> None:
     init_memory_branch(branch="main")
 

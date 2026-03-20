@@ -136,3 +136,42 @@ def test_memory_commands_support_validation_and_retrieve_json(make_madspec_proje
     next_step_payload = json.loads(next_step_select.stdout)
     assert next_step_payload["selected_step"] == "step-02-auth-flow"
 
+
+def test_memory_retrieve_and_explain_support_toon_output(make_madspec_project, invoke_cli) -> None:
+    project_path = make_madspec_project()
+
+    init_result = invoke_cli(["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    paths = get_memory_paths(project_path, "main")
+    append_jsonl(
+        paths["decision_log"],
+        [
+            make_record(
+                "main",
+                "mvp.plan",
+                "agent",
+                "Choose staged rollout",
+                status="validated",
+                evidence=["docs/cli/memory.md"],
+                semantic_kind="decision",
+                record_type="decision",
+            )
+        ],
+    )
+
+    retrieve_result = invoke_cli(
+        ["memory", "retrieve", "--branch", "main", "--stage", "mvp.plan", "--toon-output"]
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    assert "branch: main" in retrieve_result.stdout
+    assert "policy_context:" in retrieve_result.stdout
+    assert "semantic:" in retrieve_result.stdout
+
+    explain_result = invoke_cli(
+        ["memory", "explain", "--branch", "main", "--stage", "mvp.plan", "--toon-output"]
+    )
+    assert explain_result.exit_code == 0, explain_result.stdout
+    assert "branch: main" in explain_result.stdout
+    assert "summary:" in explain_result.stdout
+    assert "gate_summary:" in explain_result.stdout

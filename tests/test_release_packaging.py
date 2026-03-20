@@ -224,7 +224,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         qwen_subagent = zf.read(".qwen/agents/madspec-security.md").decode("utf-8")
         assert "name: Специалист по безопасности" in qwen_subagent
         assert 'tools: ["read_file", "glob", "grep_search", "run_shell_command"]' in qwen_subagent
-        assert "madspec agents subagents context --subagent-id security" in qwen_subagent
+        assert "madspec agents subagents context --subagent-id security --toon-output" in qwen_subagent
         qwen_developer = zf.read(".qwen/agents/madspec-developer.md").decode("utf-8")
         assert "name: Специалист по разработке" in qwen_developer
         assert 'tools: ["read_file", "glob", "grep_search", "edit", "write_file", "run_shell_command"]' in qwen_developer
@@ -235,7 +235,7 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         cursor_subagent = zf.read(".cursor/agents/madspec-architecture.md").decode("utf-8")
         assert "execution_mode_hint: sequential" in cursor_subagent
         assert "tools:" not in cursor_subagent
-        assert "madspec agents subagents context --subagent-id architecture" in cursor_subagent
+        assert "madspec agents subagents context --subagent-id architecture --toon-output" in cursor_subagent
         cursor_developer = zf.read(".cursor/agents/madspec-developer.md").decode("utf-8")
         assert 'dependencies: ["architecture"]' in cursor_developer
 

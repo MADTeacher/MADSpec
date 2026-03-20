@@ -41,10 +41,10 @@ $ARGUMENTS
 
 1. Сначала определи ветку через `madspec git current-branch` или используй явный `--branch`.
 2. Если пользователь хочет понять текущее состояние:
-   - используй `madspec gate status --json-output`
+   - используй `madspec gate status --toon-output`, если результат нужен агенту напрямую
    - для `review` и `security` можно использовать алиасы `madspec review status` и `madspec security status`
 3. Если пользователь спрашивает, почему переход блокируется или что означает конкретная проверка:
-   - используй `madspec gate explain --json-output`
+   - используй `madspec gate explain --toon-output`, если результат нужен агенту напрямую
 4. Если пользователь хочет проверить конкретный переход:
    - используй `madspec gate run --stage <stage> --operation <operation> --json-output`
 5. Если пользователь хочет ослабить допускающую исключение проверку:
