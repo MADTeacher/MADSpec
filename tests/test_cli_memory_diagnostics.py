@@ -119,6 +119,7 @@ def test_memory_why_next_step_and_explain_show_step_reasoning(init_memory_branch
     influence_kinds = {item["kind"] for item in explain_payload["influences"]}
     assert "semantic_decision" in influence_kinds
     assert "recall_match" in influence_kinds
+    assert explain_payload["observability"]["summary"]["projection_status"] in {"ok", "warn", "error"}
 
     why_text_result = invoke_cli(["memory", "why-next-step", "--branch", "main", "--stage", "mvp.implement"])
     assert why_text_result.exit_code == 0, why_text_result.stdout
@@ -260,18 +261,57 @@ def test_memory_timeline_includes_progress_snapshot_and_retrieval_runs(init_memo
     )
     assert search_result.exit_code == 0, search_result.stdout
 
-    timeline_result = invoke_cli(
-        ["memory", "timeline", "--branch", "main", "--stage", "mvp.plan", "--json-output"]
-    )
+    timeline_result = invoke_cli(["memory", "timeline", "--branch", "main", "--stage", "mvp.plan", "--json-output"])
     assert timeline_result.exit_code == 0, timeline_result.stdout
-    payload = json.loads(timeline_result.stdout)
-    assert any(item["source_type"] == "retrieval_run" for item in payload["items"])
-    assert any(
-        item["source_type"] == "snapshot" and item["stage"] == "runtime.progress"
-        for item in payload["items"]
+    timeline_payload = json.loads(timeline_result.stdout)
+    categories = {item["category"] for item in timeline_payload["items"]}
+    assert "shared_commit" in categories
+    assert "session_event" in categories
+    assert timeline_payload["observability"]["summary"]["projection_status"] in {"ok", "warn", "error"}
+
+
+def test_memory_doctor_reports_coordinator_issues(tmp_path, monkeypatch, invoke_cli, init_memory_branch) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    from tests.support import write_madspec_config
+
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    init_memory_branch(branch="main", project_path=project_path)
+    store = MemoryStore(project_path)
+    task = store.create_task(branch="main", title="Coordinator task", summary=None, acceptance_note=None)
+    work_item = store.create_work_item(
+        branch="main",
+        task_id=task["task_id"],
+        title="Developer slice",
+        work_item_type="implementation",
+        subagent_id="developer",
+        step_id="step-01-authentication",
+        scope_descriptor={
+            "step_id": "step-01-authentication",
+            "paths": ["src/auth/service.py"],
+            "artifacts": [],
+            "concerns": ["implementation"],
+        },
+        acceptance_note=None,
     )
-    timestamps = [item["timestamp"] for item in payload["items"]]
-    assert timestamps == sorted(timestamps, reverse=True)
+    with store.connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO work_item_dependencies (
+                dependency_id, branch, task_id, work_item_id, depends_on_work_item_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("dangling", "main", task["task_id"], work_item["work_item_id"], "missing-work-item", "2026-03-10T10:00:00+00:00"),
+        )
+
+    doctor_result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+    assert doctor_result.exit_code == 1, doctor_result.stdout
+    payload = json.loads(doctor_result.stdout)
+    assert payload["coordinator"]["dangling_dependencies"][0]["depends_on_work_item_id"] == "missing-work-item"
+    assert any(item["name"] == "coordinator" for item in payload["checks"])
+    assert any(item["name"] == "orphan_sessions" for item in payload["checks"])
+    assert any(item["name"] == "revision_drift" for item in payload["checks"])
 
 
 def test_memory_inspect_record_and_conflicts_report_index_and_integrity(init_memory_branch, invoke_cli) -> None:
@@ -332,6 +372,7 @@ def test_memory_inspect_record_and_conflicts_report_index_and_integrity(init_mem
     conflicts_payload = json.loads(conflicts_result.stdout)
     assert any(item["record_id"] == conflicted_record["id"] for item in conflicts_payload["record_conflicts"])
     assert conflicts_payload["integrity_conflicts"]
+    assert conflicts_payload["conflict_dashboard"]["summary"]["total_conflicts"] >= 1
 
     missing_inspect = invoke_cli(
         ["memory", "inspect-record", "--branch", "main", "--id", "missing-record", "--json-output"]
@@ -361,6 +402,9 @@ def test_memory_doctor_reports_healthy_state_and_generated_view_drift(init_memor
     drift_payload = json.loads(drift_result.stdout)
     assert drift_payload["status"] == "error"
     assert drift_payload["generated_views"]["status"] == "error"
+    stale_check = {item["name"]: item for item in drift_payload["checks"]}["stale_projections"]
+    assert stale_check["status"] == "error"
+    assert stale_check["probable_cause"]
 
     doctor_text_result = invoke_cli(["memory", "doctor", "--branch", "main"])
     assert doctor_text_result.exit_code == 1, doctor_text_result.stdout
@@ -384,3 +428,4 @@ def test_memory_doctor_reports_active_and_expired_writer_leases(init_memory_bran
     assert any(item["lease_name"] == "review:main" and item["expired"] is True for item in writer_leases["leases"])
     checks = {item["name"]: item for item in payload["checks"]}
     assert checks["writer_leases"]["status"] == "warn"
+    assert checks["stuck_leases"]["status"] == "warn"

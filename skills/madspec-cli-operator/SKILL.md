@@ -35,7 +35,9 @@ description: Операционный навык по MADSpec Framework и MADSp
 - Канонические данные и производные представления нельзя путать: Markdown-контекст часто является только проекцией.
 - Runtime state ветки теперь канонически хранится в `SQLite`: `progress`, stage snapshots, session-local state и runtime record streams сначала коммитятся туда, а branch files остаются производными projections. Файл `active-session.json` поддерживается только как проекция для session `active`.
 - Для многосубагентной координации поверх session-local runtime теперь есть канонические `task` и `work-item`. Их жизненный цикл ведется командами `madspec memory tasks ...` и `madspec memory work-items ...`, а `claim` расширяет session payload полями `task_id`, `work_item_id`, `subagent_id`.
+- Coordinator runtime теперь также хранит explicit зависимости между work items и scheduler hints роли (`default_stage`, `execution_mode_hint`, `subagent_dependencies`). Эти данные используются для readiness explain, а не для автоматического запуска субагентов.
 - Для claimed `work-item` mutating runtime-команды больше не являются рекомендуемым write path: такой session должен использовать `madspec memory proposals publish ...`, затем `madspec memory proposals apply --proposal-id ...`.
+- Если нужно понять, почему work item нельзя claim/apply прямо сейчас, используй `madspec memory coordinator explain --work-item-id ...` или `--session-key ...` вместо догадок по косвенным признакам.
 - Runtime state ветки имеет общую ревизию `runtime_revision`; успешные mutating команды возвращают `runtime_revision_before` и `runtime_revision_after`, а при устаревшей записи возможен structured `conflict`.
 - Для горячих write paths MADSpec использует scoped writer lease. Если mutating команда вернула `kind="scope_busy"`, это значит, что другой writer временно держит тот же hot scope; сначала дождись освобождения lease или истечения TTL, а уже потом повторяй запись.
 - Для сценария Phase 1 “реализация текущего шага и параллельное планирование следующего” совместимыми считаются `register-step(step-02)` вместе с `start-step(step-01)`, `checkpoint-step(step-01)` или `complete-step(step-01)`. Повторная запись в тот же step/catalog должна трактоваться как `conflict` или `scope_busy`, а не как неявное перетирание состояния.
@@ -46,6 +48,7 @@ description: Операционный навык по MADSpec Framework и MADSp
 - Для `mvp.design` источником утвержденного состояния служат память и связанные дизайн-артефакты; историю чата не считай источником истины.
 - Для `mvp.implement` и `feature.implement` рабочий цикл идет через `retrieve -> start-step -> checkpoint-step -> complete-step`.
 - Если несколько субагентов работают над одной задачей, сначала создай `task`, затем отдельные `work-item` с непересекающимися scopes и только после `claim` публикуй proposals от имени соответствующего session key. Direct runtime write для claimed session считай ошибкой протокола, а не shortcut.
+- Если работа одного subagent должна ждать другой кусок внутри того же task, зафиксируй это через `--depends-on-work-item`, а не только через текстовое описание в задаче.
 - Для `review` и `security` сначала проверяй статус соответствующих gate-проверок, затем формулируй выводы.
 
 ## Карта чтения

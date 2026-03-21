@@ -42,6 +42,10 @@ def doctor(
         console.print(f"- [{check['status']}] {check['name']}: {check['summary']}")
         for detail in check.get("details", [])[:5]:
             console.print(f"  - {detail}")
+        if check.get("probable_cause"):
+            console.print(f"  probable cause: {check['probable_cause']}")
+        if check.get("repair_hint"):
+            console.print(f"  repair hint: {check['repair_hint']}")
     if result.has_errors:
         raise typer.Exit(1)
 
@@ -102,6 +106,19 @@ def explain(
     console.print(f"[cyan]Gate status:[/cyan] {payload['gate_summary']['overall_status']}")
     console.print(f"[cyan]Recall triggers:[/cyan] {', '.join(payload['recall_explanation']['triggers']) or 'none'}")
     console.print(f"[cyan]Influences:[/cyan] {len(payload['influences'])}")
+    runtime_outcome = payload.get("latest_runtime_outcome")
+    if runtime_outcome:
+        console.print(
+            f"[cyan]Latest runtime outcome:[/cyan] {runtime_outcome.get('outcome')} "
+            f"({runtime_outcome.get('reason')})"
+        )
+    obs_summary = (payload.get("observability") or {}).get("summary") or {}
+    console.print(
+        f"[cyan]Observability:[/cyan] leases={obs_summary.get('active_lease_count', 0)} "
+        f"pending_proposals={obs_summary.get('pending_proposal_count', 0)} "
+        f"conflicts={obs_summary.get('conflict_count', 0)} "
+        f"projection={obs_summary.get('projection_status', 'unknown')}"
+    )
     for item in payload["influences"][:8]:
         console.print(f"- [{item['kind']}] {item['summary']}")
 
@@ -137,8 +154,9 @@ def timeline(
         console.print(f"[cyan]Step filter:[/cyan] {step_id}")
     for item in payload["items"]:
         console.print(
-            f"- {item['timestamp']} [{item['source_type']}] {item['summary']} "
-            f"(stage={item['stage'] or 'n/a'}, step={item['step_id'] or 'n/a'}, status={item['status']})"
+            f"- {item['timestamp']} [{item.get('category') or item['source_type']}] {item['summary']} "
+            f"(event={item.get('event_type') or 'n/a'}, stage={item['stage'] or 'n/a'}, "
+            f"step={item['step_id'] or 'n/a'}, status={item['status']}, reason={item.get('reason') or 'n/a'})"
         )
 
 
@@ -202,10 +220,18 @@ def conflicts(
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
     console.print(f"[cyan]Record conflicts:[/cyan] {len(payload['record_conflicts'])}")
     console.print(f"[cyan]Integrity conflicts:[/cyan] {len(payload['integrity_conflicts'])}")
+    dashboard = payload.get("conflict_dashboard") or {}
+    console.print(
+        f"[cyan]Conflict dashboard:[/cyan] proposals={len(dashboard.get('proposal_conflicts') or [])} "
+        f"projection={len(dashboard.get('projection_conflicts') or [])} "
+        f"coordinator={len(dashboard.get('coordinator_conflicts') or [])}"
+    )
     for item in payload["record_conflicts"][:10]:
         console.print(f"- [record] {item['summary']} ({item['record_id']})")
     for item in payload["integrity_conflicts"][:10]:
         console.print(f"- [integrity] {item['message']}")
+    for item in (dashboard.get("proposal_conflicts") or [])[:5]:
+        console.print(f"- [proposal] {item['summary']} cause={item['probable_cause']}")
 
 
 def inspect(

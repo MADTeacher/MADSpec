@@ -5,6 +5,7 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
+from .observability import build_runtime_observability
 from ..projection.retrieve import retrieve_memory_context
 from ..shared.storage import ensure_memory_layout
 
@@ -49,5 +50,13 @@ def execute(request: RetrieveMemoryContextRequest) -> RetrieveMemoryContextResul
         include_conflicted=request.include_conflicted,
         full_artifact=request.full_artifact,
         include_history=request.include_history,
+    )
+    payload["observability"] = build_runtime_observability(
+        request.project_path,
+        branch_name=request.branch_name,
+        session_key=request.session_key,
+        stage=request.stage,
+        step_id=payload.get("step_id"),
+        limit=request.limit,
     )
     return RetrieveMemoryContextResult(payload=payload)

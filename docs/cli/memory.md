@@ -28,10 +28,17 @@
 - Phase 1 теперь официально поддерживает сценарий: реализация текущего шага и параллельное планирование следующего, если операции попадают в совместимую матрицу `register-step(step-02)` + `start/checkpoint/complete-step(step-01)`.
 - Для базового многосубагентного сценария появился отдельный слой координации: `task` как контейнер работы и `work-item` как каноническая единица владения поверх session-local runtime.
 - Каноническое состояние координации тоже хранится в `SQLite`: таблицы `tasks`, `work_items`, `work_item_claims`, а их lifecycle events попадают в `records` со scope `work-item`.
+- Для coordinator runtime также используется явный dependency graph: `work_item_dependencies` хранит жесткие зависимости между work items внутри одного task.
 - `claim` привязывает `session_key` к `work_item_id`, записывает канонический owner вида `work-item:<subagent-id>:<session-key>` и расширяет session payload полями `task_id`, `work_item_id`, `subagent_id`.
+- Каждый work item теперь хранит snapshot scheduling hints в каноническом состоянии: `default_stage`, `execution_mode_hint`, `subagent_dependencies`.
 - Если runtime-сеанс привязан к work item, `start-step`, `checkpoint-step` и `complete-step` валидируют совпадение `step_id` с ownership binding и продвигают статус work item в `claimed`, `in_progress`, `completed`.
 - Для claimed `work-item` direct mutating runtime-команды больше не считаются допустимым write path: вместо `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` и `complete-step` такой session должен публиковать proposal и затем применять его через отдельный apply flow.
 - Proposal lifecycle теперь канонически хранится в `SQLite`: `runtime_proposals` и `runtime_proposal_events`, а related summary попадает в `retrieve`, `explain`, `agents subagents context`, `timeline` и `doctor`.
+- Coordinator readiness не хранится как отдельный persisted status: он вычисляется детерминированно при чтении на основе explicit dependencies, claim state, ownership и proposal context.
+- Для explainability и operator UX поверх canonical runtime теперь строится единый read-model `observability`: он объединяет shared branch state, session-local state, leases, proposals, ownership, conflicts и health rebuildable projections.
+- `retrieve`, `search`, `explain`, `timeline`, `doctor` и `conflicts` теперь возвращают additive observability payloads, чтобы session, task и work-item state можно было инспектировать без прямого SQL-доступа.
+- `doctor` теперь отдельно диагностирует `stale_projections`, `orphan_sessions`, `stuck_leases`, `unresolved_proposal_conflicts` и `revision_drift`, а также сообщает `probable_cause` и `repair_hint`.
+- `timeline` теперь нормализует runtime lifecycle в typed events с полями `event_type`, `category`, `reason`, `owner_id`, `session_key`, `task_id`, `work_item_id`, `proposal_id` и `scope`.
 
 ## Когда Использовать
 
@@ -111,6 +118,7 @@
 | `madspec memory tasks create --title ...` | Создать task как контейнер координации над общей веткой |
 | `madspec memory tasks list` | Показать tasks ветки и их канонический status |
 | `madspec memory work-items create --task-id ... --subagent-id ...` | Создать work item с канонической областью владения для конкретного субагента |
+| `madspec memory coordinator explain` | Объяснить readiness, ownership, зависимости и связанные proposals для task/work item/session |
 | `madspec memory work-items list` | Показать work items ветки, task или session |
 | `madspec memory work-items claim --work-item-id ... --session-key ...` | Привязать session к work item и назначить канонический owner |
 | `madspec memory work-items release --work-item-id ... --session-key ...` | Снять активный claim и очистить привязку сеанса |
@@ -133,6 +141,12 @@
 ```bash
 madspec memory tasks create --title "Coordinate auth"
 madspec memory work-items claim --work-item-id <id> --session-key <key> --subagent-id <id>
+```
+
+Для explicit зависимостей между work items:
+
+```bash
+madspec memory work-items create --task-id <task> --subagent-id developer --depends-on-work-item <work-item-id> ...
 ```
 
 ## Рекомендуемая Схема Использования
@@ -216,6 +230,15 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 - top-level `runtime_revision`
 - top-level `session_key`
+- `observability.shared_branch_state`
+- `observability.current_session_state`
+- `observability.active_leases`
+- `observability.proposal_state`
+- `observability.conflict_state`
+- `observability.ownership_state`
+- `observability.projection_health`
+- `observability.orphan_sessions`
+- `observability.summary`
 - `workflow.currentImplementStep`, `workflow.nextExecutableStep`, `workflow.lastPlannedStep`, `workflow.planningPhase`, `workflow.progressMetrics`
 - `policy_context.required[]`
 - `policy_context.advisory[]`
@@ -225,6 +248,12 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - `coordination.claim`
 - `coordination.session_binding`
 - `coordination.proposal_summary`
+- `coordination.coordinator`
+- `coordination.ownership`
+- `coordination.readiness`
+- `coordination.related_proposals`
+- `coordination.scheduler_hints`
+- `coordination.dependency_state`
 - `artifact_state.policy` при `--full-artifact`
 
 Поле `active_session` пока остается в ответе как совместимый псевдоним для уже разрешенной session payload, чтобы не ломать существующих потребителей.
@@ -242,6 +271,72 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - `last_planned_step`
 - `planning_phase`
 - `progress_metrics`
+- `latest_runtime_outcome`
+
+Дополнительно `madspec memory explain` теперь возвращает:
+
+- top-level `observability`
+- top-level `latest_runtime_outcome`
+- `context.observability`
+
+`latest_runtime_outcome` нужен для сценариев, когда нужно быстро объяснить, почему последняя запись была merge'нута, заблокирована lease-механизмом, отклонена или переведена в conflict.
+
+У `search` теперь также есть:
+
+- additive блок `observability`, чтобы оператор мог понять, связано ли отсутствие нужного результата с текущим runtime состоянием, pending proposals, conflicts или stuck leases.
+
+У `timeline` теперь каждый item дополнительно содержит:
+
+- `event_type`
+- `category`
+- `reason`
+- `owner_id`
+- `session_key`
+- `task_id`
+- `work_item_id`
+- `proposal_id`
+- `scope`
+
+Ключевые категории timeline:
+
+- `session_event`
+- `shared_commit`
+- `proposal_event`
+- `auto_merge`
+- `conflict`
+
+У `conflicts` теперь кроме legacy списков также есть:
+
+- `conflict_dashboard.record_conflicts`
+- `conflict_dashboard.proposal_conflicts`
+- `conflict_dashboard.integrity_conflicts`
+- `conflict_dashboard.projection_conflicts`
+- `conflict_dashboard.coordinator_conflicts`
+- `conflict_dashboard.summary`
+
+Каждый dashboard conflict теперь возвращает:
+
+- `kind`
+- `scope`
+- `summary`
+- `related_ids`
+- `probable_cause`
+- `repair_hint`
+
+## Observability И Диагностика
+
+Новый observability read-model нужен для того, чтобы parallel runtime не выглядел как “черный ящик”.
+
+Что можно увидеть без прямого обращения к базе:
+
+- какой сейчас `runtime_revision` и какой shared branch state считается каноническим;
+- какой session привязан к текущей работе и есть ли у него active claim;
+- кто держит hot-scope lease и не выглядит ли lease застрявшим;
+- какие proposals pending, conflicted или уже были auto-merged;
+- где конфликт находится на самом деле: в record stream, в proposal flow, в coordinator ownership или в rebuildable projections;
+- не отстают ли branch files и generated markdown от canonical `SQLite` state.
+
+Если `doctor` сообщает `revision_drift` или `stale_projections`, это означает, что canonical state уже продвинулся, а rebuildable views не были успешно обновлены. В этом случае safe path - пересобрать projections из `SQLite`, а не пытаться вручную править branch memory files.
 - `task_id`
 - `work_item_id`
 - `pending_proposals_count`
@@ -250,6 +345,24 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 В `context` команда также возвращает блок `coordination` с активными `task`, `work_item`, `claim` и привязкой сеанса, если текущий `session_key` уже связан с каноническим состоянием координации.
 Если session привязан к claimed work item, тот же блок теперь включает `proposal_summary` с pending count, последним статусом и связанными proposal id.
+Если coordinator runtime уже знает work item, тот же блок дополнительно содержит ownership/readiness/dependency details и scheduler hints, чтобы было видно, почему scope доступен, активен или заблокирован.
+
+У `madspec memory coordinator explain` есть:
+
+- `--task-id`
+- `--work-item-id`
+- `--session-key`
+- `--json-output`
+
+Команда возвращает coordinator-facing explain payload:
+
+- `task`
+- `work_item`
+- `coordinator.readiness`
+- `coordinator.ownership_state`
+- `coordinator.dependency_state`
+- `coordinator.related_proposals`
+- `coordinator.scheduler_hints`
 
 У `search` есть:
 

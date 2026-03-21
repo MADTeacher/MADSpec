@@ -9,8 +9,11 @@ from typing import Any
 
 from ...domain.work_items import (
     TASK_STATUSES,
+    TERMINAL_WORK_ITEM_STATUSES,
+    build_work_item_readiness,
     coordination_binding_from_session,
     make_work_item_owner_id,
+    normalize_scheduling_hints,
     normalize_scope_descriptor,
     validate_work_item_status,
     validate_work_item_type,
@@ -214,9 +217,23 @@ class MemoryStore:
                     session_key TEXT,
                     step_id TEXT,
                     scope_descriptor_json TEXT NOT NULL,
+                    scheduling_hints_json TEXT NOT NULL DEFAULT '{}',
                     acceptance_note TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
+                    FOREIGN KEY(task_id) REFERENCES tasks(task_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS work_item_dependencies (
+                    dependency_id TEXT PRIMARY KEY,
+                    branch TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    work_item_id TEXT NOT NULL,
+                    depends_on_work_item_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE (work_item_id, depends_on_work_item_id),
+                    FOREIGN KEY(work_item_id) REFERENCES work_items(work_item_id),
+                    FOREIGN KEY(depends_on_work_item_id) REFERENCES work_items(work_item_id),
                     FOREIGN KEY(task_id) REFERENCES tasks(task_id)
                 );
 
@@ -272,6 +289,8 @@ class MemoryStore:
                 CREATE INDEX IF NOT EXISTS idx_tasks_branch ON tasks(branch, updated_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_work_items_branch ON work_items(branch, updated_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_work_items_task ON work_items(task_id, updated_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_work_item_dependencies_task ON work_item_dependencies(task_id, work_item_id);
+                CREATE INDEX IF NOT EXISTS idx_work_item_dependencies_target ON work_item_dependencies(depends_on_work_item_id, work_item_id);
                 CREATE INDEX IF NOT EXISTS idx_runtime_proposals_branch ON runtime_proposals(branch, updated_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_runtime_proposals_work_item ON runtime_proposals(work_item_id, updated_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_runtime_proposal_events_branch ON runtime_proposal_events(branch, ts DESC);
@@ -597,6 +616,54 @@ class MemoryStore:
             return payload
         return None
 
+    def list_sessions(self, *, branch: str) -> list[dict[str, Any]]:
+        with self.connect_read_only() as conn:
+            rows = conn.execute(
+                """
+                SELECT session_key, branch, stage, current_step, payload_json, updated_at, content_hash
+                FROM sessions
+                WHERE branch = ?
+                ORDER BY updated_at DESC, session_key ASC
+                """,
+                (branch,),
+            ).fetchall()
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            if not isinstance(payload, dict):
+                payload = {}
+            items.append(
+                {
+                    "session_key": row["session_key"],
+                    "branch": row["branch"],
+                    "stage": row["stage"],
+                    "current_step": row["current_step"],
+                    "updated_at": row["updated_at"],
+                    "content_hash": row["content_hash"],
+                    "payload": payload,
+                }
+            )
+        return items
+
+    def fetch_branch_runtime_state(self, branch: str) -> dict[str, Any]:
+        with self.connect_read_only() as conn:
+            row = conn.execute(
+                """
+                SELECT branch, revision, updated_at
+                FROM branch_runtime_state
+                WHERE branch = ?
+                """,
+                (branch,),
+            ).fetchone()
+        if row is None:
+            revision = self.fetch_branch_revision(branch)
+            return {"branch": branch, "revision": revision, "updated_at": None}
+        return {
+            "branch": row["branch"],
+            "revision": int(row["revision"]),
+            "updated_at": row["updated_at"],
+        }
+
     def create_task(
         self,
         *,
@@ -665,13 +732,16 @@ class MemoryStore:
         subagent_id: str,
         step_id: str | None,
         scope_descriptor: dict[str, Any] | None,
-        acceptance_note: str | None,
+        scheduling_hints: dict[str, Any] | None = None,
+        acceptance_note: str | None = None,
+        depends_on_work_item_ids: list[str] | None = None,
         conn: sqlite3.Connection | None = None,
     ) -> dict[str, Any]:
         self.ensure_schema()
         normalized_scope = normalize_scope_descriptor(
             {**dict(scope_descriptor or {}), "step_id": step_id or dict(scope_descriptor or {}).get("step_id")}
         )
+        normalized_hints = normalize_scheduling_hints(scheduling_hints)
         normalized_type = validate_work_item_type(work_item_type)
         work_item_id = str(uuid.uuid4())
         now = _now_iso()
@@ -687,17 +757,21 @@ class MemoryStore:
             "session_key": None,
             "step_id": normalized_scope.get("step_id"),
             "scope_descriptor": normalized_scope,
+            "scheduling_hints": normalized_hints,
             "acceptance_note": _normalized_optional_text(acceptance_note),
             "created_at": now,
             "updated_at": now,
         }
+        dependency_ids = self._normalize_dependency_ids(depends_on_work_item_ids)
         if conn is not None:
             self._validate_work_item_scope_overlap(conn, payload)
+            self._validate_work_item_dependencies(conn, payload=payload, depends_on_work_item_ids=dependency_ids)
             self._upsert_work_item(conn, payload)
+            self._replace_work_item_dependencies(conn, payload=payload, depends_on_work_item_ids=dependency_ids)
             self._recompute_task_status(conn, task_id=task_id)
             self._record_work_item_event(
                 conn,
-                payload=payload,
+                payload={**payload, "depends_on_work_item_ids": dependency_ids},
                 event_type="work-item.created",
                 summary=f"Created work item {payload['title']}",
             )
@@ -705,11 +779,17 @@ class MemoryStore:
         with self.connect() as managed_conn:
             managed_conn.execute("BEGIN IMMEDIATE")
             self._validate_work_item_scope_overlap(managed_conn, payload)
+            self._validate_work_item_dependencies(
+                managed_conn,
+                payload=payload,
+                depends_on_work_item_ids=dependency_ids,
+            )
             self._upsert_work_item(managed_conn, payload)
+            self._replace_work_item_dependencies(managed_conn, payload=payload, depends_on_work_item_ids=dependency_ids)
             self._recompute_task_status(managed_conn, task_id=task_id)
             self._record_work_item_event(
                 managed_conn,
-                payload=payload,
+                payload={**payload, "depends_on_work_item_ids": dependency_ids},
                 event_type="work-item.created",
                 summary=f"Created work item {payload['title']}",
             )
@@ -735,7 +815,8 @@ class MemoryStore:
             rows = conn.execute(
                 f"""
                 SELECT work_item_id, task_id, branch, title, type, status, subagent_id, owner_id,
-                       session_key, step_id, scope_descriptor_json, acceptance_note, created_at, updated_at
+                       session_key, step_id, scope_descriptor_json, scheduling_hints_json,
+                       acceptance_note, created_at, updated_at
                 FROM work_items
                 WHERE {' AND '.join(clauses)}
                 ORDER BY updated_at DESC, work_item_id DESC
@@ -834,6 +915,85 @@ class MemoryStore:
         with self.connect_read_only() as managed_conn:
             return self._fetch_active_claim_for_work_item(managed_conn, work_item_id=work_item_id)
 
+    def list_work_item_dependencies(
+        self,
+        *,
+        task_id: str | None = None,
+        work_item_id: str | None = None,
+        branch: str | None = None,
+    ) -> list[dict[str, Any]]:
+        self.ensure_schema()
+        clauses = ["1 = 1"]
+        params: list[Any] = []
+        if branch is not None:
+            clauses.append("branch = ?")
+            params.append(branch)
+        if task_id is not None:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        if work_item_id is not None:
+            clauses.append("work_item_id = ?")
+            params.append(work_item_id)
+        with self.connect_read_only() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT dependency_id, branch, task_id, work_item_id, depends_on_work_item_id, created_at
+                FROM work_item_dependencies
+                WHERE {' AND '.join(clauses)}
+                ORDER BY created_at ASC, dependency_id ASC
+                """,
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def explain_work_item(
+        self,
+        *,
+        branch: str,
+        work_item_id: str,
+        session_key: str | None = None,
+    ) -> dict[str, Any] | None:
+        self.ensure_schema()
+        work_item = self.fetch_work_item(work_item_id)
+        if work_item is None or work_item["branch"] != branch:
+            return None
+        active_claim = self.fetch_active_claim_for_work_item(work_item_id=work_item_id)
+        dependency_edges = self.list_work_item_dependencies(task_id=work_item["task_id"], work_item_id=work_item_id)
+        dependency_items = []
+        for edge in dependency_edges:
+            dependency = self.fetch_work_item(str(edge["depends_on_work_item_id"]))
+            if dependency is not None:
+                dependency_items.append(dependency)
+        related_proposals = self.list_runtime_proposals(branch=branch, work_item_id=work_item_id, limit=20)
+        readiness = build_work_item_readiness(
+            work_item=work_item,
+            dependencies=dependency_items,
+            active_claim=active_claim,
+            related_proposals=related_proposals,
+        )
+        ownership_state = {
+            "has_claim": active_claim is not None,
+            "claim": active_claim,
+            "owner_id": work_item.get("owner_id"),
+            "session_key": work_item.get("session_key"),
+            "subagent_id": work_item.get("subagent_id"),
+            "session_matches": bool(session_key and work_item.get("session_key") == session_key),
+        }
+        return {
+            "task_id": work_item["task_id"],
+            "work_item_id": work_item["work_item_id"],
+            "session_key": session_key,
+            "work_item": work_item,
+            "readiness": {
+                "status": readiness["readiness_status"],
+                "blocked_reasons": readiness["blocked_reasons"],
+            },
+            "dependency_state": readiness["dependency_state"],
+            "ownership_state": ownership_state,
+            "related_proposals": readiness["related_proposals"],
+            "scheduler_hints": readiness["scheduler_hints"],
+        }
+
     def fetch_session_coordination(
         self,
         *,
@@ -855,8 +1015,14 @@ class MemoryStore:
         if task is None and work_item is not None:
             task = self.fetch_task(str(work_item["task_id"]))
         proposal_summary = None
+        coordinator = None
         if work_item is not None:
             proposal_summary = self.summarize_runtime_proposals(
+                branch=branch,
+                work_item_id=str(work_item["work_item_id"]),
+                session_key=session_key,
+            )
+            coordinator = self.explain_work_item(
                 branch=branch,
                 work_item_id=str(work_item["work_item_id"]),
                 session_key=session_key,
@@ -867,6 +1033,7 @@ class MemoryStore:
             "work_item": work_item,
             "task": task,
             "proposal_summary": proposal_summary,
+            "coordinator": coordinator,
         }
 
     def _upsert_task(self, conn: sqlite3.Connection, payload: dict[str, Any]) -> None:
@@ -930,8 +1097,9 @@ class MemoryStore:
             """
             INSERT INTO work_items (
                 work_item_id, task_id, branch, title, type, status, subagent_id, owner_id,
-                session_key, step_id, scope_descriptor_json, acceptance_note, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                session_key, step_id, scope_descriptor_json, scheduling_hints_json,
+                acceptance_note, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(work_item_id) DO UPDATE SET
                 task_id=excluded.task_id,
                 branch=excluded.branch,
@@ -943,6 +1111,7 @@ class MemoryStore:
                 session_key=excluded.session_key,
                 step_id=excluded.step_id,
                 scope_descriptor_json=excluded.scope_descriptor_json,
+                scheduling_hints_json=excluded.scheduling_hints_json,
                 acceptance_note=excluded.acceptance_note,
                 updated_at=excluded.updated_at
             """,
@@ -958,6 +1127,7 @@ class MemoryStore:
                 _normalized_optional_text(payload.get("session_key")),
                 _normalized_optional_text(payload.get("step_id")) or _normalized_optional_text(normalized_scope.get("step_id")),
                 _dump_json(normalized_scope),
+                _dump_json(normalize_scheduling_hints(payload.get("scheduling_hints"))),
                 _normalized_optional_text(payload.get("acceptance_note")),
                 str(payload["created_at"]),
                 str(payload["updated_at"]),
@@ -968,7 +1138,8 @@ class MemoryStore:
         row = conn.execute(
             """
             SELECT work_item_id, task_id, branch, title, type, status, subagent_id, owner_id,
-                   session_key, step_id, scope_descriptor_json, acceptance_note, created_at, updated_at
+                   session_key, step_id, scope_descriptor_json, scheduling_hints_json,
+                   acceptance_note, created_at, updated_at
             FROM work_items
             WHERE work_item_id = ?
             """,
@@ -991,6 +1162,7 @@ class MemoryStore:
             "session_key": row["session_key"],
             "step_id": row["step_id"],
             "scope_descriptor": normalize_scope_descriptor(json.loads(row["scope_descriptor_json"])),
+            "scheduling_hints": normalize_scheduling_hints(json.loads(row["scheduling_hints_json"] or "{}")),
             "acceptance_note": row["acceptance_note"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
@@ -1013,11 +1185,23 @@ class MemoryStore:
                 f"work item '{work_item_id}' is assigned to subagent '{work_item['subagent_id']}', not '{subagent_id}'"
             )
         active_for_work_item = self._fetch_active_claim_for_work_item(conn, work_item_id=work_item_id)
-        if active_for_work_item is not None:
-            raise ValueError(f"work item '{work_item_id}' is already claimed by session '{active_for_work_item['session_key']}'")
         active_for_session = self._fetch_active_claim_for_session(conn, branch=branch, session_key=session_key)
         if active_for_session is not None:
             raise ValueError(f"session '{session_key}' already claims work item '{active_for_session['work_item_id']}'")
+        readiness = self._build_work_item_read_model(conn, work_item=work_item, session_key=session_key)
+        if readiness["readiness"]["status"] == "blocked":
+            return {
+                **work_item,
+                "accepted": False,
+                "reason": "readiness_blocked",
+                "readiness": readiness["readiness"],
+                "dependency_state": readiness["dependency_state"],
+                "ownership_state": readiness["ownership_state"],
+                "related_proposals": readiness["related_proposals"],
+                "scheduler_hints": readiness["scheduler_hints"],
+            }
+        if active_for_work_item is not None:
+            raise ValueError(f"work item '{work_item_id}' is already claimed by session '{active_for_work_item['session_key']}'")
 
         owner_id = make_work_item_owner_id(subagent_id=subagent_id, session_key=session_key)
         claimed_at = _now_iso()
@@ -1171,17 +1355,27 @@ class MemoryStore:
             return
         rows = conn.execute(
             """
-            SELECT status, session_key
+            SELECT work_item_id, task_id, branch, title, type, status, subagent_id, owner_id,
+                   session_key, step_id, scope_descriptor_json, scheduling_hints_json,
+                   acceptance_note, created_at, updated_at
             FROM work_items
             WHERE task_id = ?
             """,
             (task_id,),
         ).fetchall()
-        work_items = [dict(row) for row in rows]
-        if work_items and all(item["status"] == "completed" for item in work_items):
+        work_items = [self._work_item_from_row(row) for row in rows]
+        ready_count = 0
+        if work_items:
+            for item in work_items:
+                read_model = self._build_work_item_read_model(conn, work_item=item, session_key=item.get("session_key"))
+                if read_model["readiness"]["status"] == "ready":
+                    ready_count += 1
+        if work_items and all(item["status"] in TERMINAL_WORK_ITEM_STATUSES for item in work_items):
             status = "completed"
         elif any(item["status"] in {"claimed", "in_progress"} for item in work_items):
             status = "active"
+        elif work_items and ready_count == 0:
+            status = "blocked"
         else:
             status = "open"
         if status == task["status"]:
@@ -1206,7 +1400,8 @@ class MemoryStore:
         rows = conn.execute(
             """
             SELECT work_item_id, task_id, branch, title, type, status, subagent_id, owner_id,
-                   session_key, step_id, scope_descriptor_json, acceptance_note, created_at, updated_at
+                   session_key, step_id, scope_descriptor_json, scheduling_hints_json,
+                   acceptance_note, created_at, updated_at
             FROM work_items
             WHERE branch = ? AND step_id = ? AND status != 'completed'
             """,
@@ -1222,6 +1417,146 @@ class MemoryStore:
                     raise ValueError(
                         f"work item scope overlaps with '{existing['work_item_id']}' on step '{step_id}' via {key}"
                     )
+
+    def _normalize_dependency_ids(self, depends_on_work_item_ids: list[str] | None) -> list[str]:
+        unique: list[str] = []
+        seen: set[str] = set()
+        for item in depends_on_work_item_ids or []:
+            normalized = str(item or "").strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            unique.append(normalized)
+        return unique
+
+    def _validate_work_item_dependencies(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        payload: dict[str, Any],
+        depends_on_work_item_ids: list[str],
+    ) -> None:
+        for dependency_id in depends_on_work_item_ids:
+            if dependency_id == payload["work_item_id"]:
+                raise ValueError("work item cannot depend on itself")
+            dependency = self._fetch_work_item(conn, dependency_id)
+            if dependency is None:
+                raise ValueError(f"dependency work item '{dependency_id}' was not found")
+            if dependency["task_id"] != payload["task_id"]:
+                raise ValueError("work item dependencies must belong to the same task")
+            if dependency["branch"] != payload["branch"]:
+                raise ValueError("work item dependencies must belong to the same branch")
+
+    def _replace_work_item_dependencies(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        payload: dict[str, Any],
+        depends_on_work_item_ids: list[str],
+    ) -> None:
+        conn.execute(
+            "DELETE FROM work_item_dependencies WHERE work_item_id = ?",
+            (str(payload["work_item_id"]),),
+        )
+        created_at = _now_iso()
+        for dependency_id in depends_on_work_item_ids:
+            conn.execute(
+                """
+                INSERT INTO work_item_dependencies (
+                    dependency_id, branch, task_id, work_item_id, depends_on_work_item_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    str(payload["branch"]),
+                    str(payload["task_id"]),
+                    str(payload["work_item_id"]),
+                    str(dependency_id),
+                    created_at,
+                ),
+            )
+
+    def _list_work_item_dependencies_for_conn(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        task_id: str | None = None,
+        work_item_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses = ["1 = 1"]
+        params: list[Any] = []
+        if task_id is not None:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        if work_item_id is not None:
+            clauses.append("work_item_id = ?")
+            params.append(work_item_id)
+        rows = conn.execute(
+            f"""
+            SELECT dependency_id, branch, task_id, work_item_id, depends_on_work_item_id, created_at
+            FROM work_item_dependencies
+            WHERE {' AND '.join(clauses)}
+            ORDER BY created_at ASC, dependency_id ASC
+            """,
+            params,
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def _build_work_item_read_model(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        work_item: dict[str, Any],
+        session_key: str | None,
+    ) -> dict[str, Any]:
+        active_claim = self._fetch_active_claim_for_work_item(conn, work_item_id=str(work_item["work_item_id"]))
+        dependency_edges = self._list_work_item_dependencies_for_conn(
+            conn,
+            task_id=str(work_item["task_id"]),
+            work_item_id=str(work_item["work_item_id"]),
+        )
+        dependency_items = []
+        for edge in dependency_edges:
+            dependency = self._fetch_work_item(conn, str(edge["depends_on_work_item_id"]))
+            if dependency is not None:
+                dependency_items.append(dependency)
+        related_proposals = [
+            self._runtime_proposal_from_row(row)
+            for row in conn.execute(
+                """
+                SELECT * FROM runtime_proposals
+                WHERE branch = ? AND work_item_id = ?
+                ORDER BY updated_at DESC, proposal_id DESC
+                LIMIT 20
+                """,
+                (str(work_item["branch"]), str(work_item["work_item_id"])),
+            ).fetchall()
+        ]
+        readiness = build_work_item_readiness(
+            work_item=work_item,
+            dependencies=dependency_items,
+            active_claim=active_claim,
+            related_proposals=related_proposals,
+        )
+        ownership_state = {
+            "has_claim": active_claim is not None,
+            "claim": active_claim,
+            "owner_id": work_item.get("owner_id"),
+            "session_key": work_item.get("session_key"),
+            "subagent_id": work_item.get("subagent_id"),
+            "session_matches": bool(session_key and work_item.get("session_key") == session_key),
+        }
+        return {
+            "work_item": work_item,
+            "readiness": {
+                "status": readiness["readiness_status"],
+                "blocked_reasons": readiness["blocked_reasons"],
+            },
+            "dependency_state": readiness["dependency_state"],
+            "ownership_state": ownership_state,
+            "related_proposals": readiness["related_proposals"],
+            "scheduler_hints": readiness["scheduler_hints"],
+        }
 
     def _record_task_event(
         self,
@@ -1242,6 +1577,7 @@ class MemoryStore:
                 "stage": "coordination",
                 "status": "validated",
                 "summary": summary,
+                "evidence": [],
                 "payload": {"event_type": event_type, "task": payload},
                 "source": event_type,
                 "ts": _now_iso(),
@@ -1268,6 +1604,7 @@ class MemoryStore:
                 "step_id": _normalized_optional_text(payload.get("step_id")),
                 "status": "validated",
                 "summary": summary,
+                "evidence": [],
                 "payload": {"event_type": event_type, "work_item": payload},
                 "source": event_type,
                 "ts": _now_iso(),
@@ -2571,6 +2908,31 @@ class MemoryStore:
             table_name="records",
             column_name="record_stream",
             ddl="TEXT",
+        )
+        self._ensure_column(
+            conn,
+            table_name="work_items",
+            column_name="scheduling_hints_json",
+            ddl="TEXT NOT NULL DEFAULT '{}'",
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS work_item_dependencies (
+                dependency_id TEXT PRIMARY KEY,
+                branch TEXT NOT NULL,
+                task_id TEXT NOT NULL,
+                work_item_id TEXT NOT NULL,
+                depends_on_work_item_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE (work_item_id, depends_on_work_item_id)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_work_item_dependencies_task ON work_item_dependencies(task_id, work_item_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_work_item_dependencies_target ON work_item_dependencies(depends_on_work_item_id, work_item_id)"
         )
 
     def _ensure_column(

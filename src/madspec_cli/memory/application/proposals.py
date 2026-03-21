@@ -10,7 +10,7 @@ from madspec_cli.shared.kernel.result import PayloadResult
 from ..semantic.capture import capture_stage_memory
 from ..semantic.checkpoint import checkpoint_stage_memory
 from ..shared.storage import now_iso
-from ..shared.system_store.canonical_state import load_canonical_branch_state
+from ..shared.system_store.canonical_state import load_canonical_branch_state, refresh_branch_file_projections
 from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
 from ..shared.system_store.store import MemoryStore
 from ..workflow.implementation import (
@@ -118,6 +118,7 @@ def publish(request: PublishProposalRequest) -> ProposalResult:
         summary=f"Published {normalized_type} proposal",
         payload={"proposal_type": normalized_type, "target_scope": proposal["target_scope"]},
     )
+    refresh_branch_file_projections(request.project_path, request.branch_name)
     return ProposalResult(payload={"proposal": proposal})
 
 
@@ -143,11 +144,17 @@ def preview(request: PreviewProposalRequest) -> ProposalResult:
     )
     current_revision = store.fetch_branch_revision(proposal["branch"])
     ownership = _ownership_state(proposal, coordination)
+    coordinator = store.explain_work_item(
+        branch=proposal["branch"],
+        work_item_id=proposal["work_item_id"],
+        session_key=proposal["session_key"],
+    )
     return ProposalResult(
         payload={
             "proposal": proposal,
             "current_revision": current_revision,
             "ownership": ownership,
+            "coordinator": coordinator,
             "events": store.list_runtime_proposal_events(proposal_id=proposal["proposal_id"], limit=20),
             "summary": _proposal_summary(proposal),
         }
@@ -181,7 +188,60 @@ def apply(request: ApplyProposalRequest) -> ProposalResult:
             summary="Rejected proposal because ownership binding is no longer valid",
             payload=updated["apply_summary"],
         )
+        refresh_branch_file_projections(request.project_path, proposal["branch"])
         return ProposalResult(payload={"proposal": updated, "accepted": False})
+
+    coordinator = store.explain_work_item(
+        branch=proposal["branch"],
+        work_item_id=proposal["work_item_id"],
+        session_key=proposal["session_key"],
+    )
+    if coordinator is not None and (coordinator.get("readiness") or {}).get("status") == "blocked":
+        apply_payload = {
+            "accepted": False,
+            "kind": "blocked",
+            "reason_code": "coordinator_readiness_blocked",
+            "coordinator": coordinator,
+        }
+        updated = _transition_proposal(
+            proposal,
+            status="rejected",
+            apply_summary={"result": apply_payload, "reason": "readiness_blocked"},
+            rejected_at=now_iso(),
+        )
+        store.upsert_runtime_proposal(updated)
+        _record_proposal_event(
+            store,
+            updated,
+            event_type="proposal.rejected",
+            summary="Rejected proposal because coordinator readiness is blocked",
+            payload=updated["apply_summary"],
+        )
+        refresh_branch_file_projections(request.project_path, proposal["branch"])
+        return ProposalResult(payload={"proposal": updated, "apply_result": apply_payload, "accepted": False})
+    if coordinator is not None and (coordinator.get("dependency_state") or {}).get("unmet_dependencies"):
+        apply_payload = {
+            "accepted": False,
+            "kind": "blocked",
+            "reason_code": "coordinator_readiness_blocked",
+            "coordinator": coordinator,
+        }
+        updated = _transition_proposal(
+            proposal,
+            status="rejected",
+            apply_summary={"result": apply_payload, "reason": "readiness_blocked"},
+            rejected_at=now_iso(),
+        )
+        store.upsert_runtime_proposal(updated)
+        _record_proposal_event(
+            store,
+            updated,
+            event_type="proposal.rejected",
+            summary="Rejected proposal because coordinator readiness is blocked",
+            payload=updated["apply_summary"],
+        )
+        refresh_branch_file_projections(request.project_path, proposal["branch"])
+        return ProposalResult(payload={"proposal": updated, "apply_result": apply_payload, "accepted": False})
 
     current_revision = store.fetch_branch_revision(proposal["branch"])
     if proposal["proposal_type"] in {"runtime_step_update", "artifact_update"} and current_revision != int(
@@ -212,6 +272,7 @@ def apply(request: ApplyProposalRequest) -> ProposalResult:
             summary="Conflict while applying proposal because base revision is stale",
             payload=updated["apply_summary"],
         )
+        refresh_branch_file_projections(request.project_path, proposal["branch"])
         return ProposalResult(payload={"proposal": updated, "apply_result": apply_payload, "accepted": False})
 
     apply_payload = _apply_proposal_payload(request.project_path, proposal)
@@ -233,6 +294,7 @@ def apply(request: ApplyProposalRequest) -> ProposalResult:
             summary=f"Applied {proposal['proposal_type']} proposal",
             payload=updated["apply_summary"],
         )
+        refresh_branch_file_projections(request.project_path, proposal["branch"])
         return ProposalResult(payload={"proposal": updated, "apply_result": apply_payload, "accepted": True})
 
     next_status = "conflict" if apply_payload.get("kind") in {"conflict", "scope_busy"} else "rejected"
@@ -254,6 +316,7 @@ def apply(request: ApplyProposalRequest) -> ProposalResult:
         summary=f"{next_status.title()} proposal during apply",
         payload=updated["apply_summary"],
     )
+    refresh_branch_file_projections(request.project_path, proposal["branch"])
     return ProposalResult(payload={"proposal": updated, "apply_result": apply_payload, "accepted": False})
 
 
@@ -423,6 +486,10 @@ def _record_proposal_event(
                 "event_type": event_type,
                 "proposal_id": proposal["proposal_id"],
                 "proposal_type": proposal["proposal_type"],
+                "session_key": proposal["session_key"],
+                "owner_id": proposal["owner_id"],
+                "task_id": proposal["task_id"],
+                "work_item_id": proposal["work_item_id"],
                 "step_id": (proposal.get("target_scope") or {}).get("step_id"),
                 **payload,
             },

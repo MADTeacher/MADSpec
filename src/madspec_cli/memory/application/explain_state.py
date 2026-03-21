@@ -8,6 +8,7 @@ from madspec_cli.features.gates.application.common import evaluate_gate_context
 from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
 from madspec_cli.shared.kernel.result import PayloadResult
 
+from .observability import build_runtime_observability
 from .retrieve_context import RetrieveMemoryContextRequest, execute as retrieve_context
 from .why_next_step import WhyNextStepRequest, execute as explain_next_step
 
@@ -94,6 +95,16 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
     workflow = context["workflow"]
     active_session = context["active_session"]
     proposal_summary = ((context.get("coordination") or {}).get("proposal_summary")) or {}
+    coordinator = ((context.get("coordination") or {}).get("coordinator")) or {}
+    observability = context.get("observability") or build_runtime_observability(
+        request.project_path,
+        branch_name=request.branch_name,
+        session_key=request.session_key,
+        stage=request.stage,
+        step_id=context.get("step_id"),
+        limit=request.limit,
+    )
+    latest_runtime_outcome = _latest_runtime_outcome(observability)
     summary = {
         "stage": request.stage,
         "step_id": context.get("step_id"),
@@ -114,6 +125,8 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
         "pending_proposals_count": proposal_summary.get("pending_count", 0),
         "last_proposal_status": proposal_summary.get("last_proposal_status"),
         "related_proposal_ids": proposal_summary.get("related_proposal_ids", []),
+        "coordinator_readiness": ((context.get("coordination") or {}).get("readiness") or {}).get("status"),
+        "latest_runtime_outcome": latest_runtime_outcome,
     }
 
     return ExplainStateResult(
@@ -130,13 +143,17 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
                 "stage_memory": context["stage_memory"],
                 "semantic": context["semantic"],
                 "coordination": context.get("coordination"),
+                "coordinator": coordinator,
                 "change_context": context.get("change_context"),
                 "status_views": status_views,
                 "gate_summary": gate_summary,
+                "observability": observability,
             },
             "influences": influences,
             "gate_summary": gate_summary,
             "policy_effects": context["policy_context"],
+            "observability": observability,
+            "latest_runtime_outcome": latest_runtime_outcome,
             "recall_explanation": {
                 "query": context["recall"].get("query"),
                 "resolved_query": context["recall"].get("resolved_query"),
@@ -224,3 +241,46 @@ def _record_influence(kind: str, item: dict[str, Any], why: str) -> dict[str, An
         "summary": item.get("summary"),
         "why": why,
     }
+
+
+def _latest_runtime_outcome(observability: dict[str, Any]) -> dict[str, Any] | None:
+    proposal_state = observability.get("proposal_state") or {}
+    latest = proposal_state.get("latest")
+    if latest is not None:
+        apply_summary = latest.get("apply_summary") or {}
+        result = apply_summary.get("result") or {}
+        kind = result.get("kind")
+        if latest.get("status") == "applied":
+            return {
+                "outcome": "merged",
+                "reason": apply_summary.get("reason") or "applied",
+                "proposal_id": latest.get("proposal_id"),
+            }
+        if kind == "scope_busy":
+            return {
+                "outcome": "blocked_by_lease",
+                "reason": apply_summary.get("reason") or "scope_conflict",
+                "proposal_id": latest.get("proposal_id"),
+            }
+        if latest.get("status") == "conflict":
+            return {
+                "outcome": "conflict",
+                "reason": apply_summary.get("reason") or "conflict",
+                "proposal_id": latest.get("proposal_id"),
+            }
+        if latest.get("status") == "rejected":
+            return {
+                "outcome": "rejected",
+                "reason": apply_summary.get("reason") or "rejected",
+                "proposal_id": latest.get("proposal_id"),
+            }
+
+    stuck_leases = ((observability.get("active_leases") or {}).get("stuck")) or []
+    if stuck_leases:
+        lease = stuck_leases[0]
+        return {
+            "outcome": "blocked_by_lease",
+            "reason": "stuck_lease",
+            "lease_name": lease.get("lease_name"),
+        }
+    return None

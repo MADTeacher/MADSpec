@@ -186,6 +186,29 @@ def test_memory_proposals_publish_list_preview_apply_plan_change(
     assert apply_payload["proposal"]["status"] == "applied"
     assert apply_payload["apply_result"]["accepted"] is True
 
+    explain_result = invoke_cli(
+        [
+            "memory",
+            "explain",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--session-key",
+            "impl",
+            "--json-output",
+        ]
+    )
+    assert explain_result.exit_code == 0, explain_result.stdout
+    explain_payload = json.loads(explain_result.stdout)
+    assert explain_payload["latest_runtime_outcome"]["outcome"] == "merged"
+    assert explain_payload["observability"]["proposal_state"]["latest"]["status"] == "applied"
+
+    timeline_result = invoke_cli(["memory", "timeline", "--branch", "main", "--json-output"])
+    assert timeline_result.exit_code == 0, timeline_result.stdout
+    timeline_payload = json.loads(timeline_result.stdout)
+    assert any(item["category"] == "auto_merge" for item in timeline_payload["items"])
+
     retrieve_result = invoke_cli(
         [
             "memory",
@@ -546,3 +569,129 @@ def test_memory_proposals_show_up_in_timeline_and_doctor(
     assert preview_result.exit_code == 0, preview_result.stdout
     preview_payload = json.loads(preview_result.stdout)
     assert preview_payload["proposal"]["work_item_id"] == work_item_payload["work_item"]["work_item_id"]
+
+
+def test_memory_proposal_apply_rejected_when_coordinator_readiness_is_blocked(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = _setup_claimed_work_item(tmp_path, monkeypatch, invoke_cli, init_memory_branch)
+    branch_dir = project_path / ".madspec" / "main"
+    write_concept_markdown(branch_dir, variant="auth_profile_export")
+    sync_result = invoke_cli(["memory", "init", "--branch", "main"])
+    assert sync_result.exit_code == 0, sync_result.stdout
+    create_step_artifacts(branch_dir, "step-01-authentication")
+
+    task_result = invoke_cli(["memory", "tasks", "create", "--branch", "main", "--title", "Coordinate auth", "--json-output"])
+    task_payload = json.loads(task_result.stdout)
+    dependency_result = invoke_cli(
+        [
+            "memory",
+            "work-items",
+            "create",
+            "--branch",
+            "main",
+            "--task-id",
+            task_payload["task"]["task_id"],
+            "--title",
+            "Architecture slice",
+            "--type",
+            "architecture",
+            "--subagent-id",
+            "architecture",
+            "--step-id",
+            "step-01-authentication",
+            "--path",
+            "src/auth/contracts.py",
+            "--json-output",
+        ]
+    )
+    dependency_payload = json.loads(dependency_result.stdout)
+    blocker_result = invoke_cli(
+        [
+            "memory",
+            "work-items",
+            "create",
+            "--branch",
+            "main",
+            "--task-id",
+            task_payload["task"]["task_id"],
+            "--title",
+            "Testing blocker",
+            "--type",
+            "testing",
+            "--subagent-id",
+            "testing",
+            "--step-id",
+            "step-01-authentication",
+            "--path",
+            "tests/test_auth.py",
+            "--json-output",
+        ]
+    )
+    claim_result = invoke_cli(
+        [
+            "memory",
+            "work-items",
+            "claim",
+            "--branch",
+            "main",
+            "--work-item-id",
+            dependency_payload["work_item"]["work_item_id"],
+            "--session-key",
+            "arch",
+            "--subagent-id",
+            "architecture",
+            "--json-output",
+        ]
+    )
+    assert claim_result.exit_code == 0, claim_result.stdout
+
+    store = MemoryStore(project_path)
+    ts = store.fetch_branch_revision("main")
+    publish_result = invoke_cli(
+        [
+            "memory",
+            "proposals",
+            "publish",
+            "--branch",
+            "main",
+            "--type",
+            "semantic_update",
+            "--session-key",
+            "arch",
+            "--subagent-id",
+            "architecture",
+            "--base-revision",
+            str(ts),
+            "--payload-json",
+            json.dumps({"stage": "mvp.architecture", "operation": "capture", "facts": ["Contract updated"]}),
+            "--target-scope-json",
+            json.dumps({"scope": "work-item", "step_id": "step-01-authentication"}),
+            "--json-output",
+        ]
+    )
+    proposal_id = json.loads(publish_result.stdout)["proposal"]["proposal_id"]
+    blocker_payload = json.loads(blocker_result.stdout)
+    with store.connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO work_item_dependencies (
+                dependency_id, branch, task_id, work_item_id, depends_on_work_item_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "proposal-blocker",
+                "main",
+                task_payload["task"]["task_id"],
+                dependency_payload["work_item"]["work_item_id"],
+                blocker_payload["work_item"]["work_item_id"],
+                "2026-03-10T10:00:00+00:00",
+            ),
+        )
+    apply_result = invoke_cli(["memory", "proposals", "apply", "--proposal-id", proposal_id, "--json-output"])
+    assert apply_result.exit_code == 1, apply_result.stdout
+    payload = json.loads(apply_result.stdout)
+    assert payload["proposal"]["apply_summary"]["reason"] == "readiness_blocked"

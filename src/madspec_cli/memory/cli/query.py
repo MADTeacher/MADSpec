@@ -4,6 +4,7 @@ from pathlib import Path
 
 import typer
 
+from ..application.observability import build_runtime_observability
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
@@ -74,6 +75,10 @@ def memory_retrieve(
     console.print(f"[cyan]Policies:[/cyan] required={len(payload['policy_context']['required'])} advisory={len(payload['policy_context']['advisory'])}")
     console.print(f"[cyan]Episodes:[/cyan] {len(payload['episodes'])}")
     console.print(f"[cyan]Recall matches:[/cyan] {len(payload['recall']['merged'])}")
+    summary = (payload.get("observability") or {}).get("summary") or {}
+    console.print(f"[cyan]Active leases:[/cyan] {summary.get('active_lease_count', 0)}")
+    console.print(f"[cyan]Pending proposals:[/cyan] {summary.get('pending_proposal_count', 0)}")
+    console.print(f"[cyan]Conflicts:[/cyan] {summary.get('conflict_count', 0)}")
 
 
 def memory_search(
@@ -110,6 +115,14 @@ def memory_search(
         include_conflicted=include_conflicted,
         active_session=active_session,
     )
+    payload["observability"] = build_runtime_observability(
+        project_path,
+        branch_name=target_branch,
+        session_key=session_key,
+        stage=stage,
+        step_id=step_id,
+        limit=recall_limit,
+    )
 
     if json_output:
         emit_json(payload)
@@ -125,6 +138,8 @@ def memory_search(
     console.print(f"[cyan]Lexical:[/cyan] {len(payload['lexical_matches'])}")
     console.print(f"[cyan]Semantic:[/cyan] {len(payload['semantic_matches'])}")
     console.print(f"[cyan]Merged:[/cyan] {len(payload['merged'])}")
+    summary = (payload.get("observability") or {}).get("summary") or {}
+    console.print(f"[cyan]Runtime summary:[/cyan] leases={summary.get('active_lease_count', 0)} proposals={summary.get('pending_proposal_count', 0)} conflicts={summary.get('conflict_count', 0)}")
     for item in payload["merged"]:
         console.print(
             f"- [{item['source_type']}] {item['summary']} "

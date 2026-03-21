@@ -16,7 +16,7 @@ def validate_record(record: dict[str, Any], *, allow_semantic_kind: bool = True)
         errors.append("evidence must be a list")
     if "step_id" in record and record["step_id"] is not None and not isinstance(record["step_id"], str):
         errors.append("step_id must be a string or null")
-    if "scope" in record and record["scope"] not in {"project", "branch", "step", "feature"}:
+    if "scope" in record and record["scope"] not in {"project", "branch", "step", "feature", "work-item"}:
         errors.append(f"invalid scope '{record['scope']}'")
     if not allow_semantic_kind and "semantic_kind" in record:
         errors.append("semantic_kind is not allowed in this record set")

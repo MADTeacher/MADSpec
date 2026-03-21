@@ -183,10 +183,16 @@ JSON-файл должен содержать:
 - `claim`
 - `session_binding`
 - `proposal_summary`
+- `coordinator`
+- `ownership`
+- `readiness`
+- `related_proposals`
+- `scheduler_hints`
+- `dependency_state`
 
 При необходимости этот же координационный контекст можно жестко зафиксировать через `--task-id` и `--work-item-id`.
 
-Если claimed session уже работает внутри task coordination, summary proposals помогает понять, есть ли pending apply, последний статус и какие `proposal_id` сейчас связаны с work item. Это read-only срез, а не coordinator runtime.
+Если claimed session уже работает внутри task coordination, summary proposals помогает понять, есть ли pending apply, последний статус и какие `proposal_id` сейчас связаны с work item. Coordinator block дополнительно объясняет readiness, ownership и hard dependencies. Это read-only explain/export слой поверх coordinator runtime, а не process runner.
 
 Так как `madspec memory retrieve` теперь возвращает также `runtime_revision`, субагент может использовать этот номер как основу для последующих mutating memory-команд. Если после чтения контекста роль должна вызвать `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` или `complete-step`, в automation- и multi-agent сценариях стоит передавать `--expected-revision`, чтобы запись не затерла более свежее состояние ветки.
 
@@ -194,13 +200,13 @@ JSON-файл должен содержать:
 
 Для hot write paths одного `--expected-revision` теперь недостаточно: `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` могут вернуть `kind="scope_busy"`, если другой writer уже удерживает scoped lease на тот же runtime scope. Это временная занятость scope, а не ревизионный конфликт, и именно поэтому в контракте фигурирует payload kind `` `scope_busy` ``.
 
-В текущей реализации это по-прежнему граница экспорта контекста для конкретной роли и текущего runtime state ветки. Команда умеет читать уже существующую привязку `task` / `work-item`, но жизненный цикл состояния координации создается и изменяется не здесь, а через `madspec memory tasks ...` и `madspec memory work-items ...`.
+В текущей реализации это по-прежнему граница экспорта контекста для конкретной роли и текущего runtime state ветки. Команда умеет читать уже существующую привязку `task` / `work-item` и coordinator readiness, но жизненный цикл состояния координации создается и изменяется не здесь, а через `madspec memory tasks ...`, `madspec memory work-items ...`, `madspec memory proposals ...` и `madspec memory coordinator explain`.
 
 ## Встроенные И Запасные Адаптеры
 
 В v1 MADSpec не реализует собственный диспетчер субагентов. Он управляет только каноническим состоянием и адаптерами среды.
 
-Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`, и proposal-based commit flow тоже уже доступен через `madspec memory proposals ...`. Следующей отдельной фазой roadmap остается coordinator runtime и более широкий orchestration protocol.
+Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`, и теперь он расширен до coordinator runtime с explicit dependencies, readiness explain и proposal-based commit flow. Он по-прежнему не запускает субагентов сам и остается каноническим orchestration protocol для внешней среды.
 
 - Встроенные адаптеры: Cursor, GitHub Copilot, OpenCode, Qwen Code
 - Запасные адаптеры: Kilo Code, Roo Code, SourceCraft

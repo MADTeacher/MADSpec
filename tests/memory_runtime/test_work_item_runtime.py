@@ -210,3 +210,50 @@ def test_claim_binds_session_and_complete_step_closes_work_item(memory_project) 
         )
     ).to_payload()
     assert released["session"]["work_item_id"] is None
+
+
+def test_work_item_dependencies_drive_readiness_and_task_status(memory_project) -> None:
+    store = MemoryStore(memory_project.project_path)
+    task = store.create_task(
+        branch="main",
+        title="Coordinator task",
+        summary=None,
+        acceptance_note=None,
+    )
+    first = store.create_work_item(
+        branch="main",
+        task_id=task["task_id"],
+        title="Architecture slice",
+        work_item_type="architecture",
+        subagent_id="architecture",
+        step_id="step-01-authentication",
+        scope_descriptor={
+            "step_id": "step-01-authentication",
+            "paths": ["src/auth/contracts.py"],
+            "artifacts": [],
+            "concerns": ["architecture"],
+        },
+        acceptance_note=None,
+    )
+    second = store.create_work_item(
+        branch="main",
+        task_id=task["task_id"],
+        title="Developer slice",
+        work_item_type="implementation",
+        subagent_id="developer",
+        step_id="step-01-authentication",
+        scope_descriptor={
+            "step_id": "step-01-authentication",
+            "paths": ["src/auth/service.py"],
+            "artifacts": [],
+            "concerns": ["implementation"],
+        },
+        acceptance_note=None,
+        depends_on_work_item_ids=[first["work_item_id"]],
+    )
+
+    explained = store.explain_work_item(branch="main", work_item_id=second["work_item_id"], session_key="impl")
+    assert explained is not None
+    assert explained["readiness"]["status"] == "blocked"
+    assert explained["dependency_state"]["unmet_dependencies"][0]["work_item_id"] == first["work_item_id"]
+    assert store.fetch_task(task["task_id"])["status"] == "open"

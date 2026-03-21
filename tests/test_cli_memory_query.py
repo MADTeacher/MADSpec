@@ -76,6 +76,8 @@ def test_memory_commands_support_validation_and_retrieve_json(
     assert payload["recall"]["resolved_query"] == "Validated planning decision"
     assert payload["recall"]["semantic_enabled"] is False
     assert payload["recall"]["merged"][0]["summary"] == "Validated planning decision"
+    assert payload["observability"]["shared_branch_state"]["runtime_revision"] >= 0
+    assert payload["observability"]["summary"]["projection_status"] in {"ok", "warn", "error"}
 
     search_result = invoke_cli(
         [
@@ -95,6 +97,8 @@ def test_memory_commands_support_validation_and_retrieve_json(
     assert search_payload["runtime_revision"] >= 0
     assert search_payload["exact_matches"]
     assert search_payload["merged"][0]["summary"] == "Validated planning decision"
+    assert search_payload["observability"]["summary"]["pending_proposal_count"] >= 0
+    assert "current_session_state" in search_payload["observability"]
 
     next_step_candidate = invoke_cli(
         [
