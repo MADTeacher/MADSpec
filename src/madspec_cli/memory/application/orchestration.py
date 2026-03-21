@@ -202,5 +202,6 @@ def resolve_coordination_context(request: CoordinationContextRequest) -> Coordin
             "work_item": work_item,
             "claim": claim,
             "session_binding": resolved["session_binding"],
+            "proposal_summary": resolved.get("proposal_summary"),
         }
     )

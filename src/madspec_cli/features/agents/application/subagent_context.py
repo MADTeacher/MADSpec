@@ -86,6 +86,7 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
             "session_key": request.session_key,
             "memory": memory_context,
             "coordination": coordination,
+            "proposal_summary": (coordination or {}).get("proposal_summary"),
             "policy": policy,
             "gates": gates,
             "change": change,

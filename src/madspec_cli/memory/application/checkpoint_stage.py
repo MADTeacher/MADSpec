@@ -7,6 +7,7 @@ from typing import Any
 from madspec_cli.features.gates.application.common import evaluate_gate_context, gate_failure_messages
 from madspec_cli.shared.kernel.result import PayloadResult
 
+from .proposal_guard import guard_direct_runtime_write
 from ..semantic.checkpoint import checkpoint_stage_memory
 
 
@@ -29,6 +30,14 @@ class CheckpointStageResult(PayloadResult):
 
 
 def execute(request: CheckpointStageRequest) -> CheckpointStageResult:
+    blocked = guard_direct_runtime_write(
+        request.project_path,
+        branch_name=request.branch_name,
+        session_key=request.session_key,
+        command_name="checkpoint",
+    )
+    if blocked is not None:
+        return CheckpointStageResult(payload=blocked)
     if request.stage.strip().lower() in {"review", "security"}:
         gate_payload = evaluate_gate_context(
             request.project_path,

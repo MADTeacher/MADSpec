@@ -21,7 +21,7 @@ def _invoke_help(invoke_cli, command: str):
 def test_parallel_memory_contract_manifest_matches_runtime_baseline(repo_root, invoke_cli) -> None:
     manifest = _load_manifest(repo_root)
 
-    assert manifest["epic"] == "epic-6-task-work-item-model"
+    assert manifest["epic"] == "epic-7-proposal-based-commit-flow"
     assert manifest["roadmap_document"] == "dev/parallel-memory-roadmap.md"
     assert manifest["scope"] == "docs+contracts+behavior"
     assert manifest["behavior_change"] is True
@@ -52,6 +52,11 @@ def test_parallel_memory_contract_manifest_matches_runtime_baseline(repo_root, i
     release_help = _invoke_help(invoke_cli, "madspec memory work-items release")
     assert release_help.exit_code == 0, release_help.stdout
     assert "--session-key" in release_help.stdout
+    proposal_publish_help = _invoke_help(invoke_cli, "madspec memory proposals publish")
+    assert proposal_publish_help.exit_code == 0, proposal_publish_help.stdout
+    assert "--base-revision" in proposal_publish_help.stdout
+    proposal_apply_help = _invoke_help(invoke_cli, "madspec memory proposals apply")
+    assert proposal_apply_help.exit_code == 0, proposal_apply_help.stdout
 
 
 def test_parallel_memory_contract_manifest_imports_request_models(repo_root) -> None:
@@ -121,8 +126,11 @@ def test_parallel_memory_docs_describe_current_runtime_truth(repo_root) -> None:
     assert "`madspec memory explain`" in memory_docs
     assert "`madspec memory tasks create`" in memory_docs
     assert "`madspec memory work-items claim`" in memory_docs
+    assert "`madspec memory proposals publish`" in memory_docs
+    assert "`runtime_proposals`" in memory_docs
     assert "`coordination`" in memory_docs
     assert "Базовый слой координации с `task` и `work-item` уже реализован" in agents_docs
+    assert "`proposal_summary`" in agents_docs
     assert "`--session-key`" in agents_docs
     assert "`--task-id`" in agents_docs
     assert "`--work-item-id`" in agents_docs

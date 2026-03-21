@@ -6,6 +6,7 @@ from typing import Any
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
+from .proposal_guard import guard_direct_runtime_write
 from ..shared.storage import ensure_memory_layout
 from ..workflow.implementation import checkpoint_implementation_step, complete_implementation_step, start_implementation_step
 
@@ -29,6 +30,14 @@ class ImplementationStepResult(PayloadResult):
 
 def start(request: ImplementationStepRequest) -> ImplementationStepResult:
     ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
+    blocked = guard_direct_runtime_write(
+        request.project_path,
+        branch_name=request.branch_name,
+        session_key=request.session_key,
+        command_name="start-step",
+    )
+    if blocked is not None:
+        return ImplementationStepResult(payload=blocked)
     payload = start_implementation_step(
         request.project_path,
         request.branch_name,
@@ -42,6 +51,14 @@ def start(request: ImplementationStepRequest) -> ImplementationStepResult:
 
 def checkpoint(request: ImplementationStepRequest) -> ImplementationStepResult:
     ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
+    blocked = guard_direct_runtime_write(
+        request.project_path,
+        branch_name=request.branch_name,
+        session_key=request.session_key,
+        command_name="checkpoint-step",
+    )
+    if blocked is not None:
+        return ImplementationStepResult(payload=blocked)
     payload = checkpoint_implementation_step(
         request.project_path,
         request.branch_name,
@@ -55,6 +72,14 @@ def checkpoint(request: ImplementationStepRequest) -> ImplementationStepResult:
 
 def complete(request: ImplementationStepRequest) -> ImplementationStepResult:
     ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
+    blocked = guard_direct_runtime_write(
+        request.project_path,
+        branch_name=request.branch_name,
+        session_key=request.session_key,
+        command_name="complete-step",
+    )
+    if blocked is not None:
+        return ImplementationStepResult(payload=blocked)
     payload = complete_implementation_step(
         request.project_path,
         request.branch_name,

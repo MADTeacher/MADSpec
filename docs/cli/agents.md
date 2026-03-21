@@ -182,8 +182,11 @@ JSON-файл должен содержать:
 - `work_item`
 - `claim`
 - `session_binding`
+- `proposal_summary`
 
 При необходимости этот же координационный контекст можно жестко зафиксировать через `--task-id` и `--work-item-id`.
+
+Если claimed session уже работает внутри task coordination, summary proposals помогает понять, есть ли pending apply, последний статус и какие `proposal_id` сейчас связаны с work item. Это read-only срез, а не coordinator runtime.
 
 Так как `madspec memory retrieve` теперь возвращает также `runtime_revision`, субагент может использовать этот номер как основу для последующих mutating memory-команд. Если после чтения контекста роль должна вызвать `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` или `complete-step`, в automation- и multi-agent сценариях стоит передавать `--expected-revision`, чтобы запись не затерла более свежее состояние ветки.
 
@@ -197,7 +200,7 @@ JSON-файл должен содержать:
 
 В v1 MADSpec не реализует собственный диспетчер субагентов. Он управляет только каноническим состоянием и адаптерами среды.
 
-Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`. Следующие фазы roadmap по-прежнему остаются впереди: proposal-based commits, coordinator runtime и расширенная multi-agent диагностика.
+Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`, и proposal-based commit flow тоже уже доступен через `madspec memory proposals ...`. Следующей отдельной фазой roadmap остается coordinator runtime и более широкий orchestration protocol.
 
 - Встроенные адаптеры: Cursor, GitHub Copilot, OpenCode, Qwen Code
 - Запасные адаптеры: Kilo Code, Roo Code, SourceCraft

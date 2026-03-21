@@ -30,6 +30,8 @@
 - Каноническое состояние координации тоже хранится в `SQLite`: таблицы `tasks`, `work_items`, `work_item_claims`, а их lifecycle events попадают в `records` со scope `work-item`.
 - `claim` привязывает `session_key` к `work_item_id`, записывает канонический owner вида `work-item:<subagent-id>:<session-key>` и расширяет session payload полями `task_id`, `work_item_id`, `subagent_id`.
 - Если runtime-сеанс привязан к work item, `start-step`, `checkpoint-step` и `complete-step` валидируют совпадение `step_id` с ownership binding и продвигают статус work item в `claimed`, `in_progress`, `completed`.
+- Для claimed `work-item` direct mutating runtime-команды больше не считаются допустимым write path: вместо `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` и `complete-step` такой session должен публиковать proposal и затем применять его через отдельный apply flow.
+- Proposal lifecycle теперь канонически хранится в `SQLite`: `runtime_proposals` и `runtime_proposal_events`, а related summary попадает в `retrieve`, `explain`, `agents subagents context`, `timeline` и `doctor`.
 
 ## Когда Использовать
 
@@ -112,6 +114,17 @@
 | `madspec memory work-items list` | Показать work items ветки, task или session |
 | `madspec memory work-items claim --work-item-id ... --session-key ...` | Привязать session к work item и назначить канонический owner |
 | `madspec memory work-items release --work-item-id ... --session-key ...` | Снять активный claim и очистить привязку сеанса |
+
+### Команды Proposal Flow
+
+| Команда | Назначение |
+| --- | --- |
+| `madspec memory proposals publish --type ... --payload-json ...` | Опубликовать typed proposal вместо direct write для claimed work item |
+| `madspec memory proposals list` | Показать proposals ветки, task, work item или session |
+| `madspec memory proposals preview --proposal-id ...` | Показать proposal, ownership state, base revision и события lifecycle |
+| `madspec memory proposals apply --proposal-id ...` | Применить proposal к каноническому runtime или перевести его в `conflict` / `rejected` |
+
+Базовые точки входа proposal flow: `madspec memory proposals publish` и `madspec memory proposals apply`.
 
 Минимальный синтаксис:
 
@@ -211,6 +224,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - `coordination.work_item`
 - `coordination.claim`
 - `coordination.session_binding`
+- `coordination.proposal_summary`
 - `artifact_state.policy` при `--full-artifact`
 
 Поле `active_session` пока остается в ответе как совместимый псевдоним для уже разрешенной session payload, чтобы не ломать существующих потребителей.
@@ -230,8 +244,12 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - `progress_metrics`
 - `task_id`
 - `work_item_id`
+- `pending_proposals_count`
+- `last_proposal_status`
+- `related_proposal_ids`
 
 В `context` команда также возвращает блок `coordination` с активными `task`, `work_item`, `claim` и привязкой сеанса, если текущий `session_key` уже связан с каноническим состоянием координации.
+Если session привязан к claimed work item, тот же блок теперь включает `proposal_summary` с pending count, последним статусом и связанными proposal id.
 
 У `search` есть:
 

@@ -234,9 +234,47 @@ class MemoryStore:
                     FOREIGN KEY(task_id) REFERENCES tasks(task_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS runtime_proposals (
+                    proposal_id TEXT PRIMARY KEY,
+                    branch TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    work_item_id TEXT NOT NULL,
+                    proposal_type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    session_key TEXT NOT NULL,
+                    subagent_id TEXT NOT NULL,
+                    owner_id TEXT NOT NULL,
+                    base_revision INTEGER NOT NULL,
+                    target_scope_json TEXT NOT NULL,
+                    conflict_hints_json TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    apply_summary_json TEXT,
+                    content_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    applied_at TEXT,
+                    rejected_at TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS runtime_proposal_events (
+                    event_id TEXT PRIMARY KEY,
+                    proposal_id TEXT NOT NULL,
+                    branch TEXT NOT NULL,
+                    task_id TEXT,
+                    work_item_id TEXT,
+                    event_type TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    ts TEXT NOT NULL,
+                    FOREIGN KEY(proposal_id) REFERENCES runtime_proposals(proposal_id)
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_tasks_branch ON tasks(branch, updated_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_work_items_branch ON work_items(branch, updated_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_work_items_task ON work_items(task_id, updated_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_runtime_proposals_branch ON runtime_proposals(branch, updated_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_runtime_proposals_work_item ON runtime_proposals(work_item_id, updated_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_runtime_proposal_events_branch ON runtime_proposal_events(branch, ts DESC);
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_work_item_claims_active_work_item
                     ON work_item_claims(work_item_id)
                     WHERE released_at IS NULL;
@@ -816,11 +854,19 @@ class MemoryStore:
             task = self.fetch_task(binding["task_id"])
         if task is None and work_item is not None:
             task = self.fetch_task(str(work_item["task_id"]))
+        proposal_summary = None
+        if work_item is not None:
+            proposal_summary = self.summarize_runtime_proposals(
+                branch=branch,
+                work_item_id=str(work_item["work_item_id"]),
+                session_key=session_key,
+            )
         return {
             "session_binding": binding,
             "claim": claim,
             "work_item": work_item,
             "task": task,
+            "proposal_summary": proposal_summary,
         }
 
     def _upsert_task(self, conn: sqlite3.Connection, payload: dict[str, Any]) -> None:
@@ -1606,6 +1652,7 @@ class MemoryStore:
         sessions: list[dict[str, Any]],
         records: list[dict[str, Any]],
         work_items: list[dict[str, Any]],
+        artifacts: list[dict[str, Any]],
         branch_revision_after: int,
         conn: sqlite3.Connection | None = None,
     ) -> None:
@@ -1617,6 +1664,7 @@ class MemoryStore:
                 sessions=sessions,
                 records=records,
                 work_items=work_items,
+                artifacts=artifacts,
                 branch_revision_after=branch_revision_after,
             )
             return
@@ -1629,6 +1677,7 @@ class MemoryStore:
                 sessions=sessions,
                 records=records,
                 work_items=work_items,
+                artifacts=artifacts,
                 branch_revision_after=branch_revision_after,
             )
 
@@ -1641,6 +1690,7 @@ class MemoryStore:
         sessions: list[dict[str, Any]],
         records: list[dict[str, Any]],
         work_items: list[dict[str, Any]],
+        artifacts: list[dict[str, Any]],
         branch_revision_after: int,
     ) -> None:
         for snapshot in stage_snapshots:
@@ -1657,6 +1707,17 @@ class MemoryStore:
                 branch=branch,
                 session_key=str(session["session_key"]),
                 payload=dict(session["payload"]),
+            )
+        for artifact in artifacts:
+            payload = dict(artifact)
+            self._upsert_artifact(
+                conn,
+                artifact_id=str(payload["artifact_id"]),
+                branch=branch,
+                stage=_normalized_optional_text(payload.get("stage")),
+                path=str(payload["path"]),
+                content=str(payload["content"]),
+                updated_at=str(payload["updated_at"]),
             )
         touched_tasks: set[str] = set()
         for work_item in work_items:
@@ -1945,12 +2006,264 @@ class MemoryStore:
             ).fetchone()
         return int(row["count"]) if row is not None else 0
 
+    def upsert_runtime_proposal(self, proposal: dict[str, Any]) -> None:
+        self.ensure_schema()
+        payload_json = _dump_json(proposal.get("payload") or {})
+        target_scope_json = _dump_json(proposal.get("target_scope") or {})
+        conflict_hints_json = _dump_json(proposal.get("conflict_hints") or {})
+        apply_summary_json = (
+            _dump_json(proposal.get("apply_summary") or {})
+            if proposal.get("apply_summary") is not None
+            else None
+        )
+        content_hash = _content_hash(
+            _dump_json(
+                {
+                    "payload": proposal.get("payload") or {},
+                    "target_scope": proposal.get("target_scope") or {},
+                    "conflict_hints": proposal.get("conflict_hints") or {},
+                    "status": proposal.get("status"),
+                    "apply_summary": proposal.get("apply_summary"),
+                }
+            )
+        )
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO runtime_proposals (
+                    proposal_id, branch, task_id, work_item_id, proposal_type, status,
+                    session_key, subagent_id, owner_id, base_revision, target_scope_json,
+                    conflict_hints_json, payload_json, apply_summary_json, content_hash,
+                    created_at, updated_at, applied_at, rejected_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(proposal_id) DO UPDATE SET
+                    branch=excluded.branch,
+                    task_id=excluded.task_id,
+                    work_item_id=excluded.work_item_id,
+                    proposal_type=excluded.proposal_type,
+                    status=excluded.status,
+                    session_key=excluded.session_key,
+                    subagent_id=excluded.subagent_id,
+                    owner_id=excluded.owner_id,
+                    base_revision=excluded.base_revision,
+                    target_scope_json=excluded.target_scope_json,
+                    conflict_hints_json=excluded.conflict_hints_json,
+                    payload_json=excluded.payload_json,
+                    apply_summary_json=excluded.apply_summary_json,
+                    content_hash=excluded.content_hash,
+                    created_at=excluded.created_at,
+                    updated_at=excluded.updated_at,
+                    applied_at=excluded.applied_at,
+                    rejected_at=excluded.rejected_at
+                """,
+                (
+                    str(proposal.get("proposal_id") or ""),
+                    str(proposal.get("branch") or ""),
+                    str(proposal.get("task_id") or ""),
+                    str(proposal.get("work_item_id") or ""),
+                    str(proposal.get("proposal_type") or ""),
+                    str(proposal.get("status") or "pending"),
+                    str(proposal.get("session_key") or ""),
+                    str(proposal.get("subagent_id") or ""),
+                    str(proposal.get("owner_id") or ""),
+                    int(proposal.get("base_revision") or 0),
+                    target_scope_json,
+                    conflict_hints_json,
+                    payload_json,
+                    apply_summary_json,
+                    content_hash,
+                    str(proposal.get("created_at") or _now_iso()),
+                    str(proposal.get("updated_at") or _now_iso()),
+                    _normalized_optional_text(proposal.get("applied_at")),
+                    _normalized_optional_text(proposal.get("rejected_at")),
+                ),
+            )
+
+    def fetch_runtime_proposal(self, proposal_id: str) -> dict[str, Any] | None:
+        self.ensure_schema()
+        with self.connect_read_only() as conn:
+            row = conn.execute(
+                "SELECT * FROM runtime_proposals WHERE proposal_id = ?",
+                (proposal_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._runtime_proposal_from_row(row)
+
+    def list_runtime_proposals(
+        self,
+        *,
+        branch: str | None = None,
+        task_id: str | None = None,
+        work_item_id: str | None = None,
+        session_key: str | None = None,
+        statuses: list[str] | None = None,
+        proposal_types: list[str] | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        self.ensure_schema()
+        clauses = ["1 = 1"]
+        params: list[Any] = []
+        if branch is not None:
+            clauses.append("branch = ?")
+            params.append(branch)
+        if task_id is not None:
+            clauses.append("task_id = ?")
+            params.append(task_id)
+        if work_item_id is not None:
+            clauses.append("work_item_id = ?")
+            params.append(work_item_id)
+        if session_key is not None:
+            clauses.append("session_key = ?")
+            params.append(session_key)
+        if statuses:
+            placeholders = ", ".join("?" for _ in statuses)
+            clauses.append(f"status IN ({placeholders})")
+            params.extend(statuses)
+        if proposal_types:
+            placeholders = ", ".join("?" for _ in proposal_types)
+            clauses.append(f"proposal_type IN ({placeholders})")
+            params.extend(proposal_types)
+        with self.connect_read_only() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM runtime_proposals
+                WHERE {' AND '.join(clauses)}
+                ORDER BY updated_at DESC, proposal_id DESC
+                LIMIT ?
+                """,
+                (*params, limit),
+            ).fetchall()
+        return [self._runtime_proposal_from_row(row) for row in rows]
+
+    def append_runtime_proposal_event(self, event: dict[str, Any]) -> None:
+        self.ensure_schema()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO runtime_proposal_events (
+                    event_id, proposal_id, branch, task_id, work_item_id, event_type,
+                    summary, payload_json, ts
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(event.get("event_id") or ""),
+                    str(event.get("proposal_id") or ""),
+                    str(event.get("branch") or ""),
+                    _normalized_optional_text(event.get("task_id")),
+                    _normalized_optional_text(event.get("work_item_id")),
+                    str(event.get("event_type") or ""),
+                    str(event.get("summary") or ""),
+                    _dump_json(event.get("payload") or {}),
+                    str(event.get("ts") or _now_iso()),
+                ),
+            )
+
+    def list_runtime_proposal_events(
+        self,
+        *,
+        branch: str | None = None,
+        proposal_id: str | None = None,
+        work_item_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        self.ensure_schema()
+        clauses = ["1 = 1"]
+        params: list[Any] = []
+        if branch is not None:
+            clauses.append("branch = ?")
+            params.append(branch)
+        if proposal_id is not None:
+            clauses.append("proposal_id = ?")
+            params.append(proposal_id)
+        if work_item_id is not None:
+            clauses.append("work_item_id = ?")
+            params.append(work_item_id)
+        with self.connect_read_only() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM runtime_proposal_events
+                WHERE {' AND '.join(clauses)}
+                ORDER BY ts DESC, event_id DESC
+                LIMIT ?
+                """,
+                (*params, limit),
+            ).fetchall()
+        return [
+            {
+                "event_id": row["event_id"],
+                "proposal_id": row["proposal_id"],
+                "branch": row["branch"],
+                "task_id": row["task_id"],
+                "work_item_id": row["work_item_id"],
+                "event_type": row["event_type"],
+                "summary": row["summary"],
+                "payload": json.loads(row["payload_json"]),
+                "ts": row["ts"],
+            }
+            for row in rows
+        ]
+
+    def summarize_runtime_proposals(
+        self,
+        *,
+        branch: str,
+        work_item_id: str,
+        session_key: str | None = None,
+    ) -> dict[str, Any]:
+        proposals = self.list_runtime_proposals(
+            branch=branch,
+            work_item_id=work_item_id,
+            session_key=session_key,
+            limit=20,
+        )
+        if not proposals:
+            return {
+                "pending_count": 0,
+                "conflict_count": 0,
+                "related_proposal_ids": [],
+                "last_proposal_status": None,
+                "last_proposal_id": None,
+            }
+        return {
+            "pending_count": len([item for item in proposals if item.get("status") == "pending"]),
+            "conflict_count": len([item for item in proposals if item.get("status") == "conflict"]),
+            "related_proposal_ids": [item["proposal_id"] for item in proposals[:5]],
+            "last_proposal_status": proposals[0].get("status"),
+            "last_proposal_id": proposals[0].get("proposal_id"),
+        }
+
+    def _runtime_proposal_from_row(self, row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
+        apply_summary_json = row["apply_summary_json"] if isinstance(row, sqlite3.Row) else row.get("apply_summary_json")
+        return {
+            "proposal_id": row["proposal_id"],
+            "branch": row["branch"],
+            "task_id": row["task_id"],
+            "work_item_id": row["work_item_id"],
+            "proposal_type": row["proposal_type"],
+            "status": row["status"],
+            "session_key": row["session_key"],
+            "subagent_id": row["subagent_id"],
+            "owner_id": row["owner_id"],
+            "base_revision": int(row["base_revision"]),
+            "target_scope": json.loads(row["target_scope_json"]),
+            "conflict_hints": json.loads(row["conflict_hints_json"]),
+            "payload": json.loads(row["payload_json"]),
+            "apply_summary": json.loads(apply_summary_json) if apply_summary_json else None,
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "applied_at": row["applied_at"],
+            "rejected_at": row["rejected_at"],
+        }
+
     def purge_branch(self, branch: str, *, include_artifacts: bool = True) -> None:
         with self.connect() as conn:
             conn.execute("DELETE FROM records WHERE branch = ?", (branch,))
             conn.execute("DELETE FROM stage_snapshots WHERE branch = ?", (branch,))
             conn.execute("DELETE FROM sessions WHERE branch = ?", (branch,))
             conn.execute("DELETE FROM index_jobs WHERE branch = ?", (branch,))
+            conn.execute("DELETE FROM runtime_proposal_events WHERE branch = ?", (branch,))
+            conn.execute("DELETE FROM runtime_proposals WHERE branch = ?", (branch,))
             if include_artifacts:
                 conn.execute("DELETE FROM artifacts WHERE branch = ?", (branch,))
             if self._fts_exists(conn, "records_fts"):

@@ -18,6 +18,7 @@ class RuntimeMutationPlan:
     sessions: list[dict[str, Any]]
     records: list[dict[str, Any]]
     work_items: list[dict[str, Any]] = field(default_factory=list)
+    artifacts: list[dict[str, Any]] = field(default_factory=list)
     response_payload: dict[str, Any] = field(default_factory=dict)
 
 
@@ -90,6 +91,7 @@ def commit_runtime_mutation(
                 sessions=normalized_plan.sessions,
                 records=normalized_plan.records,
                 work_items=normalized_plan.work_items,
+                artifacts=normalized_plan.artifacts,
                 branch_revision_after=branch_revision_after,
                 conn=conn,
             )
@@ -173,6 +175,7 @@ def _normalize_runtime_mutation_plan(
         sessions=sessions,
         records=[dict(record) for record in plan.records],
         work_items=[dict(work_item) for work_item in plan.work_items],
+        artifacts=[dict(artifact) for artifact in plan.artifacts],
         response_payload=dict(plan.response_payload),
     )
 

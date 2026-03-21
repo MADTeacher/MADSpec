@@ -1,5 +1,5 @@
 {
-  "epic": "epic-6-task-work-item-model",
+  "epic": "epic-7-proposal-based-commit-flow",
   "roadmap_document": "dev/parallel-memory-roadmap.md",
   "default_session_key": "active",
   "scope": "docs+contracts+behavior",
@@ -38,7 +38,11 @@
     "madspec memory work-items create",
     "madspec memory work-items list",
     "madspec memory work-items claim",
-    "madspec memory work-items release"
+    "madspec memory work-items release",
+    "madspec memory proposals publish",
+    "madspec memory proposals list",
+    "madspec memory proposals preview",
+    "madspec memory proposals apply"
   ],
   "reserved_cli_flags": [
     "--session-key",
@@ -63,6 +67,10 @@
       "madspec_cli.memory.application.orchestration.CreateWorkItemRequest",
       "madspec_cli.memory.application.orchestration.ClaimWorkItemRequest",
       "madspec_cli.memory.application.orchestration.ReleaseWorkItemRequest",
+      "madspec_cli.memory.application.proposals.PublishProposalRequest",
+      "madspec_cli.memory.application.proposals.ListProposalsRequest",
+      "madspec_cli.memory.application.proposals.PreviewProposalRequest",
+      "madspec_cli.memory.application.proposals.ApplyProposalRequest",
       "madspec_cli.features.agents.application.subagent_context.SubagentContextRequest"
     ],
     "future_canonical_boundary": "madspec_cli.memory.shared.system_store",

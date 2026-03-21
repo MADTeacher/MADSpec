@@ -291,6 +291,7 @@ def retrieve_memory_context(
             "work_item": coordination.get("work_item"),
             "claim": coordination.get("claim"),
             "session_binding": coordination.get("session_binding"),
+            "proposal_summary": coordination.get("proposal_summary"),
         },
         "change_context": change_context,
         "concept_status": build_concept_status(state.concept_state) if stage_lower == "mvp.concept" else None,

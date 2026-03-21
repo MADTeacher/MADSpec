@@ -7,6 +7,7 @@ from madspec_cli.features.gates.application.common import evaluate_gate_context,
 from madspec_cli.shared.kernel.result import PayloadResult
 
 from ..shared.storage import ensure_memory_layout, get_memory_paths
+from .proposal_guard import guard_direct_runtime_write
 from ..workflow.planning import register_planned_step
 
 
@@ -39,6 +40,14 @@ class RegisterStepResult(PayloadResult):
 
 def execute(request: RegisterStepRequest) -> RegisterStepResult:
     ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
+    blocked = guard_direct_runtime_write(
+        request.project_path,
+        branch_name=request.branch_name,
+        session_key=request.session_key,
+        command_name="register-step",
+    )
+    if blocked is not None:
+        return RegisterStepResult(payload=blocked)
     gate_payload = evaluate_gate_context(
         request.project_path,
         request.branch_name,

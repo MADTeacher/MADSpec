@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 
-from . import bootstrap, capture, checkpoint, diagnostics, implementation, learning, orchestration, planning, query
+from . import bootstrap, capture, checkpoint, diagnostics, implementation, learning, orchestration, planning, proposals, query
 
 
 def register(memory_app: typer.Typer) -> None:
@@ -15,3 +15,4 @@ def register(memory_app: typer.Typer) -> None:
     planning.register(memory_app)
     learning.register(memory_app)
     orchestration.register(memory_app)
+    proposals.register(memory_app)

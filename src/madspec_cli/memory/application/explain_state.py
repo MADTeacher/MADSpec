@@ -93,6 +93,7 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
     }
     workflow = context["workflow"]
     active_session = context["active_session"]
+    proposal_summary = ((context.get("coordination") or {}).get("proposal_summary")) or {}
     summary = {
         "stage": request.stage,
         "step_id": context.get("step_id"),
@@ -110,6 +111,9 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
         "recall_match_count": len(context["recall"].get("merged", [])),
         "task_id": (context.get("coordination") or {}).get("session_binding", {}).get("task_id"),
         "work_item_id": (context.get("coordination") or {}).get("session_binding", {}).get("work_item_id"),
+        "pending_proposals_count": proposal_summary.get("pending_count", 0),
+        "last_proposal_status": proposal_summary.get("last_proposal_status"),
+        "related_proposal_ids": proposal_summary.get("related_proposal_ids", []),
     }
 
     return ExplainStateResult(

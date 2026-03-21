@@ -41,9 +41,15 @@ def execute(request: TimelineRequest) -> TimelineResult:
         step_id=request.step_id,
         limit=max(request.limit * 2, 20),
     )
+    proposal_rows = store.list_runtime_proposal_events(
+        branch=request.branch_name,
+        limit=max(request.limit * 2, 20),
+    )
 
     items: list[dict[str, Any]] = []
     for row in record_rows:
+        if row.get("source") == "memory.proposal":
+            continue
         items.append(
             {
                 "timestamp": row.get("ts"),
@@ -89,6 +95,20 @@ def execute(request: TimelineRequest) -> TimelineResult:
                 "status": "validated",
                 "summary": summary,
                 "kind": "retrieval_run",
+            }
+        )
+
+    for row in proposal_rows:
+        items.append(
+            {
+                "timestamp": row.get("ts"),
+                "source_type": "proposal_event",
+                "source_id": row.get("event_id"),
+                "stage": "coordination",
+                "step_id": (row.get("payload") or {}).get("step_id"),
+                "status": row.get("event_type"),
+                "summary": row.get("summary"),
+                "kind": "proposal_event",
             }
         )
 

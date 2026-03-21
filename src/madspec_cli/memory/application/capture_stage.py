@@ -6,6 +6,7 @@ from typing import Any
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
+from .proposal_guard import guard_direct_runtime_write
 from ..semantic.capture import capture_stage_memory
 
 
@@ -27,6 +28,14 @@ class CaptureStageResult(PayloadResult):
 
 
 def execute(request: CaptureStageRequest) -> CaptureStageResult:
+    blocked = guard_direct_runtime_write(
+        request.project_path,
+        branch_name=request.branch_name,
+        session_key=request.session_key,
+        command_name="capture",
+    )
+    if blocked is not None:
+        return CaptureStageResult(payload=blocked)
     payload = capture_stage_memory(
         request.project_path,
         request.branch_name,

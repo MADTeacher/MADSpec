@@ -816,6 +816,13 @@ Ownership задается по scope и используется для writer-
 - preview/list/apply CLI surface;
 - integration proposals with revision and ownership checks.
 
+**CLI surface**
+
+- `madspec memory proposals publish`
+- `madspec memory proposals list`
+- `madspec memory proposals preview`
+- `madspec memory proposals apply`
+
 **Acceptance criteria**
 
 - субагенты могут сотрудничать над одной задачей без прямой порчи shared runtime;

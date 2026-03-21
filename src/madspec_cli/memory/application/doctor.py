@@ -21,6 +21,8 @@ REQUIRED_SQLITE_TABLES = {
     "merge_proposals",
     "records",
     "retrieval_runs",
+    "runtime_proposal_events",
+    "runtime_proposals",
     "sessions",
     "stage_snapshots",
     "writer_leases",
@@ -109,6 +111,9 @@ def execute(request: MemoryDoctorRequest) -> MemoryDoctorResult:
     lease_payload, lease_check = _lease_diagnostics(request.project_path, request.branch_name)
     checks.append(lease_check)
 
+    proposal_payload, proposal_check = _proposal_diagnostics(request.project_path, request.branch_name)
+    checks.append(proposal_check)
+
     generated_view_errors = validate_generated_stage_views(
         paths,
         project_path=request.project_path,
@@ -139,6 +144,7 @@ def execute(request: MemoryDoctorRequest) -> MemoryDoctorResult:
             "generated_views": generated_views,
             "indexing": indexing_payload,
             "writer_leases": lease_payload,
+            "runtime_proposals": proposal_payload,
         }
     )
 
@@ -312,6 +318,45 @@ def _lease_diagnostics(project_path: Path, branch_name: str) -> tuple[dict[str, 
     if expired:
         summary = "writer lease state includes expired hot-scope locks"
     return payload, _make_check("writer_leases", status, summary, details)
+
+
+def _proposal_diagnostics(project_path: Path, branch_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    store = MemoryStore(project_path)
+    payload = {
+        "pending_proposals": 0,
+        "conflict_proposals": 0,
+        "recent": [],
+    }
+    if not store.paths.sqlite_file.exists():
+        return (
+            payload,
+            _make_check(
+                "runtime_proposals",
+                "error",
+                "runtime proposals cannot be inspected because SQLite is missing",
+                [str(store.paths.sqlite_file.relative_to(project_path))],
+            ),
+        )
+    proposals = store.list_runtime_proposals(
+        branch=branch_name,
+        statuses=["pending", "conflict"],
+        limit=20,
+    )
+    payload["recent"] = proposals
+    payload["pending_proposals"] = len([item for item in proposals if item["status"] == "pending"])
+    payload["conflict_proposals"] = len([item for item in proposals if item["status"] == "conflict"])
+    details: list[str] = []
+    status = "ok"
+    if payload["conflict_proposals"]:
+        status = "warn"
+        details.append(f"{payload['conflict_proposals']} proposal(s) require conflict review")
+    elif payload["pending_proposals"]:
+        status = "warn"
+        details.append(f"{payload['pending_proposals']} proposal(s) are pending apply")
+    summary = "runtime proposals are healthy"
+    if status == "warn":
+        summary = "runtime proposals require operator attention"
+    return payload, _make_check("runtime_proposals", status, summary, details)
 
 
 def _lease_matches_branch(lease_name: str, branch_name: str) -> bool:
