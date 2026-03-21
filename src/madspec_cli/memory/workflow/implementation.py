@@ -20,24 +20,19 @@ from .implementation_shared import (
     is_step_ready,
     load_progress,
     normalize_text_list,
-    restore_file,
     set_active_step,
-    snapshot_file,
     step_dependencies,
     validate_implementation_stage,
     validate_start_step,
 )
 from ..shared.storage import (
-    append_jsonl,
     ensure_memory_layout,
     get_memory_paths,
     now_iso,
-    write_json,
 )
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
-from ..shared.system_store.sessions import clone_session_payload, save_runtime_session
-from ..shared.validation import validate_branch_memory
-from ..projection.materialize import consolidate_branch_memory
+from ..shared.system_store.canonical_state import build_runtime_snapshot_specs, tag_records_for_stream
+from ..shared.system_store.runtime_mutations import commit_runtime_mutation
 
 
 def start_implementation_step(
@@ -80,16 +75,11 @@ def start_implementation_step(
             "gate_summary": gate_payload,
         }
     paths = get_memory_paths(project_path, branch_name)
-    snapshots = {
-        paths.progress: snapshot_file(paths.progress),
-        paths.events: snapshot_file(paths.events),
-    }
     progress, active_session = load_progress(
         project_path,
         branch_name,
         session_key=session_key,
     )
-    previous_session = clone_session_payload(active_session)
 
     selected_step = resolve_runtime_step_id(
         progress=progress,
@@ -134,24 +124,23 @@ def start_implementation_step(
         }
 
     ts = now_iso()
-    try:
-        set_active_step(progress, selected_step)
-        write_json(paths.progress, progress)
-
-        active_session["stage"] = normalized_stage
-        active_session["current_step"] = selected_step
-        active_session["active_goal"] = normalized_summary or f"Implement {selected_step}"
-        active_session["last_checkpoint_at"] = ts
-        active_session["updated_at"] = ts
-        save_runtime_session(
+    set_active_step(progress, selected_step)
+    active_session["stage"] = normalized_stage
+    active_session["current_step"] = selected_step
+    active_session["active_goal"] = normalized_summary or f"Implement {selected_step}"
+    active_session["last_checkpoint_at"] = ts
+    active_session["updated_at"] = ts
+    projection_meta = commit_runtime_mutation(
+        project_path,
+        branch_name=branch_name,
+        stage=normalized_stage,
+        stage_snapshots=build_runtime_snapshot_specs(
             project_path,
-            branch_name=branch_name,
-            session_key=session_key,
-            payload=active_session,
-        )
-
-        append_jsonl(
-            paths.events,
+            branch_name,
+            {"progress": progress},
+        ),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=tag_records_for_stream(
             build_start_event(
                 branch_name=branch_name,
                 normalized_stage=normalized_stage,
@@ -162,37 +151,19 @@ def start_implementation_step(
                 dependencies=step_dependencies(progress, selected_step),
                 ts=ts,
             ),
-        )
+            "events",
+        ),
+    )
 
-        generated = consolidate_branch_memory(project_path, branch_name, stage=normalized_stage)
-        validation_errors = validate_branch_memory(project_path, branch_name, stage=normalized_stage)
-        if validation_errors:
-            raise ValueError("; ".join(validation_errors))
-    except Exception as exc:
-        for path, content in snapshots.items():
-            restore_file(path, content)
-        save_runtime_session(
-            project_path,
-            branch_name=branch_name,
-            session_key=session_key,
-            payload=previous_session,
-        )
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "step_id": selected_step,
-            "errors": [str(exc)],
-        }
-
-    return {
+    payload = {
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
         "step_id": selected_step,
         "status": progress.get("stepStatus", {}).get(selected_step, {}).get("status"),
-        "generated_views": [str(path.relative_to(project_path)) for path in generated],
     }
+    payload.update(projection_meta)
+    return payload
 
 
 def checkpoint_implementation_step(
@@ -277,16 +248,11 @@ def checkpoint_implementation_step(
             "gate_summary": gate_payload,
         }
     paths = get_memory_paths(project_path, branch_name)
-    snapshots = {
-        paths.progress: snapshot_file(paths.progress),
-        paths.events: snapshot_file(paths.events),
-    }
     progress, active_session = load_progress(
         project_path,
         branch_name,
         session_key=session_key,
     )
-    previous_session = clone_session_payload(active_session)
 
     selected_step = resolve_runtime_step_id(
         progress=progress,
@@ -363,33 +329,33 @@ def checkpoint_implementation_step(
         }
 
     ts = now_iso()
-    try:
-        set_active_step(progress, selected_step)
-        status_info = progress.setdefault("stepStatus", {}).setdefault(selected_step, {})
-        status_info["status"] = "in_progress"
-        if normalized_phase:
-            status_info["tddPhase"] = normalized_phase
-        status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
-        status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
-        if normalized_refactor_note is not None:
-            status_info["refactorNote"] = normalized_refactor_note
-        write_json(paths.progress, progress)
+    set_active_step(progress, selected_step)
+    status_info = progress.setdefault("stepStatus", {}).setdefault(selected_step, {})
+    status_info["status"] = "in_progress"
+    if normalized_phase:
+        status_info["tddPhase"] = normalized_phase
+    status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
+    status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
+    if normalized_refactor_note is not None:
+        status_info["refactorNote"] = normalized_refactor_note
 
-        active_session["stage"] = normalized_stage
-        active_session["current_step"] = selected_step
-        if normalized_summary:
-            active_session["active_goal"] = normalized_summary
-        active_session["last_checkpoint_at"] = ts
-        active_session["updated_at"] = ts
-        save_runtime_session(
+    active_session["stage"] = normalized_stage
+    active_session["current_step"] = selected_step
+    if normalized_summary:
+        active_session["active_goal"] = normalized_summary
+    active_session["last_checkpoint_at"] = ts
+    active_session["updated_at"] = ts
+    projection_meta = commit_runtime_mutation(
+        project_path,
+        branch_name=branch_name,
+        stage=normalized_stage,
+        stage_snapshots=build_runtime_snapshot_specs(
             project_path,
-            branch_name=branch_name,
-            session_key=session_key,
-            payload=active_session,
-        )
-
-        append_jsonl(
-            paths.events,
+            branch_name,
+            {"progress": progress},
+        ),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=tag_records_for_stream(
             build_checkpoint_event(
                 branch_name=branch_name,
                 normalized_stage=normalized_stage,
@@ -402,37 +368,19 @@ def checkpoint_implementation_step(
                 status_info=status_info,
                 ts=ts,
             ),
-        )
+            "events",
+        ),
+    )
 
-        generated = consolidate_branch_memory(project_path, branch_name, stage=normalized_stage)
-        validation_errors = validate_branch_memory(project_path, branch_name, stage=normalized_stage)
-        if validation_errors:
-            raise ValueError("; ".join(validation_errors))
-    except Exception as exc:
-        for path, content in snapshots.items():
-            restore_file(path, content)
-        save_runtime_session(
-            project_path,
-            branch_name=branch_name,
-            session_key=session_key,
-            payload=previous_session,
-        )
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "step_id": selected_step,
-            "errors": [str(exc)],
-        }
-
-    return {
+    payload = {
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
         "step_id": selected_step,
         "tdd_phase": status_info.get("tddPhase"),
-        "generated_views": [str(path.relative_to(project_path)) for path in generated],
     }
+    payload.update(projection_meta)
+    return payload
 
 
 def complete_implementation_step(
@@ -502,19 +450,11 @@ def complete_implementation_step(
 
     ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
     paths = get_memory_paths(project_path, branch_name)
-    snapshots = {
-        paths.progress: snapshot_file(paths.progress),
-        paths.events: snapshot_file(paths.events),
-        paths.facts: snapshot_file(paths.facts),
-        paths.decisions: snapshot_file(paths.decisions),
-        paths.contracts: snapshot_file(paths.contracts),
-    }
     progress, active_session = load_progress(
         project_path,
         branch_name,
         session_key=session_key,
     )
-    previous_session = clone_session_payload(active_session)
 
     selected_step = resolve_runtime_step_id(
         progress=progress,
@@ -563,77 +503,93 @@ def complete_implementation_step(
     status_info = progress.setdefault("stepStatus", {}).setdefault(selected_step, {})
     ts = now_iso()
     completed_at = ts.split("T", 1)[0]
-    try:
-        status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
-        status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
-        if normalized_refactor_note is not None:
-            status_info["refactorNote"] = normalized_refactor_note
+    status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
+    status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
+    if normalized_refactor_note is not None:
+        status_info["refactorNote"] = normalized_refactor_note
 
-        if metadata.get("tddPolicy") == "required":
-            if not status_info.get("redEvidence"):
-                raise ValueError(f"completed code step '{selected_step}' must record redEvidence")
-            if not status_info.get("greenEvidence"):
-                raise ValueError(f"completed code step '{selected_step}' must record greenEvidence")
-            if not isinstance(status_info.get("refactorNote"), str) or not status_info.get("refactorNote", "").strip():
-                raise ValueError(f"completed code step '{selected_step}' must record refactorNote")
-            status_info["tddPhase"] = "completed"
-        else:
-            status_info["tddPhase"] = "waived"
+    if metadata.get("tddPolicy") == "required":
+        if not status_info.get("redEvidence"):
+            return {
+                "accepted": False,
+                "branch": branch_name,
+                "stage": normalized_stage,
+                "step_id": selected_step,
+                "errors": [f"completed code step '{selected_step}' must record redEvidence"],
+            }
+        if not status_info.get("greenEvidence"):
+            return {
+                "accepted": False,
+                "branch": branch_name,
+                "stage": normalized_stage,
+                "step_id": selected_step,
+                "errors": [f"completed code step '{selected_step}' must record greenEvidence"],
+            }
+        if not isinstance(status_info.get("refactorNote"), str) or not status_info.get("refactorNote", "").strip():
+            return {
+                "accepted": False,
+                "branch": branch_name,
+                "stage": normalized_stage,
+                "step_id": selected_step,
+                "errors": [f"completed code step '{selected_step}' must record refactorNote"],
+            }
+        status_info["tddPhase"] = "completed"
+    else:
+        status_info["tddPhase"] = "waived"
 
-        status_info["status"] = "completed"
-        status_info["completedAt"] = completed_at
-        if selected_step not in completed_steps:
-            completed_steps.append(selected_step)
+    status_info["status"] = "completed"
+    status_info["completedAt"] = completed_at
+    if selected_step not in completed_steps:
+        completed_steps.append(selected_step)
 
-        next_step = select_next_executable_step(progress)
-        progress["currentImplementStep"] = next_step
-        if next_step:
-            for candidate, candidate_status in progress.get("stepStatus", {}).items():
-                if not isinstance(candidate_status, dict):
-                    continue
-                if candidate == next_step and candidate_status.get("status") == "in_progress":
-                    continue
-                if candidate != selected_step and candidate_status.get("status") == "in_progress":
-                    candidate_status["status"] = "planned"
+    next_step = select_next_executable_step(progress)
+    progress["currentImplementStep"] = next_step
+    if next_step:
+        for candidate, candidate_status in progress.get("stepStatus", {}).items():
+            if not isinstance(candidate_status, dict):
+                continue
+            if candidate == next_step and candidate_status.get("status") == "in_progress":
+                continue
+            if candidate != selected_step and candidate_status.get("status") == "in_progress":
+                candidate_status["status"] = "planned"
 
-        policy_payload = evaluate_branch_policies(
-            project_path,
-            branch_name,
-            stage=normalized_stage,
-            operation="complete-step",
-            step_id=selected_step,
-            overrides={
-                "step_kind": metadata.get("kind"),
-                "tdd_policy": metadata.get("tddPolicy"),
-                "tdd_phase": status_info.get("tddPhase"),
-                "status": "completed",
-                "red_evidence": status_info.get("redEvidence", []),
-                "green_evidence": status_info.get("greenEvidence", []),
-                "refactor_note": status_info.get("refactorNote"),
-            },
-            include_system_policies=False,
-        )
-        if policy_payload["violations"]:
-            raise ValueError("; ".join(item["message"] for item in policy_payload["violations"]))
+    policy_payload = evaluate_branch_policies(
+        project_path,
+        branch_name,
+        stage=normalized_stage,
+        operation="complete-step",
+        step_id=selected_step,
+        overrides={
+            "step_kind": metadata.get("kind"),
+            "tdd_policy": metadata.get("tddPolicy"),
+            "tdd_phase": status_info.get("tddPhase"),
+            "status": "completed",
+            "red_evidence": status_info.get("redEvidence", []),
+            "green_evidence": status_info.get("greenEvidence", []),
+            "refactor_note": status_info.get("refactorNote"),
+        },
+        include_system_policies=False,
+    )
+    if policy_payload["violations"]:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "step_id": selected_step,
+            "errors": ["; ".join(item["message"] for item in policy_payload["violations"])],
+        }
 
-        write_json(paths.progress, progress)
+    active_session["stage"] = normalized_stage
+    active_session["current_step"] = next_step
+    active_session["active_goal"] = (
+        f"Implement {next_step}" if next_step else normalized_summary
+    )
+    active_session["last_checkpoint_at"] = ts
+    active_session["updated_at"] = ts
 
-        active_session["stage"] = normalized_stage
-        active_session["current_step"] = next_step
-        active_session["active_goal"] = (
-            f"Implement {next_step}" if next_step else normalized_summary
-        )
-        active_session["last_checkpoint_at"] = ts
-        active_session["updated_at"] = ts
-        save_runtime_session(
-            project_path,
-            branch_name=branch_name,
-            session_key=session_key,
-            payload=active_session,
-        )
-
-        append_jsonl(
-            paths.events,
+    records: list[dict[str, Any]] = []
+    records.extend(
+        tag_records_for_stream(
             build_completion_event(
                 branch_name=branch_name,
                 normalized_stage=normalized_stage,
@@ -646,10 +602,11 @@ def complete_implementation_step(
                 completed_at=completed_at,
                 ts=ts,
             ),
+            "events",
         )
-
-        append_jsonl(
-            paths.facts,
+    )
+    records.extend(
+        tag_records_for_stream(
             build_completion_semantic_records(
                 branch_name=branch_name,
                 normalized_stage=normalized_stage,
@@ -659,9 +616,11 @@ def complete_implementation_step(
                 semantic_kind="fact",
                 ts=ts,
             ),
+            "facts",
         )
-        append_jsonl(
-            paths.decisions,
+    )
+    records.extend(
+        tag_records_for_stream(
             build_completion_semantic_records(
                 branch_name=branch_name,
                 normalized_stage=normalized_stage,
@@ -671,9 +630,11 @@ def complete_implementation_step(
                 semantic_kind="decision",
                 ts=ts,
             ),
+            "decisions",
         )
-        append_jsonl(
-            paths.contracts,
+    )
+    records.extend(
+        tag_records_for_stream(
             build_completion_semantic_records(
                 branch_name=branch_name,
                 normalized_stage=normalized_stage,
@@ -683,30 +644,23 @@ def complete_implementation_step(
                 semantic_kind="contract",
                 ts=ts,
             ),
+            "contracts",
         )
-
-        generated = consolidate_branch_memory(project_path, branch_name, stage=normalized_stage)
-        validation_errors = validate_branch_memory(project_path, branch_name, stage=normalized_stage)
-        if validation_errors:
-            raise ValueError("; ".join(validation_errors))
-    except Exception as exc:
-        for path, content in snapshots.items():
-            restore_file(path, content)
-        save_runtime_session(
+    )
+    projection_meta = commit_runtime_mutation(
+        project_path,
+        branch_name=branch_name,
+        stage=normalized_stage,
+        stage_snapshots=build_runtime_snapshot_specs(
             project_path,
-            branch_name=branch_name,
-            session_key=session_key,
-            payload=previous_session,
-        )
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "step_id": selected_step,
-            "errors": [str(exc)],
-        }
+            branch_name,
+            {"progress": progress},
+        ),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=records,
+    )
 
-    return {
+    payload = {
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
@@ -717,5 +671,6 @@ def complete_implementation_step(
             "decisions": len(normalized_decisions),
             "contracts": len(normalized_contracts),
         },
-        "generated_views": [str(path.relative_to(project_path)) for path in generated],
     }
+    payload.update(projection_meta)
+    return payload

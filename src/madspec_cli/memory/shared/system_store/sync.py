@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from .constants import SEARCHABLE_ARTIFACT_SUFFIXES
+from .canonical_state import (
+    bootstrap_branch_canonical_state,
+    refresh_branch_file_projections,
+)
 from .layout import ensure_system_memory_layout
 from .sessions import project_active_session
 from .retrieval import RetrievalOrchestrator
@@ -172,16 +176,14 @@ def build_db_status(project_path: Path, branch_name: str | None = None) -> dict[
 def run_reindex(project_path: Path, branch_name: str | None = None, *, limit: int = 200) -> dict[str, Any]:
     ensure_system_memory_layout(project_path)
     if branch_name:
-        sync_branch_memory_to_store(project_path, branch_name)
-        sync_generated_artifacts(project_path, branch_name)
+        bootstrap_branch_canonical_state(project_path, branch_name)
     else:
         madspec_dir = project_path / ".madspec"
         if madspec_dir.exists():
             for path in madspec_dir.iterdir():
                 if not path.is_dir() or path.name == "system":
                     continue
-                sync_branch_memory_to_store(project_path, path.name)
-                sync_generated_artifacts(project_path, path.name)
+                bootstrap_branch_canonical_state(project_path, path.name)
     return MemoryStore(project_path).process_pending_jobs(branch=branch_name, limit=limit)
 
 
@@ -200,8 +202,7 @@ def search_memory_store(
     active_session: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     ensure_system_memory_layout(project_path)
-    sync_branch_memory_to_store(project_path, branch_name)
-    sync_generated_artifacts(project_path, branch_name)
+    bootstrap_branch_canonical_state(project_path, branch_name)
     orchestrator = RetrievalOrchestrator(project_path)
     return orchestrator.search(
         branch=branch_name,
@@ -219,6 +220,7 @@ def search_memory_store(
 
 def rebuild_active_session_projection(project_path: Path, branch_name: str) -> Path:
     ensure_system_memory_layout(project_path)
+    refresh_branch_file_projections(project_path, branch_name)
     return project_active_session(project_path, branch_name=branch_name)
 
 

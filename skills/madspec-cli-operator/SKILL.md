@@ -31,7 +31,7 @@ description: Операционный навык по MADSpec Framework и MADSp
 
 - MADSpec привязывает рабочие артефакты к ветке в `.madspec/<branch>/`.
 - Канонические данные и производные представления нельзя путать: Markdown-контекст часто является только проекцией.
-- Session-local runtime state теперь канонически хранится в `SQLite`; файл `active-session.json` остается только производной проекцией для session `active`.
+- Runtime state ветки теперь канонически хранится в `SQLite`: `progress`, stage snapshots, session-local state и runtime record streams сначала коммитятся туда, а branch files остаются производными projections. Файл `active-session.json` поддерживается только как проекция для session `active`.
 - Команды, привязанные к стадии, материализуют только артефакты текущей стадии; отсутствие несвязанных производных артефактов не считай признаком поломки, пока соответствующая стадия еще не запускалась.
 - Для `mvp.plan` и `feature.plan` предпочитай минимально достаточное число шагов: легкую задачу планируй одним полным шагом, если нет реальной причины делить её дальше.
 - Для `memory capture`, `memory checkpoint`, `memory register-step`, `memory start-step`, `memory checkpoint-step` и `memory complete-step` обязательно используй `--from-file`.

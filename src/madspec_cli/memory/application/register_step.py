@@ -6,10 +6,7 @@ from pathlib import Path
 from madspec_cli.features.gates.application.common import evaluate_gate_context, gate_failure_messages
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..projection.materialize import consolidate_branch_memory
 from ..shared.storage import ensure_memory_layout, get_memory_paths
-from ..shared.system_store.sessions import clone_session_payload, load_runtime_session, save_runtime_session
-from ..shared.validation import validate_branch_memory
 from ..workflow.planning import register_planned_step
 
 
@@ -68,36 +65,6 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
             }
         )
     paths = get_memory_paths(request.project_path, request.branch_name)
-    branch_dir = paths.branch_dir
-    previous_session = clone_session_payload(
-        load_runtime_session(
-            request.project_path,
-            branch_name=request.branch_name,
-            session_key=request.session_key,
-        )
-    )
-    snapshot_targets = [
-        paths.progress,
-        paths.plan_state,
-        paths.feature_plan_state,
-        paths.active_session,
-        paths.decision_log,
-        branch_dir / "concept.md",
-        branch_dir / "ui-design.md",
-        branch_dir / "tech-stack.md",
-        branch_dir / "architecture.md",
-        branch_dir / "data-model.md",
-        branch_dir / "implementation-plan.md",
-        branch_dir / "project-analysis.md",
-        branch_dir / "feature-context.md",
-        branch_dir / "planning-context-cache.md",
-        branch_dir / "project-context.md",
-        branch_dir / "contracts" / "openapi.yaml",
-    ]
-    snapshots = {
-        path: path.read_text(encoding="utf-8") if path.exists() else None
-        for path in snapshot_targets
-    }
     payload = register_planned_step(
         request.project_path,
         request.branch_name,
@@ -115,22 +82,4 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
         size=request.size,
         complexity=request.complexity,
     )
-    if payload.get("accepted"):
-        consolidate_branch_memory(request.project_path, request.branch_name, stage=request.stage)
-        validation_errors = validate_branch_memory(request.project_path, request.branch_name, stage=request.stage)
-        if validation_errors:
-            for path, content in snapshots.items():
-                if content is None:
-                    if path.exists():
-                        path.unlink()
-                else:
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(content, encoding="utf-8")
-            save_runtime_session(
-                request.project_path,
-                branch_name=request.branch_name,
-                session_key=request.session_key,
-                payload=previous_session,
-            )
-            payload = {"accepted": False, "step_id": request.step_id, "errors": validation_errors}
     return RegisterStepResult(payload=payload)

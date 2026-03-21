@@ -14,17 +14,20 @@ from ..shared.storage import (
     _default_step_coverage,
     _default_step_metadata,
     _default_step_status,
-    append_jsonl,
     ensure_memory_layout,
     get_memory_paths,
     normalize_progress_state,
     now_iso,
     read_json,
-    write_json,
+)
+from ..shared.system_store.canonical_state import (
+    build_runtime_snapshot_specs,
+    load_canonical_branch_state,
+    tag_records_for_stream,
 )
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
-from ..shared.system_store.sessions import load_runtime_session, save_runtime_session
-from ..projection.materialize import consolidate_branch_memory
+from ..shared.system_store.runtime_mutations import commit_runtime_mutation
+from ..shared.system_store.sessions import load_runtime_session
 from ..stages.concept.state import is_empty_concept_state, load_concept_state, migrate_legacy_concept_markdown
 from ..stages.feature_init.state import (
     is_empty_feature_init_state,
@@ -117,8 +120,9 @@ def _known_function_samples(catalog: dict[str, list[str]], limit: int = 5) -> st
 def extract_function_catalog(project_path: Path, branch_name: str, stage: str) -> dict[str, list[str]]:
     paths = get_memory_paths(project_path, branch_name)
     stage_lower = stage.lower()
+    canonical = load_canonical_branch_state(project_path, branch_name)
     if "feature." in stage_lower:
-        feature_init_state = load_feature_init_state(paths.feature_init_state)
+        feature_init_state = canonical.snapshots.get("feature.init") or load_feature_init_state(paths.feature_init_state)
         legacy_feature_path = paths.branch_dir / "project-analysis.md"
         if is_empty_feature_init_state(feature_init_state) and legacy_feature_path.exists():
             feature_init_state = migrate_legacy_project_analysis_markdown(legacy_feature_path)
@@ -130,7 +134,7 @@ def extract_function_catalog(project_path: Path, branch_name: str, stage: str) -
             ]
             for priority in ("p1", "p2", "p3")
         }
-    concept_state = load_concept_state(paths.concept_state)
+    concept_state = canonical.snapshots.get("mvp.concept") or load_concept_state(paths.concept_state)
     legacy_concept_path = paths.branch_dir / "concept.md"
     if is_empty_concept_state(concept_state) and legacy_concept_path.exists():
         concept_state = migrate_legacy_concept_markdown(legacy_concept_path)
@@ -181,8 +185,7 @@ def determine_next_step(
     candidate_dependencies: list[str] | None = None,
     allow_completed_dependencies: bool = True,
 ) -> dict[str, Any]:
-    paths = get_memory_paths(project_path, branch_name)
-    progress = read_json(paths.progress, _default_progress_state())
+    progress = load_canonical_branch_state(project_path, branch_name).progress
     planned_steps = progress.get("plannedSteps", [])
     completed_steps = set(progress.get("completedSteps", []))
     step_dependencies = progress.get("planningMetadata", {}).get("stepDependencies", {})
@@ -267,7 +270,8 @@ def register_planned_step(
 ) -> dict[str, Any]:
     ensure_memory_layout(project_path, branch_name, stage=stage)
     paths = get_memory_paths(project_path, branch_name)
-    progress = read_json(paths.progress, _default_progress_state())
+    canonical = load_canonical_branch_state(project_path, branch_name)
+    progress = canonical.progress
     if isinstance(progress, dict):
         progress, _ = normalize_progress_state(progress)
     decision = determine_next_step(
@@ -421,9 +425,9 @@ def register_planned_step(
         covers_functions,
     )
     if "feature." in stage.lower():
-        plan_state = load_feature_plan_state(paths.feature_plan_state)
+        plan_state = canonical.snapshots.get("feature.plan") or load_feature_plan_state(paths.feature_plan_state)
     else:
-        plan_state = load_plan_state(paths.plan_state)
+        plan_state = canonical.snapshots.get("mvp.plan") or load_plan_state(paths.plan_state)
     plan_state = upsert_step_catalog_entry(
         plan_state,
         step_id=step_id,
@@ -438,12 +442,6 @@ def register_planned_step(
         size=size,
         complexity=complexity,
     )
-    write_json(paths.progress, progress)
-    if "feature." in stage.lower():
-        save_feature_plan_state(paths.feature_plan_state, plan_state)
-    else:
-        save_plan_state(paths.plan_state, plan_state)
-
     active_session = load_runtime_session(
         project_path,
         branch_name=branch_name,
@@ -453,15 +451,11 @@ def register_planned_step(
     active_session["current_step"] = step_id
     active_session["last_checkpoint_at"] = now_iso()
     active_session["updated_at"] = active_session["last_checkpoint_at"]
-    save_runtime_session(
-        project_path,
-        branch_name=branch_name,
-        session_key=session_key,
-        payload=active_session,
-    )
-
-    append_jsonl(
-        paths.decision_log,
+    snapshot_payloads = {
+        "progress": progress,
+        "feature.plan" if "feature." in stage.lower() else "mvp.plan": plan_state,
+    }
+    record_payloads = tag_records_for_stream(
         [
             make_record(
                 branch_name,
@@ -486,10 +480,18 @@ def register_planned_step(
                 },
             )
         ],
+        "decision_log",
     )
-    consolidate_branch_memory(project_path, branch_name, stage=stage)
+    projection_meta = commit_runtime_mutation(
+        project_path,
+        branch_name=branch_name,
+        stage=stage,
+        stage_snapshots=build_runtime_snapshot_specs(project_path, branch_name, snapshot_payloads),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=record_payloads,
+    )
 
-    return RegisterStepResult(
+    payload = RegisterStepResult(
         accepted=True,
         step_id=step_id,
         errors=[],
@@ -498,3 +500,5 @@ def register_planned_step(
         step_metadata=progress["stepMetadata"][step_id],
         progress_metrics=progress["planningMetadata"]["progressMetrics"],
     ).to_payload()
+    payload.update(projection_meta)
+    return payload

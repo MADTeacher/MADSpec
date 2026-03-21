@@ -8,6 +8,7 @@ from madspec_cli.features.change.infrastructure.storage import build_change_cont
 from ..domain.conflicts import PROJECT_MEMORY_BRANCH, semantic_fingerprint
 from ..domain.progress import select_next_executable_step
 from ..domain.step_resolution import resolve_runtime_step_id
+from ..shared.system_store.canonical_state import load_canonical_branch_state
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 from ..shared.storage import read_jsonl as _read_jsonl
 from ..stages.design.state import load_design_state
@@ -21,7 +22,7 @@ from .projections import (
     build_feature_plan_status,
     build_plan_status,
     build_tech_status,
-    load_semantic_record_sets,
+    filter_records_by_status,
 )
 
 read_jsonl = _read_jsonl
@@ -73,18 +74,52 @@ def retrieve_memory_context(
     )
     change_context = build_change_context(project_path, branch_name)
     change_state = load_change_state(project_path, branch_name)
+    canonical = load_canonical_branch_state(project_path, branch_name)
     resolved_limit = 3 if limit is None or limit <= 0 else limit
     if not is_stage_artifact and (limit is None or limit <= 0):
         resolved_limit = 5
     include_history_records = include_history or not is_stage_artifact
-    decision_log = read_jsonl(state.paths.decision_log) if include_history_records else []
-    events = read_jsonl(state.paths.events) if include_history_records else []
-    semantic_sets = load_semantic_record_sets(
-        state.paths,
-        include_obsolete=include_obsolete,
-        include_conflicted=include_conflicted,
-        read_records=read_jsonl,
-    )
+    decision_log = list(canonical.record_streams["decision_log"]) if include_history_records else []
+    events = list(canonical.record_streams["events"]) if include_history_records else []
+    semantic_sets = {
+        "validated": {
+            "facts": filter_records_by_status(
+                canonical.record_streams["facts"],
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+            ),
+            "decisions": filter_records_by_status(
+                canonical.record_streams["decisions"],
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+            ),
+            "contracts": filter_records_by_status(
+                canonical.record_streams["contracts"],
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+            ),
+        },
+        "stage": {
+            "facts": filter_records_by_status(
+                canonical.record_streams["facts"],
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+                include_proposed=True,
+            ),
+            "decisions": filter_records_by_status(
+                canonical.record_streams["decisions"],
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+                include_proposed=True,
+            ),
+            "contracts": filter_records_by_status(
+                canonical.record_streams["contracts"],
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+                include_proposed=True,
+            ),
+        },
+    }
     if scope == "project":
         project_records = MemoryStore(project_path).list_records(
             branch=PROJECT_MEMORY_BRANCH,

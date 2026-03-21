@@ -3,11 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..shared.storage import (
-    _default_progress_state,
-    get_memory_paths,
-    read_json,
-)
+from ..shared.storage import _default_progress_state
+from ..shared.system_store.canonical_state import load_canonical_branch_state
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 from ..shared.system_store.sessions import load_runtime_session
 
@@ -50,8 +47,8 @@ def load_progress(
     *,
     session_key: str = SYSTEM_SESSION_KEY,
 ) -> tuple[Any, Any]:
-    paths = get_memory_paths(project_path, branch_name)
-    progress = read_json(paths.progress, _default_progress_state())
+    canonical = load_canonical_branch_state(project_path, branch_name)
+    progress = canonical.progress or _default_progress_state()
     active_session = load_runtime_session(
         project_path,
         branch_name=branch_name,

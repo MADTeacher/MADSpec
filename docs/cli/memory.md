@@ -14,11 +14,12 @@
 
 Важно для текущего состояния реализации:
 
-- сеансы рантайма теперь читаются и обновляются через `SQLite`, а таблица `sessions` считается каноническим источником session-local state;
+- все mutating runtime-команды теперь сначала коммитят изменения в `SQLite`, а уже потом пересобирают файловые projections ветки;
+- `SQLite` считается каноническим источником для `progress`, stage snapshots, session-local state и runtime record streams;
 - файл `.madspec/<branch>/memory/working/active-session.json` больше не считается источником истины и поддерживается только как производная проекция для session `active`;
 - для `retrieve`, `search`, `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step`, `complete-step` и связанных вызовов субагентного контекста доступен `--session-key`, по умолчанию используется `active`;
-- переход всех изменяющих состояние команд `madspec memory` на `SQLite`-first path относится к `dev/parallel-memory-roadmap.md`;
-- остальные runtime-артефакты ветки, включая `progress`, снимки стадий, `episodes` и `semantic/*`, пока остаются на file-first path и будут канонизированы позже.
+- branch `memory/*.json`, `memory/*.jsonl` и generated markdown остаются rebuildable projections и могут быть пересобраны через `madspec memory consolidate`;
+- если post-commit projection refresh падает, canonical commit не откатывается: команда возвращает `projection_status="stale"` и `projection_refresh_required=true`, а последующий `madspec memory consolidate` восстанавливает projections из `SQLite`.
 
 ## Когда Использовать
 
@@ -233,7 +234,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 1. `start-step`, `checkpoint-step` и `complete-step` пишут операционные события в `episodes`.
 2. `capture`, `checkpoint` и `memory learn` добавляют заметки и кандидаты в `decision_log`.
 3. `complete-step` может сразу записать подтвержденные `facts`, `decisions` и `contracts` в `semantic/*`.
-4. Все эти операции параллельно синхронизируются в `SQLite`, а изменившиеся записи, снимки и артефакты ставятся в `index_jobs`.
+4. Все эти операции сначала коммитят canonical state в `SQLite`, а затем пересобирают projections ветки; изменившиеся записи, снимки и артефакты ставятся в `index_jobs`.
 5. `memory reindex` или фоновое индексирование при извлечении забирает ожидающие задания, обновляет векторные фрагменты и помечает их как `indexed`.
 6. `memory promote` просматривает проверенные записи из `episodes` и `decision_log` и переносит их в `semantic/*`, если они еще не были продвинуты.
 

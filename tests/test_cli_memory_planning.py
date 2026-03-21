@@ -217,10 +217,15 @@ def test_memory_register_step_rolls_back_when_step_artifacts_are_missing(
     paths = get_memory_paths(project_path, "main")
     progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
     plan_state = json.loads(paths["plan_state"].read_text(encoding="utf-8"))
+    payload = json.loads(result.stdout)
 
-    assert result.exit_code == 1, result.stdout
-    assert progress["plannedSteps"] == []
-    assert plan_state["stepCatalog"] == []
+    assert result.exit_code == 0, result.stdout
+    assert payload["accepted"] is True
+    assert payload["projection_status"] == "stale"
+    assert payload["projection_refresh_required"] is True
+    assert "projection refresh failed:" in payload["warnings"][0]
+    assert progress["plannedSteps"] == ["step-01-authentication"]
+    assert plan_state["stepCatalog"][0]["stepId"] == "step-01-authentication"
 
 
 def test_memory_register_step_rejects_invalid_step_kind_and_tdd_policy(

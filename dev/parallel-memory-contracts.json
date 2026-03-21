@@ -1,12 +1,12 @@
 {
-  "epic": "epic-1-session-scoped-runtime",
+  "epic": "epic-2-sqlite-first-canonical-writes",
   "roadmap_document": "dev/parallel-memory-roadmap.md",
   "default_session_key": "active",
   "scope": "docs+contracts+behavior",
   "behavior_change": true,
   "architecture": {
-    "current_runtime_write_mode": "file-first-then-sync",
-    "current_mutation_authority": "sqlite-for-sessions-and-branch-memory-files-for-other-runtime-state",
+    "current_runtime_write_mode": "sqlite-first-then-project",
+    "current_mutation_authority": "sqlite",
     "target_mutation_authority": "sqlite",
     "projection_role": "compatible-rebuildable-projections"
   },

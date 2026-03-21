@@ -7,66 +7,58 @@ from ..stages.architecture.state import (
     ARCHITECTURE_STAGE,
     architecture_completeness_errors,
     load_architecture_state,
-    save_architecture_state,
     update_architecture_state,
 )
 from ..stages.concept.state import (
     CONCEPT_STAGE,
     concept_completeness_errors,
     load_concept_state,
-    save_concept_state,
     update_concept_state,
 )
 from ..stages.design.state import (
     DESIGN_STAGE,
     design_completeness_errors,
     load_design_state,
-    save_design_state,
     update_design_state,
 )
 from ..stages.feature_init.state import (
     FEATURE_INIT_STAGE,
     feature_init_completeness_errors,
     load_feature_init_state,
-    save_feature_init_state,
     update_feature_init_state,
 )
 from ..stages.feature_plan.state import (
     FEATURE_PLAN_STAGE,
     feature_plan_completeness_errors,
     load_feature_plan_state,
-    save_feature_plan_state,
 )
 from ..stages.plan.state import (
     PLAN_STAGE,
     load_plan_state,
     plan_completeness_errors,
-    save_plan_state,
     update_plan_state,
 )
 from ..stages.tech.state import (
     TECH_STAGE,
     load_tech_state,
-    save_tech_state,
     tech_completeness_errors,
     update_tech_state,
 )
 from ..shared.records import make_record
 from ..shared.storage import (
-    append_jsonl,
     ensure_memory_layout,
     get_memory_paths,
+    normalize_runtime_progress,
     now_iso,
-    read_jsonl,
 )
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
-from ..shared.system_store.sessions import (
-    clone_session_payload,
-    load_runtime_session,
-    save_runtime_session,
+from ..shared.system_store.canonical_state import (
+    build_runtime_snapshot_specs,
+    load_canonical_branch_state,
+    tag_records_for_stream,
 )
-from ..shared.validation import validate_branch_memory
-from ..projection.materialize import consolidate_branch_memory
+from ..shared.system_store.runtime_mutations import commit_runtime_mutation
+from ..shared.system_store.sessions import load_runtime_session
 
 CHECKPOINT_STAGES = {
     "mvp.concept",
@@ -85,21 +77,6 @@ def _normalize_text_list(values: list[str] | None) -> list[str]:
     if not values:
         return []
     return [value.strip() for value in values if value and value.strip()]
-
-
-def _snapshot_file(path: Path) -> str | None:
-    if not path.exists():
-        return None
-    return path.read_text(encoding="utf-8")
-
-
-def _restore_file(path: Path, content: str | None) -> None:
-    if content is None:
-        if path.exists():
-            path.unlink()
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
 
 
 def checkpoint_stage_memory(
@@ -135,19 +112,20 @@ def checkpoint_stage_memory(
         errors.append("summary must not be empty")
     ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
     paths = get_memory_paths(project_path, branch_name)
+    canonical = load_canonical_branch_state(project_path, branch_name)
     existing_stage_facts = [
         record
-        for record in read_jsonl(paths.facts)
+        for record in canonical.record_streams["facts"]
         if record.get("stage") == normalized_stage and record.get("status") == "validated"
     ]
     existing_stage_decisions = [
         record
-        for record in read_jsonl(paths.decisions)
+        for record in canonical.record_streams["decisions"]
         if record.get("stage") == normalized_stage and record.get("status") == "validated"
     ]
     existing_stage_contracts = [
         record
-        for record in read_jsonl(paths.contracts)
+        for record in canonical.record_streams["contracts"]
         if record.get("stage") == normalized_stage and record.get("status") == "validated"
     ]
     has_existing_stage_memory = any(
@@ -168,27 +146,12 @@ def checkpoint_stage_memory(
     if errors:
         return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
 
-    snapshots = {
-        paths.decision_log: _snapshot_file(paths.decision_log),
-        paths.facts: _snapshot_file(paths.facts),
-        paths.decisions: _snapshot_file(paths.decisions),
-        paths.contracts: _snapshot_file(paths.contracts),
-        paths.concept_state: _snapshot_file(paths.concept_state),
-        paths.design_state: _snapshot_file(paths.design_state),
-        paths.tech_state: _snapshot_file(paths.tech_state),
-        paths.architecture_state: _snapshot_file(paths.architecture_state),
-        paths.plan_state: _snapshot_file(paths.plan_state),
-        paths.feature_init_state: _snapshot_file(paths.feature_init_state),
-        paths.feature_plan_state: _snapshot_file(paths.feature_plan_state),
-    }
-
     ts = now_iso()
     active_session = load_runtime_session(
         project_path,
         branch_name=branch_name,
         session_key=session_key,
     )
-    previous_session = clone_session_payload(active_session)
     active_session.update(
         {
             "branch": branch_name,
@@ -223,13 +186,13 @@ def checkpoint_stage_memory(
         },
         ts=ts,
     )
-    concept_state = load_concept_state(paths.concept_state)
-    design_state = load_design_state(paths.design_state)
-    tech_state = load_tech_state(paths.tech_state)
-    architecture_state = load_architecture_state(paths.architecture_state)
-    plan_state = load_plan_state(paths.plan_state)
-    feature_init_state = load_feature_init_state(paths.feature_init_state)
-    feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
+    concept_state = canonical.snapshots.get(CONCEPT_STAGE) or load_concept_state(paths.concept_state)
+    design_state = canonical.snapshots.get(DESIGN_STAGE) or load_design_state(paths.design_state)
+    tech_state = canonical.snapshots.get(TECH_STAGE) or load_tech_state(paths.tech_state)
+    architecture_state = canonical.snapshots.get(ARCHITECTURE_STAGE) or load_architecture_state(paths.architecture_state)
+    plan_state = canonical.snapshots.get(PLAN_STAGE) or load_plan_state(paths.plan_state)
+    feature_init_state = canonical.snapshots.get(FEATURE_INIT_STAGE) or load_feature_init_state(paths.feature_init_state)
+    feature_plan_state = canonical.snapshots.get(FEATURE_PLAN_STAGE) or load_feature_plan_state(paths.feature_plan_state)
     if normalized_stage == CONCEPT_STAGE:
         concept_state = update_concept_state(
             concept_state,
@@ -361,54 +324,64 @@ def checkpoint_stage_memory(
         for item in normalized_contracts
     ]
 
-    try:
-        if normalized_stage == CONCEPT_STAGE:
-            save_concept_state(paths.concept_state, concept_state)
-        elif normalized_stage == DESIGN_STAGE:
-            save_design_state(paths.design_state, design_state)
-        elif normalized_stage == TECH_STAGE:
-            save_tech_state(paths.tech_state, tech_state)
-        elif normalized_stage == ARCHITECTURE_STAGE:
-            save_architecture_state(paths.architecture_state, architecture_state)
-        elif normalized_stage == PLAN_STAGE:
-            save_plan_state(paths.plan_state, plan_state)
-        elif normalized_stage == FEATURE_INIT_STAGE:
-            save_feature_init_state(paths.feature_init_state, feature_init_state)
-        elif normalized_stage == FEATURE_PLAN_STAGE:
-            save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
-        save_runtime_session(
-            project_path,
-            branch_name=branch_name,
-            session_key=session_key,
-            payload=active_session,
-        )
-        append_jsonl(paths.decision_log, [checkpoint_record])
-        append_jsonl(paths.facts, fact_records)
-        append_jsonl(paths.decisions, decision_records)
-        append_jsonl(paths.contracts, contract_records)
+    snapshot_payloads: dict[str, dict[str, Any]] = {}
+    if normalized_stage == CONCEPT_STAGE:
+        snapshot_payloads[CONCEPT_STAGE] = concept_state
+    elif normalized_stage == DESIGN_STAGE:
+        snapshot_payloads[DESIGN_STAGE] = design_state
+    elif normalized_stage == TECH_STAGE:
+        snapshot_payloads[TECH_STAGE] = tech_state
+    elif normalized_stage == ARCHITECTURE_STAGE:
+        snapshot_payloads[ARCHITECTURE_STAGE] = architecture_state
+    elif normalized_stage == PLAN_STAGE:
+        snapshot_payloads[PLAN_STAGE] = plan_state
+    elif normalized_stage == FEATURE_INIT_STAGE:
+        snapshot_payloads[FEATURE_INIT_STAGE] = feature_init_state
+    elif normalized_stage == FEATURE_PLAN_STAGE:
+        snapshot_payloads[FEATURE_PLAN_STAGE] = feature_plan_state
 
-        generated = consolidate_branch_memory(project_path, branch_name, stage=normalized_stage)
-        ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
-        validation_errors = validate_branch_memory(project_path, branch_name, stage=normalized_stage)
-        if validation_errors:
-            raise ValueError("; ".join(validation_errors))
-    except Exception as exc:
-        for path, content in snapshots.items():
-            _restore_file(path, content)
-        save_runtime_session(
-            project_path,
-            branch_name=branch_name,
-            session_key=session_key,
-            payload=previous_session,
-        )
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "errors": [str(exc)],
+    catalog_override: dict[str, list[str]] | None = None
+    if normalized_stage == CONCEPT_STAGE:
+        catalog_override = {
+            priority: [
+                item.get("name", "")
+                for item in concept_state.get("features", {}).get(priority, [])
+                if item.get("name", "")
+            ]
+            for priority in ("p1", "p2", "p3")
         }
+    elif normalized_stage == FEATURE_INIT_STAGE:
+        catalog_override = {
+            priority: [
+                item.get("id", "")
+                for item in feature_init_state.get("features", {}).get(priority, [])
+                if item.get("id", "")
+            ]
+            for priority in ("p1", "p2", "p3")
+        }
+    progress_state, _ = normalize_runtime_progress(
+        project_path,
+        branch_name,
+        canonical.progress,
+        catalog_override=catalog_override,
+    )
+    snapshot_payloads["progress"] = progress_state
 
-    return {
+    records: list[dict[str, Any]] = []
+    records.extend(tag_records_for_stream([checkpoint_record], "decision_log"))
+    records.extend(tag_records_for_stream(fact_records, "facts"))
+    records.extend(tag_records_for_stream(decision_records, "decisions"))
+    records.extend(tag_records_for_stream(contract_records, "contracts"))
+    projection_meta = commit_runtime_mutation(
+        project_path,
+        branch_name=branch_name,
+        stage=normalized_stage,
+        stage_snapshots=build_runtime_snapshot_specs(project_path, branch_name, snapshot_payloads),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=records,
+    )
+
+    payload = {
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
@@ -422,5 +395,6 @@ def checkpoint_stage_memory(
             "decisions": len(decision_records),
             "contracts": len(contract_records),
         },
-        "generated_views": [str(path.relative_to(project_path)) for path in generated],
     }
+    payload.update(projection_meta)
+    return payload

@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import madspec_cli.memory.semantic.capture as capture_module
-import madspec_cli.memory.semantic.checkpoint as checkpoint_module
+import madspec_cli.memory.shared.system_store.runtime_mutations as runtime_mutations_module
+from madspec_cli.memory.application.consolidate_memory import ConsolidateMemoryRequest, execute as consolidate_memory
 from madspec_cli.memory import (
     append_jsonl,
     capture_stage_memory,
@@ -17,6 +17,8 @@ from madspec_cli.memory import (
     validate_branch_memory,
     write_json,
 )
+from madspec_cli.memory.shared.system_store import bootstrap_branch_canonical_state, load_canonical_branch_state
+from madspec_cli.memory.shared.system_store.store import MemoryStore
 from tests.memory_runtime.support import step_metadata, step_status
 
 
@@ -246,14 +248,14 @@ def test_promote_retrieve_and_learn_flow(memory_project) -> None:
 
 
 def test_capture_stage_memory_consolidates_once(memory_project, monkeypatch) -> None:
-    original_consolidate = capture_module.consolidate_branch_memory
+    original_refresh = runtime_mutations_module.refresh_branch_projections
     calls: list[str] = []
 
-    def counting_consolidate(project_path: Path, branch_name: str, **kwargs) -> list[Path]:
+    def counting_refresh(project_path: Path, branch_name: str, **kwargs):
         calls.append(branch_name)
-        return original_consolidate(project_path, branch_name, **kwargs)
+        return original_refresh(project_path, branch_name, **kwargs)
 
-    monkeypatch.setattr(capture_module, "consolidate_branch_memory", counting_consolidate)
+    monkeypatch.setattr(runtime_mutations_module, "refresh_branch_projections", counting_refresh)
 
     captured = capture_stage_memory(
         memory_project.project_path,
@@ -286,14 +288,14 @@ def test_checkpoint_stage_memory_consolidates_once(memory_project, monkeypatch) 
         status="validated",
     )
 
-    original_consolidate = checkpoint_module.consolidate_branch_memory
+    original_refresh = runtime_mutations_module.refresh_branch_projections
     calls: list[str] = []
 
-    def counting_consolidate(project_path: Path, branch_name: str, **kwargs) -> list[Path]:
+    def counting_refresh(project_path: Path, branch_name: str, **kwargs):
         calls.append(branch_name)
-        return original_consolidate(project_path, branch_name, **kwargs)
+        return original_refresh(project_path, branch_name, **kwargs)
 
-    monkeypatch.setattr(checkpoint_module, "consolidate_branch_memory", counting_consolidate)
+    monkeypatch.setattr(runtime_mutations_module, "refresh_branch_projections", counting_refresh)
 
     checkpointed = checkpoint_stage_memory(
         memory_project.project_path,
@@ -341,8 +343,8 @@ def test_security_checkpoint_generates_security_audit_view(memory_project) -> No
 
 def test_checkpoint_stage_memory_is_atomic_on_invalid_payload(memory_project) -> None:
     paths = memory_project.paths
-    original_active_session = paths["active_session"].read_text(encoding="utf-8")
     original_decision_log = paths["decision_log"].read_text(encoding="utf-8")
+    original_session = retrieve_memory_context(memory_project.project_path, "main", "mvp.plan")["active_session"]
 
     payload = checkpoint_stage_memory(
         memory_project.project_path,
@@ -352,5 +354,93 @@ def test_checkpoint_stage_memory_is_atomic_on_invalid_payload(memory_project) ->
     )
 
     assert payload["accepted"] is False
-    assert paths["active_session"].read_text(encoding="utf-8") == original_active_session
     assert paths["decision_log"].read_text(encoding="utf-8") == original_decision_log
+    current_session = retrieve_memory_context(memory_project.project_path, "main", "mvp.plan")["active_session"]
+    assert current_session == original_session
+
+
+def test_consolidate_rebuilds_branch_memory_files_from_canonical_state(memory_project) -> None:
+    capture_stage_memory(
+        memory_project.project_path,
+        "main",
+        "mvp.concept",
+        project_name="MVP scheduling assistant",
+        system_overview="System helps freelancers manage bookings.",
+        audiences=["Freelancers"],
+        scenarios=["Book client meetings"],
+        pain_points=["Manual follow-ups are slow"],
+        feature_p1=["Booking workflow::Create bookings and reminders"],
+        status="validated",
+    )
+    branch_dir = memory_project.paths["branch_dir"]
+    memory_project.paths["concept_state"].unlink()
+    memory_project.paths["decision_log"].write_text("", encoding="utf-8")
+    (branch_dir / "concept.md").unlink()
+
+    retrieved = retrieve_memory_context(memory_project.project_path, "main", "mvp.concept", full_artifact=True)
+    rebuilt = consolidate_memory(
+        ConsolidateMemoryRequest(project_path=memory_project.project_path, branch_name="main")
+    ).to_payload()
+
+    assert retrieved["artifact_state"]["concept"]["projectName"] == "MVP scheduling assistant"
+    assert memory_project.paths["concept_state"].exists()
+    assert "MVP scheduling assistant" in memory_project.paths["concept_state"].read_text(encoding="utf-8")
+    assert "MVP scheduling assistant" in (branch_dir / "concept.md").read_text(encoding="utf-8")
+    assert rebuilt["generated_paths"]
+
+
+def test_bootstrap_branch_canonical_state_imports_legacy_files_only_once(memory_project) -> None:
+    store = MemoryStore(memory_project.project_path)
+    store.purge_branch("main")
+
+    legacy_progress = {
+        "currentImplementStep": None,
+        "completedSteps": [],
+        "plannedSteps": ["step-01-bootstrap"],
+        "stepStatus": {"step-01-bootstrap": step_status(status="planned")},
+        "stepMetadata": {"step-01-bootstrap": step_metadata("code", "required")},
+        "coversFunctions": {"step-01-bootstrap": {"p1": ["Booking workflow"], "p2": [], "p3": []}},
+        "planningMetadata": {
+            "lastPlannedStep": "step-01-bootstrap",
+            "planningPhase": "initial",
+            "totalStepsEstimated": 1,
+            "stepDependencies": {"step-01-bootstrap": []},
+            "progressMetrics": {
+                "p1Coverage": {"covered": 1, "total": 1, "percentage": 100},
+                "p2Coverage": {"covered": 0, "total": 0, "percentage": 0},
+                "p3Coverage": {"covered": 0, "total": 0, "percentage": 0},
+                "overallProgress": 50,
+            },
+        },
+    }
+    memory_project.paths["progress"].write_text(
+        json.dumps(legacy_progress, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    memory_project.paths["decision_log"].write_text(
+        json.dumps(
+            make_record(
+                "main",
+                "mvp.plan",
+                "memory.register-step",
+                "Imported legacy planned step",
+                step_id="step-01-bootstrap",
+                status="validated",
+            ),
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert bootstrap_branch_canonical_state(memory_project.project_path, "main") is True
+
+    memory_project.paths["progress"].write_text(
+        json.dumps({**legacy_progress, "plannedSteps": ["step-99-overwrite"]}, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    assert bootstrap_branch_canonical_state(memory_project.project_path, "main") is False
+
+    canonical = load_canonical_branch_state(memory_project.project_path, "main")
+    assert canonical.progress["plannedSteps"] == ["step-01-bootstrap"]
+    assert canonical.record_streams["decision_log"][0]["summary"] == "Imported legacy planned step"

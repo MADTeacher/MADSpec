@@ -24,6 +24,27 @@ from .text import (
 )
 from .vector import VectorMemoryIndex
 
+_SEMANTIC_RECORD_STREAMS = {
+    "fact": "facts",
+    "decision": "decisions",
+    "contract": "contracts",
+}
+
+
+def _infer_record_stream(record: dict[str, Any]) -> str:
+    explicit = _normalized_optional_text(record.get("record_stream"))
+    if explicit:
+        return explicit
+
+    semantic_kind = _normalized_optional_text(record.get("semantic_kind"))
+    if semantic_kind in _SEMANTIC_RECORD_STREAMS:
+        return _SEMANTIC_RECORD_STREAMS[semantic_kind]
+
+    source = str(record.get("source") or "")
+    if source.startswith("memory.start-step") or source.startswith("memory.checkpoint-step") or source.startswith("memory.complete-step"):
+        return "events"
+    return "decision_log"
+
 
 class MemoryStore:
     def __init__(self, project_path: Path) -> None:
@@ -41,6 +62,7 @@ class MemoryStore:
                     record_id TEXT PRIMARY KEY,
                     kind TEXT NOT NULL,
                     semantic_kind TEXT,
+                    record_stream TEXT,
                     scope TEXT,
                     branch TEXT NOT NULL,
                     stage TEXT NOT NULL,
@@ -154,6 +176,7 @@ class MemoryStore:
                 );
                 """
             )
+            self._ensure_schema_migrations(conn)
             self._ensure_fts_tables(conn)
 
     def connect(self) -> sqlite3.Connection:
@@ -169,11 +192,16 @@ class MemoryStore:
         return conn
 
     def upsert_record(self, record: dict[str, Any]) -> None:
+        with self.connect() as conn:
+            self._upsert_record(conn, record)
+
+    def _upsert_record(self, conn: sqlite3.Connection, record: dict[str, Any]) -> None:
         payload_json = _dump_json(record)
         search_text = _record_search_text(record)
         content_hash = _content_hash(payload_json)
         kind = str(record.get("semantic_kind") or record.get("record_type") or "event")
         record_id = str(record.get("id") or uuid.uuid4())
+        record_stream = _infer_record_stream(record)
         branch = str(record.get("branch") or "")
         stage = str(record.get("stage") or "")
         step_id = _normalized_optional_text(record.get("step_id"))
@@ -183,84 +211,103 @@ class MemoryStore:
         summary = str(record.get("summary") or "")
         source = _normalized_optional_text(record.get("source"))
         semantic_kind = _normalized_optional_text(record.get("semantic_kind"))
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO records (
-                    record_id, kind, semantic_kind, scope, branch, stage, step_id,
-                    status, version, summary, payload_json, search_text, source, ts, content_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(record_id) DO UPDATE SET
-                    kind=excluded.kind,
-                    semantic_kind=excluded.semantic_kind,
-                    scope=excluded.scope,
-                    branch=excluded.branch,
-                    stage=excluded.stage,
-                    step_id=excluded.step_id,
-                    status=excluded.status,
-                    summary=excluded.summary,
-                    payload_json=excluded.payload_json,
-                    search_text=excluded.search_text,
-                    source=excluded.source,
-                    ts=excluded.ts,
-                    content_hash=excluded.content_hash
-                """,
-                (
-                    record_id,
-                    kind,
-                    semantic_kind,
-                    scope,
-                    branch,
-                    stage,
-                    step_id,
-                    status,
-                    int(record.get("version") or 1),
-                    summary,
-                    payload_json,
-                    search_text,
-                    source,
-                    ts,
-                    content_hash,
-                ),
-            )
-            self._upsert_fts_row(
-                conn,
-                table_name="records_fts",
-                columns=(
-                    "row_id",
-                    "record_id",
-                    "branch",
-                    "stage",
-                    "step_id",
-                    "scope",
-                    "status",
-                    "kind",
-                    "content",
-                ),
-                values=(
-                    record_id,
-                    record_id,
-                    branch,
-                    stage,
-                    step_id or "",
-                    scope,
-                    status,
-                    kind,
-                    search_text,
-                ),
-            )
-            self._enqueue_index_job(
-                conn,
-                source_type="record",
-                source_id=record_id,
-                branch=branch,
-                stage=stage,
-                step_id=step_id,
-                content_hash=content_hash,
-            )
+        conn.execute(
+            """
+            INSERT INTO records (
+                record_id, kind, semantic_kind, record_stream, scope, branch, stage, step_id,
+                status, version, summary, payload_json, search_text, source, ts, content_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(record_id) DO UPDATE SET
+                kind=excluded.kind,
+                semantic_kind=excluded.semantic_kind,
+                record_stream=excluded.record_stream,
+                scope=excluded.scope,
+                branch=excluded.branch,
+                stage=excluded.stage,
+                step_id=excluded.step_id,
+                status=excluded.status,
+                summary=excluded.summary,
+                payload_json=excluded.payload_json,
+                search_text=excluded.search_text,
+                source=excluded.source,
+                ts=excluded.ts,
+                content_hash=excluded.content_hash
+            """,
+            (
+                record_id,
+                kind,
+                semantic_kind,
+                record_stream,
+                scope,
+                branch,
+                stage,
+                step_id,
+                status,
+                int(record.get("version") or 1),
+                summary,
+                payload_json,
+                search_text,
+                source,
+                ts,
+                content_hash,
+            ),
+        )
+        self._upsert_fts_row(
+            conn,
+            table_name="records_fts",
+            columns=(
+                "row_id",
+                "record_id",
+                "branch",
+                "stage",
+                "step_id",
+                "scope",
+                "status",
+                "kind",
+                "content",
+            ),
+            values=(
+                record_id,
+                record_id,
+                branch,
+                stage,
+                step_id or "",
+                scope,
+                status,
+                kind,
+                search_text,
+            ),
+        )
+        self._enqueue_index_job(
+            conn,
+            source_type="record",
+            source_id=record_id,
+            branch=branch,
+            stage=stage,
+            step_id=step_id,
+            content_hash=content_hash,
+        )
 
     def upsert_stage_snapshot(
         self,
+        *,
+        branch: str,
+        snapshot_key: str,
+        payload: dict[str, Any],
+        source_path: str,
+    ) -> None:
+        with self.connect() as conn:
+            self._upsert_stage_snapshot(
+                conn,
+                branch=branch,
+                snapshot_key=snapshot_key,
+                payload=payload,
+                source_path=source_path,
+            )
+
+    def _upsert_stage_snapshot(
+        self,
+        conn: sqlite3.Connection,
         *,
         branch: str,
         snapshot_key: str,
@@ -278,78 +325,87 @@ class MemoryStore:
             or ""
         )
         stage = _snapshot_stage(snapshot_key)
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO stage_snapshots (
-                    snapshot_key, branch, stage, version, summary, payload_json, search_text,
-                    source_path, updated_at, content_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(snapshot_key, branch) DO UPDATE SET
-                    stage=excluded.stage,
-                    summary=excluded.summary,
-                    payload_json=excluded.payload_json,
-                    search_text=excluded.search_text,
-                    source_path=excluded.source_path,
-                    updated_at=excluded.updated_at,
-                    content_hash=excluded.content_hash
-                """,
-                (
-                    snapshot_key,
-                    branch,
-                    stage,
-                    int(payload.get("revision") or payload.get("version") or 1),
-                    summary,
-                    payload_json,
-                    search_text,
-                    source_path,
-                    updated_at,
-                    content_hash,
-                ),
-            )
-            self._upsert_fts_row(
-                conn,
-                table_name="stage_snapshots_fts",
-                columns=("row_id", "snapshot_key", "branch", "stage", "content"),
-                values=(f"{branch}:{snapshot_key}", snapshot_key, branch, stage, search_text),
-            )
-            self._enqueue_index_job(
-                conn,
-                source_type="snapshot",
-                source_id=f"{branch}:{snapshot_key}",
-                branch=branch,
-                stage=stage,
-                step_id=None,
-                content_hash=content_hash,
-            )
+        conn.execute(
+            """
+            INSERT INTO stage_snapshots (
+                snapshot_key, branch, stage, version, summary, payload_json, search_text,
+                source_path, updated_at, content_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(snapshot_key, branch) DO UPDATE SET
+                stage=excluded.stage,
+                summary=excluded.summary,
+                payload_json=excluded.payload_json,
+                search_text=excluded.search_text,
+                source_path=excluded.source_path,
+                updated_at=excluded.updated_at,
+                content_hash=excluded.content_hash
+            """,
+            (
+                snapshot_key,
+                branch,
+                stage,
+                int(payload.get("revision") or payload.get("version") or 1),
+                summary,
+                payload_json,
+                search_text,
+                source_path,
+                updated_at,
+                content_hash,
+            ),
+        )
+        self._upsert_fts_row(
+            conn,
+            table_name="stage_snapshots_fts",
+            columns=("row_id", "snapshot_key", "branch", "stage", "content"),
+            values=(f"{branch}:{snapshot_key}", snapshot_key, branch, stage, search_text),
+        )
+        self._enqueue_index_job(
+            conn,
+            source_type="snapshot",
+            source_id=f"{branch}:{snapshot_key}",
+            branch=branch,
+            stage=stage,
+            step_id=None,
+            content_hash=content_hash,
+        )
 
     def upsert_session(self, *, branch: str, session_key: str, payload: dict[str, Any]) -> None:
+        with self.connect() as conn:
+            self._upsert_session(conn, branch=branch, session_key=session_key, payload=payload)
+
+    def _upsert_session(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        branch: str,
+        session_key: str,
+        payload: dict[str, Any],
+    ) -> None:
         payload_json = _dump_json(payload)
         content_hash = _content_hash(payload_json)
         updated_at = str(payload.get("updated_at") or payload.get("last_checkpoint_at") or "")
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO sessions (
-                    session_key, branch, stage, current_step, payload_json, updated_at, content_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(session_key, branch) DO UPDATE SET
-                    stage=excluded.stage,
-                    current_step=excluded.current_step,
-                    payload_json=excluded.payload_json,
-                    updated_at=excluded.updated_at,
-                    content_hash=excluded.content_hash
-                """,
-                (
-                    session_key,
-                    branch,
-                    _normalized_optional_text(payload.get("stage")),
-                    _normalized_optional_text(payload.get("current_step")),
-                    payload_json,
-                    updated_at,
-                    content_hash,
-                ),
-            )
+        conn.execute(
+            """
+            INSERT INTO sessions (
+                session_key, branch, stage, current_step, payload_json, updated_at, content_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_key, branch) DO UPDATE SET
+                stage=excluded.stage,
+                current_step=excluded.current_step,
+                payload_json=excluded.payload_json,
+                updated_at=excluded.updated_at,
+                content_hash=excluded.content_hash
+            """,
+            (
+                session_key,
+                branch,
+                _normalized_optional_text(payload.get("stage")),
+                _normalized_optional_text(payload.get("current_step")),
+                payload_json,
+                updated_at,
+                content_hash,
+            ),
+        )
 
     def fetch_session(self, *, branch: str, session_key: str) -> dict[str, Any] | None:
         with self.connect_read_only() as conn:
@@ -378,49 +434,70 @@ class MemoryStore:
         content: str,
         updated_at: str,
     ) -> None:
-        search_text = content
-        content_hash = _content_hash(content)
         with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO artifacts (
-                    artifact_id, branch, stage, path, content, search_text, updated_at, content_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(artifact_id) DO UPDATE SET
-                    branch=excluded.branch,
-                    stage=excluded.stage,
-                    path=excluded.path,
-                    content=excluded.content,
-                    search_text=excluded.search_text,
-                    updated_at=excluded.updated_at,
-                    content_hash=excluded.content_hash
-                """,
-                (
-                    artifact_id,
-                    branch,
-                    stage,
-                    path,
-                    content,
-                    search_text,
-                    updated_at,
-                    content_hash,
-                ),
-            )
-            self._upsert_fts_row(
+            self._upsert_artifact(
                 conn,
-                table_name="artifacts_fts",
-                columns=("row_id", "artifact_id", "branch", "stage", "path", "content"),
-                values=(artifact_id, artifact_id, branch, stage or "", path, search_text),
-            )
-            self._enqueue_index_job(
-                conn,
-                source_type="artifact",
-                source_id=artifact_id,
+                artifact_id=artifact_id,
                 branch=branch,
                 stage=stage,
-                step_id=None,
-                content_hash=content_hash,
+                path=path,
+                content=content,
+                updated_at=updated_at,
             )
+
+    def _upsert_artifact(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        artifact_id: str,
+        branch: str,
+        stage: str | None,
+        path: str,
+        content: str,
+        updated_at: str,
+    ) -> None:
+        search_text = content
+        content_hash = _content_hash(content)
+        conn.execute(
+            """
+            INSERT INTO artifacts (
+                artifact_id, branch, stage, path, content, search_text, updated_at, content_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(artifact_id) DO UPDATE SET
+                branch=excluded.branch,
+                stage=excluded.stage,
+                path=excluded.path,
+                content=excluded.content,
+                search_text=excluded.search_text,
+                updated_at=excluded.updated_at,
+                content_hash=excluded.content_hash
+            """,
+            (
+                artifact_id,
+                branch,
+                stage,
+                path,
+                content,
+                search_text,
+                updated_at,
+                content_hash,
+            ),
+        )
+        self._upsert_fts_row(
+            conn,
+            table_name="artifacts_fts",
+            columns=("row_id", "artifact_id", "branch", "stage", "path", "content"),
+            values=(artifact_id, artifact_id, branch, stage or "", path, search_text),
+        )
+        self._enqueue_index_job(
+            conn,
+            source_type="artifact",
+            source_id=artifact_id,
+            branch=branch,
+            stage=stage,
+            step_id=None,
+            content_hash=content_hash,
+        )
 
     def exact_search(
         self,
@@ -564,6 +641,7 @@ class MemoryStore:
         payload = json.loads(row["payload_json"])
         payload.setdefault("id", row["record_id"])
         payload.setdefault("kind", row["kind"])
+        payload.setdefault("record_stream", row["record_stream"])
         payload.setdefault("content_hash", row["content_hash"])
         return payload
 
@@ -600,6 +678,26 @@ class MemoryStore:
         if row is None:
             return None
         return dict(row)
+
+    def branch_has_canonical_state(self, branch: str) -> bool:
+        with self.connect_read_only() as conn:
+            snapshot_count = conn.execute(
+                "SELECT COUNT(*) FROM stage_snapshots WHERE branch = ?",
+                (branch,),
+            ).fetchone()[0]
+            session_count = conn.execute(
+                "SELECT COUNT(*) FROM sessions WHERE branch = ?",
+                (branch,),
+            ).fetchone()[0]
+            record_count = conn.execute(
+                "SELECT COUNT(*) FROM records WHERE branch = ?",
+                (branch,),
+            ).fetchone()[0]
+            artifact_count = conn.execute(
+                "SELECT COUNT(*) FROM artifacts WHERE branch = ?",
+                (branch,),
+            ).fetchone()[0]
+        return any((snapshot_count, session_count, record_count, artifact_count))
 
     def list_records(
         self,
@@ -640,6 +738,89 @@ class MemoryStore:
                 (*params, limit),
             ).fetchall()
         return [self._record_details_from_row(dict(row)) for row in rows]
+
+    def list_records_by_stream(
+        self,
+        *,
+        branch: str,
+        record_stream: str,
+        statuses: list[str] | None = None,
+        stage: str | None = None,
+        step_id: str | None = None,
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        clauses = ["branch = ?", "record_stream = ?"]
+        params: list[Any] = [branch, record_stream]
+        if stage is not None:
+            clauses.append("stage = ?")
+            params.append(stage)
+        if step_id is not None:
+            clauses.append("step_id = ?")
+            params.append(step_id)
+        if statuses:
+            placeholders = ", ".join("?" for _ in statuses)
+            clauses.append(f"status IN ({placeholders})")
+            params.extend(statuses)
+        with self.connect_read_only() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT payload_json
+                FROM records
+                WHERE {' AND '.join(clauses)}
+                ORDER BY ts ASC, record_id ASC
+                LIMIT ?
+                """,
+                (*params, limit),
+            ).fetchall()
+        payloads: list[dict[str, Any]] = []
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            if isinstance(payload, dict):
+                payloads.append(payload)
+        return payloads
+
+    def upsert_artifacts_batch(self, *, branch: str, artifacts: list[dict[str, Any]]) -> None:
+        if not artifacts:
+            return
+        with self.connect() as conn:
+            for artifact in artifacts:
+                self._upsert_artifact(
+                    conn,
+                    artifact_id=str(artifact["artifact_id"]),
+                    branch=branch,
+                    stage=_normalized_optional_text(artifact.get("stage")),
+                    path=str(artifact["path"]),
+                    content=str(artifact["content"]),
+                    updated_at=str(artifact["updated_at"]),
+                )
+
+    def commit_runtime_mutation(
+        self,
+        *,
+        branch: str,
+        stage_snapshots: list[dict[str, Any]],
+        sessions: list[dict[str, Any]],
+        records: list[dict[str, Any]],
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            for snapshot in stage_snapshots:
+                self._upsert_stage_snapshot(
+                    conn,
+                    branch=branch,
+                    snapshot_key=str(snapshot["snapshot_key"]),
+                    payload=dict(snapshot["payload"]),
+                    source_path=str(snapshot["source_path"]),
+                )
+            for session in sessions:
+                self._upsert_session(
+                    conn,
+                    branch=branch,
+                    session_key=str(session["session_key"]),
+                    payload=dict(session["payload"]),
+                )
+            for record in records:
+                self._upsert_record(conn, dict(record))
 
     def list_stage_snapshots(
         self,
@@ -1182,11 +1363,13 @@ class MemoryStore:
         payload = json.loads(row["payload_json"])
         payload.setdefault("id", row["record_id"])
         payload.setdefault("kind", row["kind"])
+        payload.setdefault("record_stream", row.get("record_stream"))
         payload.setdefault("content_hash", row["content_hash"])
         return {
             "record_id": row["record_id"],
             "kind": row["kind"],
             "semantic_kind": row.get("semantic_kind"),
+            "record_stream": row.get("record_stream"),
             "scope": row.get("scope"),
             "branch": row.get("branch"),
             "stage": row.get("stage"),
@@ -1200,6 +1383,30 @@ class MemoryStore:
             "ts": row.get("ts"),
             "content_hash": row.get("content_hash"),
         }
+
+    def _ensure_schema_migrations(self, conn: sqlite3.Connection) -> None:
+        self._ensure_column(
+            conn,
+            table_name="records",
+            column_name="record_stream",
+            ddl="TEXT",
+        )
+
+    def _ensure_column(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        table_name: str,
+        column_name: str,
+        ddl: str,
+    ) -> None:
+        columns = {
+            row["name"]
+            for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name in columns:
+            return
+        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}")
 
 
 def _dedupe_search_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:

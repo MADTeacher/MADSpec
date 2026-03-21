@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import madspec_cli.memory.projection.retrieve as retrieve_module
 from madspec_cli.memory import (
     capture_stage_memory,
     checkpoint_stage_memory,
@@ -141,12 +139,7 @@ def test_retrieve_memory_context_returns_concept_status_for_partial_concept(memo
     }
 
 
-def test_retrieve_memory_context_reads_semantic_files_once_and_skips_history_for_concept(
-    memory_project,
-    monkeypatch,
-) -> None:
-    paths = memory_project.paths
-
+def test_retrieve_memory_context_skips_history_for_concept_by_default(memory_project) -> None:
     capture_stage_memory(
         memory_project.project_path,
         "main",
@@ -160,30 +153,16 @@ def test_retrieve_memory_context_reads_semantic_files_once_and_skips_history_for
         questions=["Q1"],
         status="validated",
     )
-
-    original_read_jsonl = retrieve_module.read_jsonl
-    calls: list[Path] = []
-
-    def counting_read_jsonl(path: Path) -> list[dict[str, object]]:
-        calls.append(path)
-        return original_read_jsonl(path)
-
-    monkeypatch.setattr(retrieve_module, "read_jsonl", counting_read_jsonl)
 
     retrieved = retrieve_memory_context(memory_project.project_path, "main", "mvp.concept")
 
     assert retrieved["decision_log"] == []
     assert retrieved["episodes"] == []
-    assert calls.count(paths["facts"]) == 1
-    assert calls.count(paths["decisions"]) == 1
-    assert calls.count(paths["contracts"]) == 1
-    assert paths["decision_log"] not in calls
-    assert paths["events"] not in calls
+    assert len(retrieved["semantic"]["facts"]) >= 1
+    assert retrieved["semantic"]["decisions"] != []
 
 
-def test_retrieve_memory_context_reads_history_when_requested_for_concept(memory_project, monkeypatch) -> None:
-    paths = memory_project.paths
-
+def test_retrieve_memory_context_includes_history_when_requested_for_concept(memory_project) -> None:
     capture_stage_memory(
         memory_project.project_path,
         "main",
@@ -197,15 +176,6 @@ def test_retrieve_memory_context_reads_history_when_requested_for_concept(memory
         questions=["Q1"],
         status="validated",
     )
-
-    original_read_jsonl = retrieve_module.read_jsonl
-    calls: list[Path] = []
-
-    def counting_read_jsonl(path: Path) -> list[dict[str, object]]:
-        calls.append(path)
-        return original_read_jsonl(path)
-
-    monkeypatch.setattr(retrieve_module, "read_jsonl", counting_read_jsonl)
 
     retrieved = retrieve_memory_context(
         memory_project.project_path,
@@ -214,9 +184,8 @@ def test_retrieve_memory_context_reads_history_when_requested_for_concept(memory
         include_history=True,
     )
 
-    assert calls.count(paths["decision_log"]) == 1
-    assert calls.count(paths["events"]) == 1
     assert len(retrieved["decision_log"]) == 1
+    assert retrieved["episodes"] == []
 
 
 def test_validate_detects_out_of_sync_generated_concept(memory_project) -> None:

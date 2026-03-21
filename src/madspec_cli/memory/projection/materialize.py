@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from madspec_cli.features.change.infrastructure.storage import build_change_context
+from madspec_cli.memory.shared.system_store.store import MemoryStore
 
 from ..shared.stage_scope import resolve_stage_scope
 from ..stages.architecture.state import render_data_model_markdown, render_openapi_yaml
@@ -23,10 +24,29 @@ from .renderers import (
 )
 
 
-def _write_generated(path: Path, content: str, generated: list[Path]) -> None:
+def _write_generated(
+    path: Path,
+    content: str,
+    generated: list[Path],
+    artifacts: list[dict[str, str]],
+    *,
+    project_path: Path,
+    branch_name: str,
+    stage: str | None,
+    updated_at: str,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     generated.append(path)
+    artifacts.append(
+        {
+            "artifact_id": str(path.relative_to(project_path)),
+            "path": str(path.relative_to(project_path)),
+            "content": content,
+            "stage": stage or "",
+            "updated_at": updated_at,
+        }
+    )
 
 
 def consolidate_branch_memory(
@@ -36,12 +56,15 @@ def consolidate_branch_memory(
     stage: str | None = None,
     full: bool = False,
 ) -> list[Path]:
-    from ..shared.system_store import sync_generated_artifacts
-
     state = load_branch_projection_state(project_path, branch_name)
-    records = load_materialization_records(state.paths)
+    records = load_materialization_records(
+        state.paths,
+        project_path=project_path,
+        branch_name=branch_name,
+    )
     scope = resolve_stage_scope(stage, full=full)
     generated: list[Path] = []
+    artifacts: list[dict[str, str]] = []
     summaries = build_materialization_summaries(
         project_path,
         branch_name,
@@ -55,6 +78,11 @@ def consolidate_branch_memory(
             state.paths.branch_dir / "concept.md",
             render_concept_markdown(state.concept_state),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="mvp.concept",
+            updated_at=state.generated_at,
         )
 
     if "ui-design" in scope.view_keys:
@@ -66,6 +94,11 @@ def consolidate_branch_memory(
                 project_name=state.concept_state.get("projectName", ""),
             ),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="mvp.design",
+            updated_at=state.generated_at,
         )
 
     if "tech-stack" in scope.view_keys:
@@ -78,7 +111,16 @@ def consolidate_branch_memory(
                 project_name=state.concept_state.get("projectName", ""),
             )
         )
-        _write_generated(state.paths.branch_dir / "tech-stack.md", tech_content, generated)
+        _write_generated(
+            state.paths.branch_dir / "tech-stack.md",
+            tech_content,
+            generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="mvp.tech" if not state.feature_mode else "feature.init",
+            updated_at=state.generated_at,
+        )
 
     if "architecture" in scope.view_keys:
         architecture_content = (
@@ -90,13 +132,27 @@ def consolidate_branch_memory(
                 project_name=state.concept_state.get("projectName", ""),
             )
         )
-        _write_generated(state.paths.branch_dir / "architecture.md", architecture_content, generated)
+        _write_generated(
+            state.paths.branch_dir / "architecture.md",
+            architecture_content,
+            generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="mvp.architecture" if not state.feature_mode else "feature.init",
+            updated_at=state.generated_at,
+        )
 
     if "project-analysis" in scope.view_keys:
         _write_generated(
             state.paths.branch_dir / "project-analysis.md",
             feature_materializer.render_project_analysis(state.feature_init_state),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="feature.init",
+            updated_at=state.generated_at,
         )
 
     if "feature-context" in scope.view_keys:
@@ -104,6 +160,11 @@ def consolidate_branch_memory(
             state.paths.branch_dir / "feature-context.md",
             feature_materializer.render_feature_context(state.feature_init_state),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="feature.init",
+            updated_at=state.generated_at,
         )
 
     if "data-model" in scope.view_keys:
@@ -115,6 +176,11 @@ def consolidate_branch_memory(
                 project_name=state.concept_state.get("projectName", ""),
             ),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="mvp.architecture",
+            updated_at=state.generated_at,
         )
 
     if "openapi" in scope.view_keys:
@@ -122,6 +188,11 @@ def consolidate_branch_memory(
             state.paths.branch_dir / "contracts" / "openapi.yaml",
             render_openapi_yaml(state.architecture_state, branch_name=branch_name),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="mvp.architecture",
+            updated_at=state.generated_at,
         )
 
     if "project-context" in scope.view_keys:
@@ -145,6 +216,11 @@ def consolidate_branch_memory(
                 security_gate_summary=summaries["security_gate_summary"],
             ),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="mvp.implement" if not state.feature_mode else "feature.implement",
+            updated_at=state.generated_at,
         )
 
     if "planning-cache" in scope.view_keys:
@@ -159,6 +235,11 @@ def consolidate_branch_memory(
                 state.generated_at,
             ),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="mvp.plan" if not state.feature_mode else "feature.plan",
+            updated_at=state.generated_at,
         )
 
     if "implementation-plan" in scope.view_keys:
@@ -181,6 +262,11 @@ def consolidate_branch_memory(
             state.paths.branch_dir / "implementation-plan.md",
             implementation_content,
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="feature.plan" if state.feature_mode else "mvp.plan",
+            updated_at=state.generated_at,
         )
 
     all_records = records.decision_log + records.events + records.facts + records.decisions + records.contracts
@@ -213,6 +299,11 @@ def consolidate_branch_memory(
                     ),
                 ),
                 generated,
+                artifacts,
+                project_path=project_path,
+                branch_name=branch_name,
+                stage=summaries["planning_stage"],
+                updated_at=state.generated_at,
             )
             _write_generated(
                 step_dir / "implementation-context.md",
@@ -231,6 +322,11 @@ def consolidate_branch_memory(
                     ),
                 ),
                 generated,
+                artifacts,
+                project_path=project_path,
+                branch_name=branch_name,
+                stage=summaries["implementation_stage"],
+                updated_at=state.generated_at,
             )
 
     review_records = [record for record in all_records if record.get("stage") == "review"]
@@ -250,9 +346,27 @@ def consolidate_branch_memory(
             gate_summary=summaries["review_gate_summary"],
         )
         if "review" in scope.view_keys:
-            _write_generated(state.paths.branch_dir / "review.md", review_text, generated)
+            _write_generated(
+                state.paths.branch_dir / "review.md",
+                review_text,
+                generated,
+                artifacts,
+                project_path=project_path,
+                branch_name=branch_name,
+                stage="review",
+                updated_at=state.generated_at,
+            )
         if "improvements" in scope.view_keys:
-            _write_generated(state.paths.branch_dir / "improvements.md", improvements_text, generated)
+            _write_generated(
+                state.paths.branch_dir / "improvements.md",
+                improvements_text,
+                generated,
+                artifacts,
+                project_path=project_path,
+                branch_name=branch_name,
+                stage="review",
+                updated_at=state.generated_at,
+            )
 
     if "security-audit" in scope.view_keys:
         security_records = [record for record in all_records if record.get("stage") == "security"]
@@ -265,7 +379,12 @@ def consolidate_branch_memory(
                 gate_summary=summaries["security_gate_summary"],
             ),
             generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="security",
+            updated_at=state.generated_at,
         )
 
-    sync_generated_artifacts(project_path, branch_name)
+    MemoryStore(project_path).upsert_artifacts_batch(branch=branch_name, artifacts=artifacts)
     return generated

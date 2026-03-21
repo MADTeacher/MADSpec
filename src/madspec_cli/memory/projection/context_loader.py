@@ -4,13 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..shared.storage import (
-    _default_progress_state,
-    get_memory_paths,
-    now_iso,
-    read_json,
-    read_jsonl,
-)
+from ..shared.storage import _default_progress_state, get_memory_paths, now_iso, read_json, read_jsonl
+from ..shared.system_store.canonical_state import load_canonical_branch_state
 from ..shared.system_store.sessions import load_runtime_session
 from ..stages.architecture.state import load_architecture_state
 from ..stages.concept.state import load_concept_state
@@ -62,15 +57,16 @@ class RetrieveProjectionState:
 
 def load_branch_projection_state(project_path: Path, branch_name: str) -> BranchProjectionState:
     paths = get_memory_paths(project_path, branch_name)
-    progress = read_json(paths.progress, _default_progress_state())
-    active_session = load_runtime_session(project_path, branch_name=branch_name)
-    concept_state = load_concept_state(paths.concept_state)
-    design_state = load_design_state(paths.design_state)
-    tech_state = load_tech_state(paths.tech_state)
-    architecture_state = load_architecture_state(paths.architecture_state)
-    plan_state = load_plan_state(paths.plan_state)
-    feature_init_state = load_feature_init_state(paths.feature_init_state)
-    feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
+    canonical = load_canonical_branch_state(project_path, branch_name)
+    progress = canonical.progress or _default_progress_state()
+    active_session = canonical.active_session
+    concept_state = canonical.snapshots.get("mvp.concept") or load_concept_state(paths.concept_state)
+    design_state = canonical.snapshots.get("mvp.design") or load_design_state(paths.design_state)
+    tech_state = canonical.snapshots.get("mvp.tech") or load_tech_state(paths.tech_state)
+    architecture_state = canonical.snapshots.get("mvp.architecture") or load_architecture_state(paths.architecture_state)
+    plan_state = canonical.snapshots.get("mvp.plan") or load_plan_state(paths.plan_state)
+    feature_init_state = canonical.snapshots.get("feature.init") or load_feature_init_state(paths.feature_init_state)
+    feature_plan_state = canonical.snapshots.get("feature.plan") or load_feature_plan_state(paths.feature_plan_state)
     feature_mode = not is_empty_feature_init_state(feature_init_state)
     generated_at = active_session.get("updated_at") or active_session.get("last_checkpoint_at") or now_iso()
     return BranchProjectionState(
@@ -92,8 +88,24 @@ def load_branch_projection_state(project_path: Path, branch_name: str) -> Branch
 def load_materialization_records(
     paths,
     *,
+    project_path: Path | None = None,
+    branch_name: str | None = None,
     read_records=read_jsonl,
 ) -> MaterializationRecords:
+    if project_path is not None and branch_name is not None:
+        canonical = load_canonical_branch_state(project_path, branch_name)
+        decision_log = list(canonical.record_streams["decision_log"])
+        events = list(canonical.record_streams["events"])
+        facts = [record for record in canonical.record_streams["facts"] if record.get("status") == "validated"]
+        decisions = [record for record in canonical.record_streams["decisions"] if record.get("status") == "validated"]
+        contracts = [record for record in canonical.record_streams["contracts"] if record.get("status") == "validated"]
+        return MaterializationRecords(
+            decision_log=decision_log,
+            events=events,
+            facts=facts,
+            decisions=decisions,
+            contracts=contracts,
+        )
     decision_log = read_records(paths.decision_log)
     events = read_records(paths.events)
     facts = [record for record in read_records(paths.facts) if record.get("status") == "validated"]
@@ -116,7 +128,8 @@ def load_retrieve_projection_state(
     session_key: str,
 ) -> RetrieveProjectionState:
     paths = get_memory_paths(project_path, branch_name)
-    progress = read_json(paths.progress, _default_progress_state())
+    canonical = load_canonical_branch_state(project_path, branch_name)
+    progress = canonical.progress or _default_progress_state()
     active_session = load_runtime_session(
         project_path,
         branch_name=branch_name,
@@ -126,11 +139,11 @@ def load_retrieve_projection_state(
         paths=paths,
         progress=progress,
         active_session=active_session,
-        concept_state=load_concept_state(paths.concept_state),
-        design_state=load_design_state(paths.design_state) if stage_lower == "mvp.design" else None,
-        tech_state=load_tech_state(paths.tech_state) if stage_lower == "mvp.tech" else None,
-        architecture_state=load_architecture_state(paths.architecture_state) if stage_lower == "mvp.architecture" else None,
-        plan_state=load_plan_state(paths.plan_state) if stage_lower == "mvp.plan" else None,
-        feature_init_state=load_feature_init_state(paths.feature_init_state) if stage_lower == "feature.init" else None,
-        feature_plan_state=load_feature_plan_state(paths.feature_plan_state) if stage_lower == "feature.plan" else None,
+        concept_state=canonical.snapshots.get("mvp.concept") or load_concept_state(paths.concept_state),
+        design_state=(canonical.snapshots.get("mvp.design") or load_design_state(paths.design_state)) if stage_lower == "mvp.design" else None,
+        tech_state=(canonical.snapshots.get("mvp.tech") or load_tech_state(paths.tech_state)) if stage_lower == "mvp.tech" else None,
+        architecture_state=(canonical.snapshots.get("mvp.architecture") or load_architecture_state(paths.architecture_state)) if stage_lower == "mvp.architecture" else None,
+        plan_state=(canonical.snapshots.get("mvp.plan") or load_plan_state(paths.plan_state)) if stage_lower == "mvp.plan" else None,
+        feature_init_state=(canonical.snapshots.get("feature.init") or load_feature_init_state(paths.feature_init_state)) if stage_lower == "feature.init" else None,
+        feature_plan_state=(canonical.snapshots.get("feature.plan") or load_feature_plan_state(paths.feature_plan_state)) if stage_lower == "feature.plan" else None,
     )

@@ -21,7 +21,7 @@ def _invoke_help(invoke_cli, command: str):
 def test_parallel_memory_contract_manifest_matches_runtime_baseline(repo_root, invoke_cli) -> None:
     manifest = _load_manifest(repo_root)
 
-    assert manifest["epic"] == "epic-1-session-scoped-runtime"
+    assert manifest["epic"] == "epic-2-sqlite-first-canonical-writes"
     assert manifest["roadmap_document"] == "dev/parallel-memory-roadmap.md"
     assert manifest["scope"] == "docs+contracts+behavior"
     assert manifest["behavior_change"] is True
@@ -85,8 +85,8 @@ def test_parallel_memory_docs_describe_current_runtime_truth(repo_root) -> None:
     memory_docs = (repo_root / "docs" / "cli" / "memory.md").read_text(encoding="utf-8")
     agents_docs = (repo_root / "docs" / "cli" / "agents.md").read_text(encoding="utf-8")
 
-    assert "сеансы рантайма теперь читаются и обновляются через `SQLite`" in memory_docs
-    assert "переход всех изменяющих состояние команд `madspec memory` на `SQLite`-first path относится к `dev/parallel-memory-roadmap.md`" in memory_docs
+    assert "все mutating runtime-команды теперь сначала коммитят изменения в `SQLite`" in memory_docs
+    assert "branch `memory/*.json`, `memory/*.jsonl` и generated markdown остаются rebuildable projections" in memory_docs
     assert "`--session-key`" in memory_docs
     assert "session `active`" in memory_docs
     assert "не является встроенным координатором выполнения" in agents_docs
