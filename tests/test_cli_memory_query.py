@@ -4,36 +4,39 @@ import json
 
 from madspec_cli.memory import append_jsonl, get_memory_paths, make_record
 
-from tests.support import step_metadata, step_status
 
-
-def test_memory_commands_support_validation_and_retrieve_json(make_madspec_project, invoke_cli) -> None:
+def test_memory_commands_support_validation_and_retrieve_json(
+    make_madspec_project,
+    invoke_cli,
+    write_concept_markdown,
+    create_step_artifacts,
+) -> None:
     project_path = make_madspec_project()
+    branch_dir = project_path / ".madspec" / "main"
+    branch_dir.mkdir(parents=True, exist_ok=True)
+    write_concept_markdown(branch_dir, variant="auth_sessions")
 
     result = invoke_cli(["memory", "init", "--branch", "main"])
     assert result.exit_code == 0, result.stdout
+    create_step_artifacts(branch_dir, "step-01-bootstrap")
+    create_step_artifacts(branch_dir, "step-02-auth-flow")
 
-    paths = get_memory_paths(project_path, "main")
-    append_jsonl(
-        paths["decision_log"],
+    capture_result = invoke_cli(
         [
-            make_record(
-                "main",
-                "mvp.plan",
-                "agent",
-                "Validated planning decision",
-                status="validated",
-                evidence=["README.md"],
-                semantic_kind="decision",
-                record_type="decision",
-            )
-        ],
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--decision",
+            "Validated planning decision",
+            "--evidence",
+            "README.md",
+            "--json-output",
+        ]
     )
-
-    promote_result = invoke_cli(["memory", "promote", "--branch", "main", "--json-output"])
-    assert promote_result.exit_code == 0, promote_result.stdout
-    promoted_payload = json.loads(promote_result.stdout)
-    assert promoted_payload["promoted"]["decision"] == 1
+    assert capture_result.exit_code == 0, capture_result.stdout
 
     validate_result = invoke_cli(["memory", "validate", "--branch", "main", "--json-output"])
     assert validate_result.exit_code == 0, validate_result.stdout
@@ -68,6 +71,7 @@ def test_memory_commands_support_validation_and_retrieve_json(make_madspec_proje
     )
     assert retrieve_result.exit_code == 0, retrieve_result.stdout
     payload = json.loads(retrieve_result.stdout)
+    assert payload["runtime_revision"] >= 0
     assert payload["semantic"]["decisions"][0]["summary"] == "Validated planning decision"
     assert payload["recall"]["resolved_query"] == "Validated planning decision"
     assert payload["recall"]["semantic_enabled"] is False
@@ -88,6 +92,7 @@ def test_memory_commands_support_validation_and_retrieve_json(make_madspec_proje
     )
     assert search_result.exit_code == 0, search_result.stdout
     search_payload = json.loads(search_result.stdout)
+    assert search_payload["runtime_revision"] >= 0
     assert search_payload["exact_matches"]
     assert search_payload["merged"][0]["summary"] == "Validated planning decision"
 
@@ -108,26 +113,93 @@ def test_memory_commands_support_validation_and_retrieve_json(make_madspec_proje
     )
     assert next_step_candidate.exit_code == 1, next_step_candidate.stdout
 
-    progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
-    progress["plannedSteps"] = ["step-01-bootstrap", "step-02-auth-flow"]
-    progress["completedSteps"] = ["step-01-bootstrap"]
-    progress["stepStatus"] = {
-        "step-01-bootstrap": step_status(
-            status="completed",
-            completed_at="2026-03-10",
-            tdd_phase="completed",
-            red=["uv run pytest tests/test_bootstrap.py -q"],
-            green=["uv run pytest tests/test_bootstrap.py -q"],
-            refactor_note="No refactor needed.",
-        ),
-        "step-02-auth-flow": step_status(status="planned"),
-    }
-    progress["stepMetadata"] = {
-        "step-01-bootstrap": step_metadata("code", "required"),
-        "step-02-auth-flow": step_metadata("code", "required"),
-    }
-    progress["planningMetadata"]["stepDependencies"] = {"step-02-auth-flow": ["step-01-bootstrap"]}
-    paths["progress"].write_text(json.dumps(progress, indent=2) + "\n", encoding="utf-8")
+    register_first = invoke_cli(
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-01-bootstrap",
+            "--step-kind",
+            "code",
+            "--covers",
+            "Authentication",
+            "--json-output",
+        ]
+    )
+    assert register_first.exit_code == 0, register_first.stdout
+
+    register_second = invoke_cli(
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--step-id",
+            "step-02-auth-flow",
+            "--step-kind",
+            "code",
+            "--covers",
+            "Sessions",
+            "--depends-on",
+            "step-01-bootstrap",
+            "--json-output",
+        ]
+    )
+    assert register_second.exit_code == 0, register_second.stdout
+
+    start_result = invoke_cli(
+        ["memory", "start-step", "--branch", "main", "--stage", "mvp.implement", "--json-output"]
+    )
+    assert start_result.exit_code == 0, start_result.stdout
+    assert json.loads(start_result.stdout)["step_id"] == "step-01-bootstrap"
+
+    checkpoint_result = invoke_cli(
+        [
+            "memory",
+            "checkpoint-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.implement",
+            "--step-id",
+            "step-01-bootstrap",
+            "--tdd-phase",
+            "red",
+            "--summary",
+            "Bootstrap test is red",
+            "--red-evidence",
+            "uv run pytest tests/test_bootstrap.py -q",
+            "--json-output",
+        ]
+    )
+    assert checkpoint_result.exit_code == 0, checkpoint_result.stdout
+
+    complete_result = invoke_cli(
+        [
+            "memory",
+            "complete-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.implement",
+            "--step-id",
+            "step-01-bootstrap",
+            "--summary",
+            "Bootstrap completed",
+            "--green-evidence",
+            "uv run pytest tests/test_bootstrap.py -q",
+            "--refactor-note",
+            "No refactor needed.",
+            "--json-output",
+        ]
+    )
+    assert complete_result.exit_code == 0, complete_result.stdout
 
     next_step_select = invoke_cli(
         ["memory", "next-step", "--branch", "main", "--stage", "mvp.implement", "--json-output"]
@@ -173,5 +245,6 @@ def test_memory_retrieve_and_explain_support_toon_output(make_madspec_project, i
     )
     assert explain_result.exit_code == 0, explain_result.stdout
     assert "branch: main" in explain_result.stdout
+    assert "runtime_revision:" in explain_result.stdout
     assert "summary:" in explain_result.stdout
     assert "gate_summary:" in explain_result.stdout

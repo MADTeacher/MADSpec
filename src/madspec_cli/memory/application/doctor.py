@@ -15,6 +15,7 @@ from .diagnostics_shared import overall_status
 
 REQUIRED_SQLITE_TABLES = {
     "artifacts",
+    "branch_runtime_state",
     "index_jobs",
     "merge_history",
     "merge_proposals",

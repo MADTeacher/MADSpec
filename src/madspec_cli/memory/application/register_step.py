@@ -16,6 +16,7 @@ class RegisterStepRequest:
     branch_name: str
     stage: str
     session_key: str
+    expected_revision: int | None
     step_id: str
     covers: list[str]
     step_kind: str
@@ -70,6 +71,7 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
         request.branch_name,
         request.stage,
         session_key=request.session_key,
+        expected_revision=request.expected_revision,
         step_id=request.step_id,
         covers=request.covers,
         step_kind=request.step_kind,

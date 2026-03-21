@@ -15,6 +15,7 @@ class CaptureStageRequest:
     branch_name: str
     stage: str
     session_key: str
+    expected_revision: int | None
     options: dict[str, Any]
 
 
@@ -31,6 +32,7 @@ def execute(request: CaptureStageRequest) -> CaptureStageResult:
         request.branch_name,
         request.stage,
         session_key=request.session_key,
+        expected_revision=request.expected_revision,
         **request.options,
     )
     return CaptureStageResult(payload=payload)

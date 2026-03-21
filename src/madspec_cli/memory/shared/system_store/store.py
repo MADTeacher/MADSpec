@@ -102,6 +102,12 @@ class MemoryStore:
                     PRIMARY KEY (session_key, branch)
                 );
 
+                CREATE TABLE IF NOT EXISTS branch_runtime_state (
+                    branch TEXT PRIMARY KEY,
+                    revision INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS artifacts (
                     artifact_id TEXT PRIMARY KEY,
                     branch TEXT NOT NULL,
@@ -194,6 +200,72 @@ class MemoryStore:
     def upsert_record(self, record: dict[str, Any]) -> None:
         with self.connect() as conn:
             self._upsert_record(conn, record)
+
+    def ensure_branch_runtime_state(self, branch: str, *, conn: sqlite3.Connection | None = None) -> int:
+        if conn is not None:
+            return self._ensure_branch_runtime_state(conn, branch)
+        with self.connect() as managed_conn:
+            return self._ensure_branch_runtime_state(managed_conn, branch)
+
+    def _ensure_branch_runtime_state(self, conn: sqlite3.Connection, branch: str) -> int:
+        row = conn.execute(
+            """
+            SELECT revision
+            FROM branch_runtime_state
+            WHERE branch = ?
+            """,
+            (branch,),
+        ).fetchone()
+        if row is not None:
+            return int(row["revision"])
+        now = _now_iso()
+        conn.execute(
+            """
+            INSERT INTO branch_runtime_state (branch, revision, updated_at)
+            VALUES (?, 0, ?)
+            """,
+            (branch, now),
+        )
+        return 0
+
+    def fetch_branch_revision(self, branch: str, *, conn: sqlite3.Connection | None = None) -> int:
+        if conn is not None:
+            return self._fetch_branch_revision(conn, branch)
+        with self.connect() as managed_conn:
+            return self._fetch_branch_revision(managed_conn, branch)
+
+    def _fetch_branch_revision(self, conn: sqlite3.Connection, branch: str) -> int:
+        return self._ensure_branch_runtime_state(conn, branch)
+
+    def update_branch_revision(
+        self,
+        branch: str,
+        *,
+        revision: int,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        if conn is not None:
+            self._update_branch_revision(conn, branch=branch, revision=revision)
+            return
+        with self.connect() as managed_conn:
+            self._update_branch_revision(managed_conn, branch=branch, revision=revision)
+
+    def _update_branch_revision(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        branch: str,
+        revision: int,
+    ) -> None:
+        self._ensure_branch_runtime_state(conn, branch)
+        conn.execute(
+            """
+            UPDATE branch_runtime_state
+            SET revision = ?, updated_at = ?
+            WHERE branch = ?
+            """,
+            (revision, _now_iso(), branch),
+        )
 
     def _upsert_record(self, conn: sqlite3.Connection, record: dict[str, Any]) -> None:
         payload_json = _dump_json(record)
@@ -801,26 +873,58 @@ class MemoryStore:
         stage_snapshots: list[dict[str, Any]],
         sessions: list[dict[str, Any]],
         records: list[dict[str, Any]],
+        branch_revision_after: int,
+        conn: sqlite3.Connection | None = None,
     ) -> None:
-        with self.connect() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            for snapshot in stage_snapshots:
-                self._upsert_stage_snapshot(
-                    conn,
-                    branch=branch,
-                    snapshot_key=str(snapshot["snapshot_key"]),
-                    payload=dict(snapshot["payload"]),
-                    source_path=str(snapshot["source_path"]),
-                )
-            for session in sessions:
-                self._upsert_session(
-                    conn,
-                    branch=branch,
-                    session_key=str(session["session_key"]),
-                    payload=dict(session["payload"]),
-                )
-            for record in records:
-                self._upsert_record(conn, dict(record))
+        if conn is not None:
+            self._commit_runtime_mutation(
+                conn,
+                branch=branch,
+                stage_snapshots=stage_snapshots,
+                sessions=sessions,
+                records=records,
+                branch_revision_after=branch_revision_after,
+            )
+            return
+        with self.connect() as managed_conn:
+            managed_conn.execute("BEGIN IMMEDIATE")
+            self._commit_runtime_mutation(
+                managed_conn,
+                branch=branch,
+                stage_snapshots=stage_snapshots,
+                sessions=sessions,
+                records=records,
+                branch_revision_after=branch_revision_after,
+            )
+
+    def _commit_runtime_mutation(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        branch: str,
+        stage_snapshots: list[dict[str, Any]],
+        sessions: list[dict[str, Any]],
+        records: list[dict[str, Any]],
+        branch_revision_after: int,
+    ) -> None:
+        for snapshot in stage_snapshots:
+            self._upsert_stage_snapshot(
+                conn,
+                branch=branch,
+                snapshot_key=str(snapshot["snapshot_key"]),
+                payload=dict(snapshot["payload"]),
+                source_path=str(snapshot["source_path"]),
+            )
+        for session in sessions:
+            self._upsert_session(
+                conn,
+                branch=branch,
+                session_key=str(session["session_key"]),
+                payload=dict(session["payload"]),
+            )
+        for record in records:
+            self._upsert_record(conn, dict(record))
+        self._update_branch_revision(conn, branch=branch, revision=branch_revision_after)
 
     def list_stage_snapshots(
         self,
@@ -1177,6 +1281,7 @@ class MemoryStore:
                 + (" AND branch = ?" if branch else ""),
                 params,
             ).fetchone()[0]
+            branch_revision = self._fetch_branch_revision(conn, branch) if branch else None
         return {
             "sqlite_path": str(self.paths.sqlite_file.relative_to(self.project_path)),
             "vector_dir": str(self.paths.lancedb_dir.relative_to(self.project_path)),
@@ -1188,6 +1293,7 @@ class MemoryStore:
             "pending_index_jobs": pending_jobs,
             "indexed_jobs": indexed_jobs,
             "vector_backend": VectorMemoryIndex(self.paths.lancedb_dir).backend_name,
+            "runtime_revision": branch_revision,
         }
 
     def acquire_lease(

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ..domain.conflicts import semantic_fingerprint
 from ..shared.storage import (
     ensure_memory_layout,
     get_memory_paths,
@@ -12,12 +13,13 @@ from ..shared.storage import (
 )
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 from ..shared.system_store.canonical_state import (
+    CanonicalBranchState,
     build_runtime_snapshot_specs,
     load_canonical_branch_state,
     tag_records_for_stream,
 )
-from ..shared.system_store.runtime_mutations import commit_runtime_mutation
-from ..shared.system_store.sessions import load_runtime_session
+from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
+from ..shared.system_store.sessions import read_runtime_session_payload
 from ..stages.architecture.state import (
     ARCHITECTURE_STAGE,
     load_architecture_state,
@@ -39,23 +41,103 @@ from .shared import append_unique
 from .updates import apply_stage_state_update
 
 
-def persist_capture(
+def _capture_semantic_fingerprints(
+    branch_name: str,
+    prepared: PreparedCapture,
+) -> set[str]:
+    inputs = prepared.inputs
+    return {
+        semantic_fingerprint(record)
+        for record in (
+            build_fact_records(
+                branch_name=branch_name,
+                normalized_stage=inputs.stage,
+                normalized_status=inputs.status,
+                normalized_evidence=inputs.evidence,
+                normalized_facts=inputs.facts,
+                normalized_system_overview=inputs.system_overview,
+                normalized_project_name=inputs.project_name,
+                normalized_audiences=inputs.audiences,
+                normalized_scenarios=inputs.scenarios,
+                normalized_pain_points=inputs.pain_points,
+                normalized_assumptions=inputs.assumptions,
+                normalized_design_overview=inputs.design_overview,
+                normalized_platforms=inputs.platforms,
+                normalized_project_type=inputs.project_type,
+                normalized_stack_overview=inputs.stack_overview,
+                normalized_requirements=inputs.requirements,
+                normalized_architecture_overview=inputs.architecture_overview,
+                architecture_project_structure=prepared.parsed.architecture_project_structure,
+                architecture_directory_updates=prepared.parsed.architecture_directory_updates,
+                architecture_entity_updates=prepared.parsed.architecture_entity_updates,
+                architecture_entity_field_updates=prepared.parsed.architecture_entity_field_updates,
+                architecture_integration_updates=prepared.parsed.architecture_integration_updates,
+                normalized_code_principles=inputs.code_principles,
+                normalized_security_notes=inputs.security_notes,
+                normalized_performance_notes=inputs.performance_notes,
+                normalized_preferences=inputs.preferences,
+                normalized_plan_overview=inputs.plan_overview,
+                design_zone_updates=prepared.parsed.design_zone_updates,
+                design_screen_updates=prepared.parsed.design_screen_updates,
+                design_flow_updates=prepared.parsed.design_flow_updates,
+                design_flow_step_updates=prepared.parsed.design_flow_step_updates,
+                design_screen_data_updates=prepared.parsed.design_screen_data_updates,
+                ts="",
+            )
+            + build_decision_records(
+                branch_name=branch_name,
+                normalized_stage=inputs.stage,
+                normalized_status=inputs.status,
+                normalized_evidence=inputs.evidence,
+                normalized_decisions=inputs.decisions,
+                concept_feature_updates=prepared.parsed.concept_feature_updates,
+                design_screen_feature_links=prepared.parsed.design_screen_feature_links,
+                architecture_entity_relationship_updates=prepared.parsed.architecture_entity_relationship_updates,
+                architecture_entity_state_updates=prepared.parsed.architecture_entity_state_updates,
+                architecture_endpoint_updates=prepared.parsed.architecture_endpoint_updates,
+                architecture_endpoint_screen_updates=prepared.parsed.architecture_endpoint_screen_updates,
+                architecture_endpoint_field_updates=prepared.parsed.architecture_endpoint_field_updates,
+                architecture_pattern_updates=prepared.parsed.architecture_pattern_updates,
+                tech_component_updates=prepared.parsed.tech_component_updates,
+                tech_library_updates=prepared.parsed.tech_library_updates,
+                tech_code_organization=prepared.parsed.tech_code_organization,
+                tech_alternative_updates=prepared.parsed.tech_alternative_updates,
+                design_navigation_updates=prepared.parsed.design_navigation_updates,
+                design_flow_alternative_updates=prepared.parsed.design_flow_alternative_updates,
+                normalized_planning_principles=inputs.planning_principles,
+                ts="",
+            )
+            + build_contract_records(
+                branch_name=branch_name,
+                normalized_stage=inputs.stage,
+                normalized_status=inputs.status,
+                normalized_evidence=inputs.evidence,
+                normalized_contracts=inputs.contracts,
+                normalized_constraints=inputs.constraints,
+                normalized_platform_constraints=inputs.platform_constraints,
+                normalized_tech_constraints=inputs.tech_constraints,
+                architecture_endpoint_error_updates=prepared.parsed.architecture_endpoint_error_updates,
+                ts="",
+            )
+        )
+    }
+
+
+def _build_capture_plan(
     *,
     project_path: Path,
     branch_name: str,
-    session_key: str = SYSTEM_SESSION_KEY,
+    session_key: str,
     prepared: PreparedCapture,
-    consolidate_fn: Callable[..., list[Path]],
-) -> dict[str, Any]:
-    ensure_memory_layout(project_path, branch_name, stage=prepared.inputs.stage)
+    canonical: CanonicalBranchState,
+) -> RuntimeMutationPlan:
     paths = get_memory_paths(project_path, branch_name)
-
     inputs = prepared.inputs
     parsed = prepared.parsed
     bundles = prepared.bundles
     ts = now_iso()
 
-    active_session = load_runtime_session(
+    active_session = read_runtime_session_payload(
         project_path,
         branch_name=branch_name,
         session_key=session_key,
@@ -102,13 +184,13 @@ def persist_capture(
         ts=ts,
     )
 
-    concept_state = load_concept_state(paths.concept_state)
-    design_state = load_design_state(paths.design_state)
-    tech_state = load_tech_state(paths.tech_state)
-    architecture_state = load_architecture_state(paths.architecture_state)
-    plan_state = load_plan_state(paths.plan_state)
-    feature_init_state = load_feature_init_state(paths.feature_init_state)
-    feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
+    concept_state = canonical.snapshots.get(CONCEPT_STAGE) or load_concept_state(paths.concept_state)
+    design_state = canonical.snapshots.get(DESIGN_STAGE) or load_design_state(paths.design_state)
+    tech_state = canonical.snapshots.get(TECH_STAGE) or load_tech_state(paths.tech_state)
+    architecture_state = canonical.snapshots.get(ARCHITECTURE_STAGE) or load_architecture_state(paths.architecture_state)
+    plan_state = canonical.snapshots.get(PLAN_STAGE) or load_plan_state(paths.plan_state)
+    feature_init_state = canonical.snapshots.get(FEATURE_INIT_STAGE) or load_feature_init_state(paths.feature_init_state)
+    feature_plan_state = canonical.snapshots.get(FEATURE_PLAN_STAGE) or load_feature_plan_state(paths.feature_plan_state)
     concept_state, design_state, tech_state, architecture_state, plan_state = apply_stage_state_update(
         normalized_stage=inputs.stage,
         concept_state=concept_state,
@@ -302,7 +384,7 @@ def persist_capture(
     progress_state, _ = normalize_runtime_progress(
         project_path,
         branch_name,
-        load_canonical_branch_state(project_path, branch_name).progress,
+        canonical.progress,
         catalog_override=catalog_override,
     )
     snapshot_payloads["progress"] = progress_state
@@ -312,32 +394,97 @@ def persist_capture(
     records.extend(tag_records_for_stream(fact_records, "facts"))
     records.extend(tag_records_for_stream(decision_records, "decisions"))
     records.extend(tag_records_for_stream(contract_records, "contracts"))
-    projection_meta = commit_runtime_mutation(
-        project_path,
-        branch_name=branch_name,
-        stage=inputs.stage,
+    return RuntimeMutationPlan(
         stage_snapshots=build_runtime_snapshot_specs(project_path, branch_name, snapshot_payloads),
         sessions=[{"session_key": session_key, "payload": active_session}],
         records=records,
+        response_payload={
+            "written": {
+                "notes": len(note_records),
+                "facts": len(fact_records),
+                "decisions": len(decision_records),
+                "contracts": len(contract_records),
+                "questions": len(inputs.questions),
+                "pending_actions": len(inputs.pending_actions),
+            },
+        },
     )
 
+
+def _detect_capture_conflict(
+    base_state: CanonicalBranchState,
+    current_state: CanonicalBranchState,
+    *,
+    stage: str,
+) -> dict[str, Any] | None:
+    if stage not in {
+        CONCEPT_STAGE,
+        DESIGN_STAGE,
+        TECH_STAGE,
+        ARCHITECTURE_STAGE,
+        PLAN_STAGE,
+        FEATURE_INIT_STAGE,
+        FEATURE_PLAN_STAGE,
+    }:
+        return None
+    base_snapshot = base_state.snapshots.get(stage)
+    current_snapshot = current_state.snapshots.get(stage)
+    if base_snapshot != current_snapshot:
+        return {
+            "kind": "snapshot_conflict",
+            "scope": "stage",
+            "conflicting_fields": [stage],
+            "details": {"reason": "target stage snapshot changed while preparing capture"},
+        }
+    return None
+
+
+def persist_capture(
+    *,
+    project_path: Path,
+    branch_name: str,
+    session_key: str = SYSTEM_SESSION_KEY,
+    expected_revision: int | None = None,
+    prepared: PreparedCapture,
+    consolidate_fn: Callable[..., list[Path]],
+) -> dict[str, Any]:
+    ensure_memory_layout(project_path, branch_name, stage=prepared.inputs.stage)
+    base_state = load_canonical_branch_state(project_path, branch_name)
+    projection_meta = commit_runtime_mutation(
+        project_path,
+        branch_name=branch_name,
+        stage=prepared.inputs.stage,
+        mutation_kind="capture",
+        scope="stage",
+        session_key=session_key,
+        expected_revision=expected_revision if expected_revision is not None else base_state.runtime_revision,
+        base_state=base_state,
+        plan_builder=lambda latest_state: _build_capture_plan(
+            project_path=project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            prepared=prepared,
+            canonical=latest_state,
+        ),
+        conflict_detector=lambda base, current: _detect_capture_conflict(
+            base,
+            current,
+            stage=prepared.inputs.stage,
+        ),
+    )
+    if not projection_meta.get("accepted", True):
+        return projection_meta
+
     result = PersistedCaptureResult(
-        written={
-            "notes": len(note_records),
-            "facts": len(fact_records),
-            "decisions": len(decision_records),
-            "contracts": len(contract_records),
-            "questions": len(inputs.questions),
-            "pending_actions": len(inputs.pending_actions),
-        },
+        written=projection_meta["written"],
         generated_views=[],
     )
     payload = result.to_payload(
         project_path=project_path,
         branch_name=branch_name,
-        stage=inputs.stage,
-        status=inputs.status,
-        warnings=inputs.warnings,
+        stage=prepared.inputs.stage,
+        status=prepared.inputs.status,
+        warnings=prepared.inputs.warnings,
     )
     payload["generated_views"] = projection_meta["generated_views"]
     payload["projection_status"] = projection_meta["projection_status"]

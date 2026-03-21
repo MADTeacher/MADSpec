@@ -16,18 +16,20 @@ from ..shared.storage import (
     _default_step_status,
     ensure_memory_layout,
     get_memory_paths,
+    normalize_runtime_progress,
     normalize_progress_state,
     now_iso,
     read_json,
 )
 from ..shared.system_store.canonical_state import (
+    CanonicalBranchState,
     build_runtime_snapshot_specs,
     load_canonical_branch_state,
     tag_records_for_stream,
 )
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
-from ..shared.system_store.runtime_mutations import commit_runtime_mutation
-from ..shared.system_store.sessions import load_runtime_session
+from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
+from ..shared.system_store.sessions import read_runtime_session_payload
 from ..stages.concept.state import is_empty_concept_state, load_concept_state, migrate_legacy_concept_markdown
 from ..stages.feature_init.state import (
     is_empty_feature_init_state,
@@ -250,12 +252,157 @@ def determine_next_step(
     return decision.to_payload()
 
 
+def _build_register_step_plan(
+    project_path: Path,
+    branch_name: str,
+    stage: str,
+    *,
+    session_key: str,
+    step_id: str,
+    normalized_covers: list[str],
+    known_functions: dict[str, str],
+    step_kind: str,
+    effective_tdd_policy: str,
+    waiver_reason: str | None,
+    depends_on: list[str],
+    summary: str | None,
+    title: str | None,
+    related_artifacts: list[str],
+    size: str | None,
+    complexity: str | None,
+    canonical: CanonicalBranchState,
+) -> RuntimeMutationPlan:
+    paths = get_memory_paths(project_path, branch_name)
+    progress = canonical.progress or _default_progress_state()
+    if isinstance(progress, dict):
+        progress, _ = normalize_progress_state(progress)
+
+    planned_steps = progress.setdefault("plannedSteps", [])
+    if step_id not in planned_steps:
+        planned_steps.append(step_id)
+
+    tdd_phase = "waived" if effective_tdd_policy in {"waived", "not-applicable"} else "not_started"
+    progress.setdefault("stepStatus", {})[step_id] = _default_step_status(tdd_phase=tdd_phase)
+    progress.setdefault("stepMetadata", {})[step_id] = _default_step_metadata(
+        kind=step_kind,
+        tdd_policy=effective_tdd_policy,
+        waiver_reason=waiver_reason,
+    )
+
+    step_dependencies = progress.setdefault("planningMetadata", {}).setdefault(
+        "stepDependencies", {}
+    )
+    step_dependencies[step_id] = list(depends_on)
+
+    covers_functions = progress.setdefault("coversFunctions", {})
+    covers_functions[step_id] = _default_step_coverage()
+    for item in normalized_covers:
+        covers_functions[step_id][known_functions[item]].append(item)
+
+    progress, _ = normalize_runtime_progress(
+        project_path,
+        branch_name,
+        progress,
+    )
+
+    if "feature." in stage.lower():
+        plan_state = canonical.snapshots.get("feature.plan") or load_feature_plan_state(paths.feature_plan_state)
+    else:
+        plan_state = canonical.snapshots.get("mvp.plan") or load_plan_state(paths.plan_state)
+    plan_state = upsert_step_catalog_entry(
+        plan_state,
+        step_id=step_id,
+        title=title,
+        summary=summary,
+        step_kind=step_kind,
+        tdd_policy=effective_tdd_policy,
+        waiver_reason=waiver_reason,
+        covers=covers_functions[step_id],
+        depends_on=list(depends_on),
+        related_artifacts=related_artifacts,
+        size=size,
+        complexity=complexity,
+    )
+    active_session = read_runtime_session_payload(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
+    active_session["stage"] = stage
+    active_session["current_step"] = step_id
+    active_session["last_checkpoint_at"] = now_iso()
+    active_session["updated_at"] = active_session["last_checkpoint_at"]
+
+    snapshot_payloads = {
+        "progress": progress,
+        "feature.plan" if "feature." in stage.lower() else "mvp.plan": plan_state,
+    }
+    record_payloads = tag_records_for_stream(
+        [
+            make_record(
+                branch_name,
+                stage,
+                "memory.register-step",
+                summary or f"Registered planned step {step_id}",
+                step_id=step_id,
+                status="validated",
+                evidence=[str(paths.progress.relative_to(project_path))],
+                semantic_kind="decision",
+                record_type="planned_step",
+                metadata={
+                    "depends_on": list(depends_on),
+                    "covers": list(normalized_covers),
+                    "step_kind": step_kind,
+                    "tdd_policy": effective_tdd_policy,
+                    "waiver_reason": waiver_reason,
+                    "title": title,
+                    "related_artifacts": related_artifacts,
+                    "size": size,
+                    "complexity": complexity,
+                },
+            )
+        ],
+        "decision_log",
+    )
+    return RuntimeMutationPlan(
+        stage_snapshots=build_runtime_snapshot_specs(project_path, branch_name, snapshot_payloads),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=record_payloads,
+        response_payload={
+            "depends_on": list(depends_on),
+            "covers": covers_functions[step_id],
+            "stepMetadata": progress["stepMetadata"][step_id],
+            "progressMetrics": progress["planningMetadata"]["progressMetrics"],
+        },
+    )
+
+
+def _detect_register_step_conflict(
+    base_state: CanonicalBranchState,
+    current_state: CanonicalBranchState,
+    *,
+    step_id: str,
+) -> dict[str, Any] | None:
+    base_planned = set(base_state.progress.get("plannedSteps", []))
+    current_planned = set(current_state.progress.get("plannedSteps", []))
+    if step_id in current_planned and step_id not in base_planned:
+        return {
+            "kind": "progress_conflict",
+            "scope": "plan-catalog",
+            "step_id": step_id,
+            "conflicting_fields": ["plannedSteps", "stepStatus", "stepMetadata", "coversFunctions"],
+            "details": {"reason": "target step was registered by another writer"},
+        }
+    return None
+
+
 def register_planned_step(
     project_path: Path,
     branch_name: str,
     stage: str,
     *,
     session_key: str = SYSTEM_SESSION_KEY,
+    expected_revision: int | None = None,
     step_id: str,
     covers: list[str],
     step_kind: str,
@@ -269,7 +416,6 @@ def register_planned_step(
     complexity: str | None = None,
 ) -> dict[str, Any]:
     ensure_memory_layout(project_path, branch_name, stage=stage)
-    paths = get_memory_paths(project_path, branch_name)
     canonical = load_canonical_branch_state(project_path, branch_name)
     progress = canonical.progress
     if isinstance(progress, dict):
@@ -393,112 +539,51 @@ def register_planned_step(
                 f"unknown covered functions in {catalog_source}: {', '.join(unknown)}.{suggestion}"
             ],
         ).to_payload()
-
-    planned_steps = progress.setdefault("plannedSteps", [])
-    if step_id not in planned_steps:
-        planned_steps.append(step_id)
-
-    tdd_phase = "waived" if effective_tdd_policy in {"waived", "not-applicable"} else "not_started"
-    progress.setdefault("stepStatus", {})[step_id] = _default_step_status(tdd_phase=tdd_phase)
-    progress.setdefault("stepMetadata", {})[step_id] = _default_step_metadata(
-        kind=step_kind,
-        tdd_policy=effective_tdd_policy,
-        waiver_reason=waiver_reason,
-    )
-
-    step_dependencies = progress.setdefault("planningMetadata", {}).setdefault(
-        "stepDependencies", {}
-    )
-    step_dependencies[step_id] = list(depends_on or [])
-    progress["planningMetadata"]["lastPlannedStep"] = step_id
-    progress["planningMetadata"]["planningPhase"] = (
-        "initial" if len(planned_steps) == 1 else "incremental"
-    )
-
-    covers_functions = progress.setdefault("coversFunctions", {})
-    covers_functions[step_id] = _default_step_coverage()
-    for item in normalized_covers:
-        covers_functions[step_id][known_functions[item]].append(item)
-
-    progress["planningMetadata"]["progressMetrics"] = _compute_progress_metrics(
-        catalog,
-        covers_functions,
-    )
-    if "feature." in stage.lower():
-        plan_state = canonical.snapshots.get("feature.plan") or load_feature_plan_state(paths.feature_plan_state)
-    else:
-        plan_state = canonical.snapshots.get("mvp.plan") or load_plan_state(paths.plan_state)
-    plan_state = upsert_step_catalog_entry(
-        plan_state,
-        step_id=step_id,
-        title=title,
-        summary=summary,
-        step_kind=step_kind,
-        tdd_policy=effective_tdd_policy,
-        waiver_reason=waiver_reason,
-        covers=covers_functions[step_id],
-        depends_on=list(depends_on or []),
-        related_artifacts=related_artifacts or [],
-        size=size,
-        complexity=complexity,
-    )
-    active_session = load_runtime_session(
-        project_path,
-        branch_name=branch_name,
-        session_key=session_key,
-    )
-    active_session["stage"] = stage
-    active_session["current_step"] = step_id
-    active_session["last_checkpoint_at"] = now_iso()
-    active_session["updated_at"] = active_session["last_checkpoint_at"]
-    snapshot_payloads = {
-        "progress": progress,
-        "feature.plan" if "feature." in stage.lower() else "mvp.plan": plan_state,
-    }
-    record_payloads = tag_records_for_stream(
-        [
-            make_record(
-                branch_name,
-                stage,
-                "memory.register-step",
-                summary or f"Registered planned step {step_id}",
-                step_id=step_id,
-                status="validated",
-                evidence=[str(paths.progress.relative_to(project_path))],
-                semantic_kind="decision",
-                record_type="planned_step",
-                metadata={
-                    "depends_on": list(depends_on or []),
-                    "covers": list(normalized_covers),
-                    "step_kind": step_kind,
-                    "tdd_policy": effective_tdd_policy,
-                    "waiver_reason": waiver_reason,
-                    "title": title,
-                    "related_artifacts": related_artifacts or [],
-                    "size": size,
-                    "complexity": complexity,
-                },
-            )
-        ],
-        "decision_log",
-    )
     projection_meta = commit_runtime_mutation(
         project_path,
         branch_name=branch_name,
         stage=stage,
-        stage_snapshots=build_runtime_snapshot_specs(project_path, branch_name, snapshot_payloads),
-        sessions=[{"session_key": session_key, "payload": active_session}],
-        records=record_payloads,
+        mutation_kind="register-step",
+        scope="plan-catalog",
+        session_key=session_key,
+        expected_revision=expected_revision if expected_revision is not None else canonical.runtime_revision,
+        base_state=canonical,
+        plan_builder=lambda latest_state: _build_register_step_plan(
+            project_path,
+            branch_name,
+            stage,
+            session_key=session_key,
+            step_id=step_id,
+            normalized_covers=normalized_covers,
+            known_functions=known_functions,
+            step_kind=step_kind,
+            effective_tdd_policy=effective_tdd_policy,
+            waiver_reason=waiver_reason,
+            depends_on=list(depends_on or []),
+            summary=summary,
+            title=title,
+            related_artifacts=related_artifacts or [],
+            size=size,
+            complexity=complexity,
+            canonical=latest_state,
+        ),
+        conflict_detector=lambda base, current: _detect_register_step_conflict(
+            base,
+            current,
+            step_id=step_id,
+        ),
     )
+    if not projection_meta.get("accepted", True):
+        return projection_meta
 
     payload = RegisterStepResult(
         accepted=True,
         step_id=step_id,
         errors=[],
         depends_on=list(depends_on or []),
-        covers=covers_functions[step_id],
-        step_metadata=progress["stepMetadata"][step_id],
-        progress_metrics=progress["planningMetadata"]["progressMetrics"],
+        covers=projection_meta.get("covers"),
+        step_metadata=projection_meta.get("stepMetadata"),
+        progress_metrics=projection_meta.get("progressMetrics"),
     ).to_payload()
     payload.update(projection_meta)
     return payload

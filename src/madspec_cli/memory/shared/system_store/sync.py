@@ -20,6 +20,7 @@ def sync_branch_memory_to_store(project_path: Path, branch_name: str) -> None:
 
     ensure_system_memory_layout(project_path)
     store = MemoryStore(project_path)
+    store.ensure_branch_runtime_state(branch_name)
     paths = get_memory_paths(project_path, branch_name)
 
     progress = read_json(paths.progress, {})

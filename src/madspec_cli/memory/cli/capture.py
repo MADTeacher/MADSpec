@@ -71,6 +71,7 @@ CAPTURE_FROM_FILE_ALIASES = {
 CAPTURE_FROM_FILE_ALLOWED_KEYS = {
     "stage",
     "session_key",
+    "expected_revision",
     "summary",
     "branch",
     "json_output",
@@ -151,6 +152,7 @@ def memory_capture(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Stage to capture: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
     session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
+    expected_revision: int | None = typer.Option(None, "--expected-revision", help="Expected branch runtime revision for optimistic concurrency"),
     summary: str = typer.Option(None, "--summary", help="Optional stage note summary"),
     fact: list[str] = typer.Option(None, "--fact", help="Fact to capture; repeat for multiple values"),
     decision: list[str] = typer.Option(None, "--decision", help="Decision to capture; repeat for multiple values"),
@@ -234,6 +236,7 @@ def memory_capture(
         )
         stage = file_data.pop("stage", stage)
         session_key = file_data.pop("session_key", session_key)
+        expected_revision = file_data.pop("expected_revision", expected_revision)
         branch_name = file_data.pop("branch", branch_name)
         json_output = file_data.pop("json_output", json_output)
         status = file_data.pop("status", status)
@@ -326,6 +329,7 @@ def memory_capture(
             branch_name=target_branch,
             stage=stage,
             session_key=session_key,
+            expected_revision=expected_revision,
             options=options,
         )
     )

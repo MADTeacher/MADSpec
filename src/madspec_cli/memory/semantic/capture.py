@@ -29,6 +29,7 @@ def capture_stage_memory(
     stage: str,
     *,
     session_key: str = SYSTEM_SESSION_KEY,
+    expected_revision: int | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     normalized_stage = stage.strip().lower()
@@ -63,6 +64,7 @@ def capture_stage_memory(
         project_path=project_path,
         branch_name=branch_name,
         session_key=session_key,
+        expected_revision=expected_revision,
         prepared=prepared,
         consolidate_fn=consolidate_branch_memory,
     )

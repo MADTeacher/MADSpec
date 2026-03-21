@@ -21,6 +21,7 @@ REGISTER_STEP_FROM_FILE_ALIASES = {
 REGISTER_STEP_FROM_FILE_ALLOWED_KEYS = {
     "stage",
     "session_key",
+    "expected_revision",
     "step_id",
     "covers",
     "step_kind",
@@ -82,6 +83,7 @@ def memory_register_step(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Planning stage, e.g. mvp.plan or feature.plan"),
     session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
+    expected_revision: int | None = typer.Option(None, "--expected-revision", help="Expected branch runtime revision for optimistic concurrency"),
     step_id: str = typer.Option(None, "--step-id", help="New step identifier"),
     covers: list[str] = typer.Option(None, "--covers", help="Covered function ids/labels; repeat for multiple values."),
     step_kind: str = typer.Option(None, "--step-kind", help="Step kind: code or non-code"),
@@ -105,6 +107,7 @@ def memory_register_step(
         )
         stage = file_data.pop("stage", stage)
         session_key = file_data.pop("session_key", session_key)
+        expected_revision = file_data.pop("expected_revision", expected_revision)
         step_id = file_data.pop("step_id", step_id)
         covers = file_data.pop("covers", covers)
         step_kind = file_data.pop("step_kind", step_kind)
@@ -137,6 +140,7 @@ def memory_register_step(
             branch_name=target_branch,
             stage=stage,
             session_key=session_key,
+            expected_revision=expected_revision,
             step_id=step_id,
             covers=covers or [],
             step_kind=step_kind,

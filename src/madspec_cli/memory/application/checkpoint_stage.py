@@ -17,6 +17,7 @@ class CheckpointStageRequest:
     stage: str
     summary: str
     session_key: str
+    expected_revision: int | None
     options: dict[str, Any]
 
 
@@ -55,6 +56,7 @@ def execute(request: CheckpointStageRequest) -> CheckpointStageResult:
         request.stage,
         request.summary,
         session_key=request.session_key,
+        expected_revision=request.expected_revision,
         **request.options,
     )
     return CheckpointStageResult(payload=payload)

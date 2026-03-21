@@ -25,6 +25,7 @@ CHECKPOINT_FROM_FILE_ALIASES = {
 CHECKPOINT_FROM_FILE_ALLOWED_KEYS = {
     "stage",
     "session_key",
+    "expected_revision",
     "summary",
     "branch",
     "json_output",
@@ -41,6 +42,7 @@ def memory_checkpoint(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
     session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
+    expected_revision: int | None = typer.Option(None, "--expected-revision", help="Expected branch runtime revision for optimistic concurrency"),
     summary: str = typer.Option(None, "--summary", help="Stage checkpoint summary"),
     fact: list[str] = typer.Option(None, "--fact", help="Validated fact; repeat for multiple values"),
     decision: list[str] = typer.Option(None, "--decision", help="Validated decision; repeat for multiple values"),
@@ -60,6 +62,7 @@ def memory_checkpoint(
         )
         stage = file_data.pop("stage", stage)
         session_key = file_data.pop("session_key", session_key)
+        expected_revision = file_data.pop("expected_revision", expected_revision)
         summary = file_data.pop("summary", summary)
         branch_name = file_data.pop("branch", branch_name)
         json_output = file_data.pop("json_output", json_output)
@@ -97,6 +100,7 @@ def memory_checkpoint(
             stage=stage,
             summary=summary,
             session_key=session_key,
+            expected_revision=expected_revision,
             options=options,
         )
     )

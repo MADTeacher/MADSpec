@@ -20,6 +20,7 @@ from .store import MemoryStore
 
 @dataclass(frozen=True)
 class CanonicalBranchState:
+    runtime_revision: int
     progress: dict[str, Any]
     active_session: dict[str, Any]
     snapshots: dict[str, dict[str, Any]]
@@ -63,6 +64,7 @@ def bootstrap_branch_canonical_state(project_path: Path, branch_name: str) -> bo
 
     ensure_system_memory_layout(project_path)
     store = MemoryStore(project_path)
+    store.ensure_branch_runtime_state(branch_name)
     if store.branch_has_canonical_state(branch_name):
         return False
     sync_branch_memory_to_store(project_path, branch_name)
@@ -74,6 +76,7 @@ def load_canonical_branch_state(project_path: Path, branch_name: str) -> Canonic
     ensure_system_memory_layout(project_path)
     bootstrap_branch_canonical_state(project_path, branch_name)
     store = MemoryStore(project_path)
+    runtime_revision = store.fetch_branch_revision(branch_name)
     present_snapshots = frozenset(
         item["snapshot_key"]
         for item in store.list_stage_snapshots(branch=branch_name, limit=len(_SNAPSHOT_SPECS) + 8)
@@ -92,6 +95,7 @@ def load_canonical_branch_state(project_path: Path, branch_name: str) -> Canonic
         for record_stream in _RECORD_STREAM_PATHS
     }
     return CanonicalBranchState(
+        runtime_revision=runtime_revision,
         progress=snapshots["progress"],
         active_session=active_session,
         snapshots=snapshots,

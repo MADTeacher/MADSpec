@@ -239,6 +239,7 @@ def retrieve_memory_context(
     return {
         "branch": branch_name,
         "stage": stage,
+        "runtime_revision": canonical.runtime_revision,
         "session_key": session_key,
         "step_id": resolved_step_id,
         "active_session": {

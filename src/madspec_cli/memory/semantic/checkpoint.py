@@ -53,12 +53,13 @@ from ..shared.storage import (
 )
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 from ..shared.system_store.canonical_state import (
+    CanonicalBranchState,
     build_runtime_snapshot_specs,
     load_canonical_branch_state,
     tag_records_for_stream,
 )
-from ..shared.system_store.runtime_mutations import commit_runtime_mutation
-from ..shared.system_store.sessions import load_runtime_session
+from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
+from ..shared.system_store.sessions import read_runtime_session_payload
 
 CHECKPOINT_STAGES = {
     "mvp.concept",
@@ -79,75 +80,24 @@ def _normalize_text_list(values: list[str] | None) -> list[str]:
     return [value.strip() for value in values if value and value.strip()]
 
 
-def checkpoint_stage_memory(
+def _build_stage_checkpoint_plan(
     project_path: Path,
     branch_name: str,
-    stage: str,
-    summary: str,
+    normalized_stage: str,
     *,
-    session_key: str = SYSTEM_SESSION_KEY,
-    facts: list[str] | None = None,
-    decisions: list[str] | None = None,
-    contracts: list[str] | None = None,
-    evidence: list[str] | None = None,
-    questions: list[str] | None = None,
-    pending_actions: list[str] | None = None,
-) -> dict[str, Any]:
-    normalized_stage = stage.strip().lower()
-    normalized_summary = summary.strip()
-    normalized_facts = _normalize_text_list(facts)
-    normalized_decisions = _normalize_text_list(decisions)
-    normalized_contracts = _normalize_text_list(contracts)
-    normalized_evidence = _normalize_text_list(evidence)
-    normalized_questions = _normalize_text_list(questions)
-    normalized_pending_actions = _normalize_text_list(pending_actions)
-
-    errors: list[str] = []
-    if normalized_stage not in CHECKPOINT_STAGES:
-        errors.append(
-            "stage must be one of: "
-            + ", ".join(sorted(CHECKPOINT_STAGES))
-        )
-    if not normalized_summary:
-        errors.append("summary must not be empty")
-    ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
+    session_key: str,
+    normalized_summary: str,
+    normalized_facts: list[str],
+    normalized_decisions: list[str],
+    normalized_contracts: list[str],
+    normalized_evidence: list[str],
+    normalized_questions: list[str],
+    normalized_pending_actions: list[str],
+    canonical: CanonicalBranchState,
+) -> RuntimeMutationPlan:
     paths = get_memory_paths(project_path, branch_name)
-    canonical = load_canonical_branch_state(project_path, branch_name)
-    existing_stage_facts = [
-        record
-        for record in canonical.record_streams["facts"]
-        if record.get("stage") == normalized_stage and record.get("status") == "validated"
-    ]
-    existing_stage_decisions = [
-        record
-        for record in canonical.record_streams["decisions"]
-        if record.get("stage") == normalized_stage and record.get("status") == "validated"
-    ]
-    existing_stage_contracts = [
-        record
-        for record in canonical.record_streams["contracts"]
-        if record.get("stage") == normalized_stage and record.get("status") == "validated"
-    ]
-    has_existing_stage_memory = any(
-        [existing_stage_facts, existing_stage_decisions, existing_stage_contracts]
-    )
-    if not any(
-        [
-            normalized_summary,
-            normalized_facts,
-            normalized_decisions,
-            normalized_contracts,
-            has_existing_stage_memory,
-        ]
-    ):
-        errors.append(
-            "checkpoint payload must include summary plus fact/decision/contract content or use previously captured validated stage memory"
-        )
-    if errors:
-        return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
-
     ts = now_iso()
-    active_session = load_runtime_session(
+    active_session = read_runtime_session_payload(
         project_path,
         branch_name=branch_name,
         session_key=session_key,
@@ -201,9 +151,6 @@ def checkpoint_stage_memory(
             checkpoint_summary=normalized_summary,
             ratify=True,
         )
-        errors.extend(concept_completeness_errors(concept_state))
-        if errors:
-            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
     elif normalized_stage == DESIGN_STAGE:
         design_state = update_design_state(
             design_state,
@@ -211,16 +158,6 @@ def checkpoint_stage_memory(
             checkpoint_summary=normalized_summary,
             ratify=True,
         )
-        errors.extend(
-            design_completeness_errors(
-                design_state,
-                concept_state=concept_state,
-                project_path=project_path,
-                branch_name=branch_name,
-            )
-        )
-        if errors:
-            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
     elif normalized_stage == TECH_STAGE:
         tech_state = update_tech_state(
             tech_state,
@@ -229,9 +166,6 @@ def checkpoint_stage_memory(
             checkpoint_summary=normalized_summary,
             ratify=True,
         )
-        errors.extend(tech_completeness_errors(tech_state))
-        if errors:
-            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
     elif normalized_stage == ARCHITECTURE_STAGE:
         architecture_state = update_architecture_state(
             architecture_state,
@@ -239,14 +173,6 @@ def checkpoint_stage_memory(
             checkpoint_summary=normalized_summary,
             ratify=True,
         )
-        errors.extend(
-            architecture_completeness_errors(
-                architecture_state,
-                design_state=design_state,
-            )
-        )
-        if errors:
-            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
     elif normalized_stage == PLAN_STAGE:
         plan_state = update_plan_state(
             plan_state,
@@ -254,9 +180,6 @@ def checkpoint_stage_memory(
             checkpoint_summary=normalized_summary,
             ratify=True,
         )
-        errors.extend(plan_completeness_errors(plan_state))
-        if errors:
-            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
     elif normalized_stage == FEATURE_INIT_STAGE:
         feature_init_state = update_feature_init_state(
             feature_init_state,
@@ -264,9 +187,6 @@ def checkpoint_stage_memory(
             checkpoint_summary=normalized_summary,
             ratify=True,
         )
-        errors.extend(feature_init_completeness_errors(feature_init_state))
-        if errors:
-            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
     elif normalized_stage == FEATURE_PLAN_STAGE:
         feature_plan_state = update_plan_state(
             feature_plan_state,
@@ -274,9 +194,6 @@ def checkpoint_stage_memory(
             checkpoint_summary=normalized_summary,
             ratify=True,
         )
-        errors.extend(feature_plan_completeness_errors(feature_plan_state))
-        if errors:
-            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
 
     fact_records = [
         make_record(
@@ -372,29 +289,249 @@ def checkpoint_stage_memory(
     records.extend(tag_records_for_stream(fact_records, "facts"))
     records.extend(tag_records_for_stream(decision_records, "decisions"))
     records.extend(tag_records_for_stream(contract_records, "contracts"))
+    return RuntimeMutationPlan(
+        stage_snapshots=build_runtime_snapshot_specs(project_path, branch_name, snapshot_payloads),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=records,
+        response_payload={
+            "summary": normalized_summary,
+            "written": {
+                "decision_log": 1,
+                "facts": len(fact_records),
+                "decisions": len(decision_records),
+                "contracts": len(contract_records),
+            },
+        },
+    )
+
+
+def _detect_stage_checkpoint_conflict(
+    base_state: CanonicalBranchState,
+    current_state: CanonicalBranchState,
+    *,
+    normalized_stage: str,
+) -> dict[str, Any] | None:
+    if normalized_stage not in {
+        CONCEPT_STAGE,
+        DESIGN_STAGE,
+        TECH_STAGE,
+        ARCHITECTURE_STAGE,
+        PLAN_STAGE,
+        FEATURE_INIT_STAGE,
+        FEATURE_PLAN_STAGE,
+    }:
+        return None
+    if base_state.snapshots.get(normalized_stage) != current_state.snapshots.get(normalized_stage):
+        return {
+            "kind": "snapshot_conflict",
+            "scope": "stage",
+            "conflicting_fields": [normalized_stage],
+            "details": {"reason": "target stage snapshot changed while preparing checkpoint"},
+        }
+    return None
+
+
+def checkpoint_stage_memory(
+    project_path: Path,
+    branch_name: str,
+    stage: str,
+    summary: str,
+    *,
+    session_key: str = SYSTEM_SESSION_KEY,
+    expected_revision: int | None = None,
+    facts: list[str] | None = None,
+    decisions: list[str] | None = None,
+    contracts: list[str] | None = None,
+    evidence: list[str] | None = None,
+    questions: list[str] | None = None,
+    pending_actions: list[str] | None = None,
+) -> dict[str, Any]:
+    normalized_stage = stage.strip().lower()
+    normalized_summary = summary.strip()
+    normalized_facts = _normalize_text_list(facts)
+    normalized_decisions = _normalize_text_list(decisions)
+    normalized_contracts = _normalize_text_list(contracts)
+    normalized_evidence = _normalize_text_list(evidence)
+    normalized_questions = _normalize_text_list(questions)
+    normalized_pending_actions = _normalize_text_list(pending_actions)
+
+    errors: list[str] = []
+    if normalized_stage not in CHECKPOINT_STAGES:
+        errors.append(
+            "stage must be one of: "
+            + ", ".join(sorted(CHECKPOINT_STAGES))
+        )
+    if not normalized_summary:
+        errors.append("summary must not be empty")
+    ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
+    paths = get_memory_paths(project_path, branch_name)
+    canonical = load_canonical_branch_state(project_path, branch_name)
+    existing_stage_facts = [
+        record
+        for record in canonical.record_streams["facts"]
+        if record.get("stage") == normalized_stage and record.get("status") == "validated"
+    ]
+    existing_stage_decisions = [
+        record
+        for record in canonical.record_streams["decisions"]
+        if record.get("stage") == normalized_stage and record.get("status") == "validated"
+    ]
+    existing_stage_contracts = [
+        record
+        for record in canonical.record_streams["contracts"]
+        if record.get("stage") == normalized_stage and record.get("status") == "validated"
+    ]
+    has_existing_stage_memory = any(
+        [existing_stage_facts, existing_stage_decisions, existing_stage_contracts]
+    )
+    if not any(
+        [
+            normalized_summary,
+            normalized_facts,
+            normalized_decisions,
+            normalized_contracts,
+            has_existing_stage_memory,
+        ]
+    ):
+        errors.append(
+            "checkpoint payload must include summary plus fact/decision/contract content or use previously captured validated stage memory"
+        )
+    if errors:
+        return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+
+    concept_state = canonical.snapshots.get(CONCEPT_STAGE) or load_concept_state(paths.concept_state)
+    design_state = canonical.snapshots.get(DESIGN_STAGE) or load_design_state(paths.design_state)
+    tech_state = canonical.snapshots.get(TECH_STAGE) or load_tech_state(paths.tech_state)
+    architecture_state = canonical.snapshots.get(ARCHITECTURE_STAGE) or load_architecture_state(paths.architecture_state)
+    plan_state = canonical.snapshots.get(PLAN_STAGE) or load_plan_state(paths.plan_state)
+    feature_init_state = canonical.snapshots.get(FEATURE_INIT_STAGE) or load_feature_init_state(paths.feature_init_state)
+    feature_plan_state = canonical.snapshots.get(FEATURE_PLAN_STAGE) or load_feature_plan_state(paths.feature_plan_state)
+    if normalized_stage == CONCEPT_STAGE:
+        concept_state = update_concept_state(
+            concept_state,
+            constraints=normalized_contracts,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(concept_completeness_errors(concept_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == DESIGN_STAGE:
+        design_state = update_design_state(
+            design_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(
+            design_completeness_errors(
+                design_state,
+                concept_state=concept_state,
+                project_path=project_path,
+                branch_name=branch_name,
+            )
+        )
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == TECH_STAGE:
+        tech_state = update_tech_state(
+            tech_state,
+            constraints=normalized_contracts,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(tech_completeness_errors(tech_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == ARCHITECTURE_STAGE:
+        architecture_state = update_architecture_state(
+            architecture_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(
+            architecture_completeness_errors(
+                architecture_state,
+                design_state=design_state,
+            )
+        )
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == PLAN_STAGE:
+        plan_state = update_plan_state(
+            plan_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(plan_completeness_errors(plan_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == FEATURE_INIT_STAGE:
+        feature_init_state = update_feature_init_state(
+            feature_init_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(feature_init_completeness_errors(feature_init_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == FEATURE_PLAN_STAGE:
+        feature_plan_state = update_plan_state(
+            feature_plan_state,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(feature_plan_completeness_errors(feature_plan_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+
     projection_meta = commit_runtime_mutation(
         project_path,
         branch_name=branch_name,
         stage=normalized_stage,
-        stage_snapshots=build_runtime_snapshot_specs(project_path, branch_name, snapshot_payloads),
-        sessions=[{"session_key": session_key, "payload": active_session}],
-        records=records,
+        mutation_kind="checkpoint",
+        scope="stage",
+        session_key=session_key,
+        expected_revision=expected_revision if expected_revision is not None else canonical.runtime_revision,
+        base_state=canonical,
+        plan_builder=lambda latest_state: _build_stage_checkpoint_plan(
+            project_path,
+            branch_name,
+            normalized_stage,
+            session_key=session_key,
+            normalized_summary=normalized_summary,
+            normalized_facts=normalized_facts,
+            normalized_decisions=normalized_decisions,
+            normalized_contracts=normalized_contracts,
+            normalized_evidence=normalized_evidence,
+            normalized_questions=normalized_questions,
+            normalized_pending_actions=normalized_pending_actions,
+            canonical=latest_state,
+        ),
+        conflict_detector=lambda base, current: _detect_stage_checkpoint_conflict(
+            base,
+            current,
+            normalized_stage=normalized_stage,
+        ),
     )
+    if not projection_meta.get("accepted", True):
+        return projection_meta
 
     payload = {
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
-        "summary": normalized_summary,
+        "summary": projection_meta.get("summary", normalized_summary),
         "used_existing_stage_memory": has_existing_stage_memory and not any(
             [normalized_facts, normalized_decisions, normalized_contracts]
         ),
-        "written": {
-            "decision_log": 1,
-            "facts": len(fact_records),
-            "decisions": len(decision_records),
-            "contracts": len(contract_records),
-        },
+        "written": projection_meta.get("written"),
     }
     payload.update(projection_meta)
     return payload

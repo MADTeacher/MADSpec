@@ -105,6 +105,7 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
         payload={
             "branch": request.branch_name,
             "stage": request.stage,
+            "runtime_revision": context.get("runtime_revision"),
             "step_id": context.get("step_id"),
             "summary": summary,
             "context": {

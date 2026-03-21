@@ -262,6 +262,39 @@ def normalize_runtime_progress(
     from ..workflow.planning import _compute_progress_metrics, extract_function_catalog
 
     normalized, changed = normalize_progress_state(progress)
+    normalized, derived_changed = recompute_runtime_progress_fields(
+        project_path,
+        branch_name,
+        normalized,
+        catalog_override=catalog_override,
+    )
+    changed = changed or derived_changed
+    return normalized, changed
+
+
+def recompute_runtime_progress_fields(
+    project_path: Path,
+    branch_name: str,
+    progress: dict[str, Any],
+    *,
+    catalog_override: dict[str, list[str]] | None = None,
+) -> tuple[dict[str, Any], bool]:
+    from ..workflow.planning import _compute_progress_metrics, extract_function_catalog
+
+    normalized = dict(progress)
+    changed = False
+
+    planned_steps = list(normalized.get("plannedSteps", []))
+    planning_metadata = normalized.setdefault("planningMetadata", {})
+    expected_last_planned_step = planned_steps[-1] if planned_steps else None
+    expected_planning_phase = "initial" if len(planned_steps) <= 1 else "incremental"
+    if planning_metadata.get("lastPlannedStep") != expected_last_planned_step:
+        planning_metadata["lastPlannedStep"] = expected_last_planned_step
+        changed = True
+    if planning_metadata.get("planningPhase") != expected_planning_phase:
+        planning_metadata["planningPhase"] = expected_planning_phase
+        changed = True
+
     catalog: dict[str, list[str]] = catalog_override or {}
     if not catalog:
         for stage_name in ("mvp.plan", "feature.plan"):
@@ -272,7 +305,6 @@ def normalize_runtime_progress(
     if not catalog:
         return normalized, changed
 
-    planning_metadata = normalized.setdefault("planningMetadata", {})
     covers_functions = normalized.setdefault("coversFunctions", {})
     expected_metrics = _compute_progress_metrics(catalog, covers_functions)
     if planning_metadata.get("progressMetrics") != expected_metrics:

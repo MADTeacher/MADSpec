@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -31,8 +32,331 @@ from ..shared.storage import (
     now_iso,
 )
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
-from ..shared.system_store.canonical_state import build_runtime_snapshot_specs, tag_records_for_stream
-from ..shared.system_store.runtime_mutations import commit_runtime_mutation
+from ..shared.system_store.canonical_state import CanonicalBranchState, build_runtime_snapshot_specs, load_canonical_branch_state, tag_records_for_stream
+from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
+from ..shared.system_store.sessions import read_runtime_session_payload
+
+
+def _step_runtime_signature(progress: dict[str, Any], step_id: str) -> str:
+    payload = {
+        "planned": step_id in progress.get("plannedSteps", []),
+        "completed": step_id in progress.get("completedSteps", []),
+        "status": progress.get("stepStatus", {}).get(step_id, {}),
+        "metadata": progress.get("stepMetadata", {}).get(step_id, {}),
+        "covers": progress.get("coversFunctions", {}).get(step_id, {}),
+        "dependencies": progress.get("planningMetadata", {}).get("stepDependencies", {}).get(step_id, []),
+    }
+    return json.dumps(payload, sort_keys=True, ensure_ascii=False)
+
+
+def _build_start_step_plan(
+    project_path: Path,
+    branch_name: str,
+    normalized_stage: str,
+    *,
+    session_key: str,
+    selected_step: str,
+    normalized_summary: str,
+    normalized_evidence: list[str],
+    canonical: CanonicalBranchState,
+) -> RuntimeMutationPlan:
+    paths = get_memory_paths(project_path, branch_name)
+    progress = dict(canonical.progress)
+    active_session = read_runtime_session_payload(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
+
+    ts = now_iso()
+    set_active_step(progress, selected_step)
+    active_session["stage"] = normalized_stage
+    active_session["current_step"] = selected_step
+    active_session["active_goal"] = normalized_summary or f"Implement {selected_step}"
+    active_session["last_checkpoint_at"] = ts
+    active_session["updated_at"] = ts
+    return RuntimeMutationPlan(
+        stage_snapshots=build_runtime_snapshot_specs(
+            project_path,
+            branch_name,
+            {"progress": progress},
+        ),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=tag_records_for_stream(
+            build_start_event(
+                branch_name=branch_name,
+                normalized_stage=normalized_stage,
+                selected_step=selected_step,
+                normalized_summary=normalized_summary,
+                normalized_evidence=normalized_evidence,
+                progress_path=str(paths.progress.relative_to(project_path)),
+                dependencies=step_dependencies(progress, selected_step),
+                ts=ts,
+            ),
+            "events",
+        ),
+        response_payload={
+            "step_id": selected_step,
+            "status": progress.get("stepStatus", {}).get(selected_step, {}).get("status"),
+        },
+    )
+
+
+def _build_checkpoint_step_plan(
+    project_path: Path,
+    branch_name: str,
+    normalized_stage: str,
+    *,
+    session_key: str,
+    selected_step: str,
+    normalized_summary: str,
+    normalized_phase: str | None,
+    normalized_red: list[str],
+    normalized_green: list[str],
+    normalized_refactor_note: str | None,
+    normalized_evidence: list[str],
+    canonical: CanonicalBranchState,
+) -> RuntimeMutationPlan:
+    paths = get_memory_paths(project_path, branch_name)
+    progress = dict(canonical.progress)
+    active_session = read_runtime_session_payload(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
+
+    ts = now_iso()
+    set_active_step(progress, selected_step)
+    status_info = progress.setdefault("stepStatus", {}).setdefault(selected_step, {})
+    status_info["status"] = "in_progress"
+    if normalized_phase:
+        status_info["tddPhase"] = normalized_phase
+    status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
+    status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
+    if normalized_refactor_note is not None:
+        status_info["refactorNote"] = normalized_refactor_note
+
+    active_session["stage"] = normalized_stage
+    active_session["current_step"] = selected_step
+    if normalized_summary:
+        active_session["active_goal"] = normalized_summary
+    active_session["last_checkpoint_at"] = ts
+    active_session["updated_at"] = ts
+    return RuntimeMutationPlan(
+        stage_snapshots=build_runtime_snapshot_specs(
+            project_path,
+            branch_name,
+            {"progress": progress},
+        ),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=tag_records_for_stream(
+            build_checkpoint_event(
+                branch_name=branch_name,
+                normalized_stage=normalized_stage,
+                selected_step=selected_step,
+                normalized_summary=normalized_summary,
+                normalized_evidence=normalized_evidence,
+                normalized_red=normalized_red,
+                normalized_green=normalized_green,
+                progress_path=str(paths.progress.relative_to(project_path)),
+                status_info=status_info,
+                ts=ts,
+            ),
+            "events",
+        ),
+        response_payload={
+            "step_id": selected_step,
+            "tdd_phase": status_info.get("tddPhase"),
+        },
+    )
+
+
+def _build_complete_step_plan(
+    project_path: Path,
+    branch_name: str,
+    normalized_stage: str,
+    *,
+    session_key: str,
+    selected_step: str,
+    normalized_summary: str,
+    normalized_red: list[str],
+    normalized_green: list[str],
+    normalized_refactor_note: str | None,
+    normalized_evidence: list[str],
+    normalized_facts: list[str],
+    normalized_decisions: list[str],
+    normalized_contracts: list[str],
+    canonical: CanonicalBranchState,
+) -> RuntimeMutationPlan:
+    paths = get_memory_paths(project_path, branch_name)
+    progress = dict(canonical.progress)
+    active_session = read_runtime_session_payload(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
+
+    completed_steps = progress.setdefault("completedSteps", [])
+    metadata = progress.get("stepMetadata", {}).get(selected_step, {})
+    status_info = progress.setdefault("stepStatus", {}).setdefault(selected_step, {})
+    ts = now_iso()
+    completed_at = ts.split("T", 1)[0]
+    status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
+    status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
+    if normalized_refactor_note is not None:
+        status_info["refactorNote"] = normalized_refactor_note
+    if metadata.get("tddPolicy") == "required":
+        status_info["tddPhase"] = "completed"
+    else:
+        status_info["tddPhase"] = "waived"
+
+    status_info["status"] = "completed"
+    status_info["completedAt"] = completed_at
+    if selected_step not in completed_steps:
+        completed_steps.append(selected_step)
+
+    next_step = select_next_executable_step(progress)
+    progress["currentImplementStep"] = next_step
+    if next_step:
+        for candidate, candidate_status in progress.get("stepStatus", {}).items():
+            if not isinstance(candidate_status, dict):
+                continue
+            if candidate == next_step and candidate_status.get("status") == "in_progress":
+                continue
+            if candidate != selected_step and candidate_status.get("status") == "in_progress":
+                candidate_status["status"] = "planned"
+
+    active_session["stage"] = normalized_stage
+    active_session["current_step"] = next_step
+    active_session["active_goal"] = (
+        f"Implement {next_step}" if next_step else normalized_summary
+    )
+    active_session["last_checkpoint_at"] = ts
+    active_session["updated_at"] = ts
+
+    records: list[dict[str, Any]] = []
+    records.extend(
+        tag_records_for_stream(
+            build_completion_event(
+                branch_name=branch_name,
+                normalized_stage=normalized_stage,
+                selected_step=selected_step,
+                normalized_summary=normalized_summary,
+                normalized_evidence=normalized_evidence,
+                progress_path=str(paths.progress.relative_to(project_path)),
+                status_info=status_info,
+                next_step=next_step,
+                completed_at=completed_at,
+                ts=ts,
+            ),
+            "events",
+        )
+    )
+    records.extend(
+        tag_records_for_stream(
+            build_completion_semantic_records(
+                branch_name=branch_name,
+                normalized_stage=normalized_stage,
+                selected_step=selected_step,
+                normalized_evidence=normalized_evidence,
+                values=normalized_facts,
+                semantic_kind="fact",
+                ts=ts,
+            ),
+            "facts",
+        )
+    )
+    records.extend(
+        tag_records_for_stream(
+            build_completion_semantic_records(
+                branch_name=branch_name,
+                normalized_stage=normalized_stage,
+                selected_step=selected_step,
+                normalized_evidence=normalized_evidence,
+                values=normalized_decisions,
+                semantic_kind="decision",
+                ts=ts,
+            ),
+            "decisions",
+        )
+    )
+    records.extend(
+        tag_records_for_stream(
+            build_completion_semantic_records(
+                branch_name=branch_name,
+                normalized_stage=normalized_stage,
+                selected_step=selected_step,
+                normalized_evidence=normalized_evidence,
+                values=normalized_contracts,
+                semantic_kind="contract",
+                ts=ts,
+            ),
+            "contracts",
+        )
+    )
+    return RuntimeMutationPlan(
+        stage_snapshots=build_runtime_snapshot_specs(
+            project_path,
+            branch_name,
+            {"progress": progress},
+        ),
+        sessions=[{"session_key": session_key, "payload": active_session}],
+        records=records,
+        response_payload={
+            "step_id": selected_step,
+            "next_step": progress.get("currentImplementStep"),
+            "written": {
+                "facts": len(normalized_facts),
+                "decisions": len(normalized_decisions),
+                "contracts": len(normalized_contracts),
+            },
+        },
+    )
+
+
+def _detect_implementation_conflict(
+    project_path: Path,
+    branch_name: str,
+    *,
+    session_key: str,
+    stage: str,
+    selected_step: str,
+    explicit_step_id: str | None,
+    base_state: CanonicalBranchState,
+    current_state: CanonicalBranchState,
+) -> dict[str, Any] | None:
+    current_session = read_runtime_session_payload(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
+    if explicit_step_id is None:
+        resolved_step = resolve_runtime_step_id(
+            progress=current_state.progress,
+            session_payload=current_session,
+            stage=stage,
+            explicit_step_id=None,
+            require_ready=False,
+        )
+        if resolved_step != selected_step:
+            return {
+                "kind": "progress_conflict",
+                "scope": "step",
+                "step_id": selected_step,
+                "conflicting_fields": ["currentImplementStep"],
+                "details": {"reason": "selected implementation step changed while preparing the mutation"},
+            }
+
+    if _step_runtime_signature(base_state.progress, selected_step) != _step_runtime_signature(current_state.progress, selected_step):
+        return {
+            "kind": "progress_conflict",
+            "scope": "step",
+            "step_id": selected_step,
+            "conflicting_fields": ["stepStatus", "stepMetadata", "coversFunctions", "planningMetadata.stepDependencies"],
+            "details": {"reason": "target implementation step was modified by another writer"},
+        }
+
+    return None
 
 
 def start_implementation_step(
@@ -41,6 +365,7 @@ def start_implementation_step(
     stage: str,
     *,
     session_key: str = SYSTEM_SESSION_KEY,
+    expected_revision: int | None = None,
     step_id: str | None = None,
     summary: str | None = None,
     evidence: list[str] | None = None,
@@ -74,7 +399,6 @@ def start_implementation_step(
             "errors": gate_failure_messages(gate_payload),
             "gate_summary": gate_payload,
         }
-    paths = get_memory_paths(project_path, branch_name)
     progress, active_session = load_progress(
         project_path,
         branch_name,
@@ -123,44 +447,46 @@ def start_implementation_step(
             "errors": [item["message"] for item in policy_payload["violations"]],
         }
 
-    ts = now_iso()
-    set_active_step(progress, selected_step)
-    active_session["stage"] = normalized_stage
-    active_session["current_step"] = selected_step
-    active_session["active_goal"] = normalized_summary or f"Implement {selected_step}"
-    active_session["last_checkpoint_at"] = ts
-    active_session["updated_at"] = ts
+    base_state = load_canonical_branch_state(project_path, branch_name)
     projection_meta = commit_runtime_mutation(
         project_path,
         branch_name=branch_name,
         stage=normalized_stage,
-        stage_snapshots=build_runtime_snapshot_specs(
+        mutation_kind="start-step",
+        scope="step",
+        session_key=session_key,
+        expected_revision=expected_revision if expected_revision is not None else base_state.runtime_revision,
+        base_state=base_state,
+        plan_builder=lambda latest_state: _build_start_step_plan(
             project_path,
             branch_name,
-            {"progress": progress},
+            normalized_stage,
+            session_key=session_key,
+            selected_step=selected_step,
+            normalized_summary=normalized_summary,
+            normalized_evidence=normalized_evidence,
+            canonical=latest_state,
         ),
-        sessions=[{"session_key": session_key, "payload": active_session}],
-        records=tag_records_for_stream(
-            build_start_event(
-                branch_name=branch_name,
-                normalized_stage=normalized_stage,
-                selected_step=selected_step,
-                normalized_summary=normalized_summary,
-                normalized_evidence=normalized_evidence,
-                progress_path=str(paths.progress.relative_to(project_path)),
-                dependencies=step_dependencies(progress, selected_step),
-                ts=ts,
-            ),
-            "events",
+        conflict_detector=lambda base, current: _detect_implementation_conflict(
+            project_path,
+            branch_name,
+            session_key=session_key,
+            stage=normalized_stage,
+            selected_step=selected_step,
+            explicit_step_id=step_id,
+            base_state=base,
+            current_state=current,
         ),
     )
+    if not projection_meta.get("accepted", True):
+        return projection_meta
 
     payload = {
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
-        "step_id": selected_step,
-        "status": progress.get("stepStatus", {}).get(selected_step, {}).get("status"),
+        "step_id": projection_meta.get("step_id", selected_step),
+        "status": projection_meta.get("status"),
     }
     payload.update(projection_meta)
     return payload
@@ -172,6 +498,7 @@ def checkpoint_implementation_step(
     stage: str,
     *,
     session_key: str = SYSTEM_SESSION_KEY,
+    expected_revision: int | None = None,
     step_id: str | None = None,
     summary: str | None = None,
     tdd_phase: str | None = None,
@@ -247,7 +574,6 @@ def checkpoint_implementation_step(
             "errors": gate_failure_messages(gate_payload),
             "gate_summary": gate_payload,
         }
-    paths = get_memory_paths(project_path, branch_name)
     progress, active_session = load_progress(
         project_path,
         branch_name,
@@ -328,56 +654,50 @@ def checkpoint_implementation_step(
             "errors": [item["message"] for item in policy_payload["violations"]],
         }
 
-    ts = now_iso()
-    set_active_step(progress, selected_step)
-    status_info = progress.setdefault("stepStatus", {}).setdefault(selected_step, {})
-    status_info["status"] = "in_progress"
-    if normalized_phase:
-        status_info["tddPhase"] = normalized_phase
-    status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
-    status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
-    if normalized_refactor_note is not None:
-        status_info["refactorNote"] = normalized_refactor_note
-
-    active_session["stage"] = normalized_stage
-    active_session["current_step"] = selected_step
-    if normalized_summary:
-        active_session["active_goal"] = normalized_summary
-    active_session["last_checkpoint_at"] = ts
-    active_session["updated_at"] = ts
+    base_state = load_canonical_branch_state(project_path, branch_name)
     projection_meta = commit_runtime_mutation(
         project_path,
         branch_name=branch_name,
         stage=normalized_stage,
-        stage_snapshots=build_runtime_snapshot_specs(
+        mutation_kind="checkpoint-step",
+        scope="step",
+        session_key=session_key,
+        expected_revision=expected_revision if expected_revision is not None else base_state.runtime_revision,
+        base_state=base_state,
+        plan_builder=lambda latest_state: _build_checkpoint_step_plan(
             project_path,
             branch_name,
-            {"progress": progress},
+            normalized_stage,
+            session_key=session_key,
+            selected_step=selected_step,
+            normalized_summary=normalized_summary,
+            normalized_phase=normalized_phase,
+            normalized_red=normalized_red,
+            normalized_green=normalized_green,
+            normalized_refactor_note=normalized_refactor_note,
+            normalized_evidence=normalized_evidence,
+            canonical=latest_state,
         ),
-        sessions=[{"session_key": session_key, "payload": active_session}],
-        records=tag_records_for_stream(
-            build_checkpoint_event(
-                branch_name=branch_name,
-                normalized_stage=normalized_stage,
-                selected_step=selected_step,
-                normalized_summary=normalized_summary,
-                normalized_evidence=normalized_evidence,
-                normalized_red=normalized_red,
-                normalized_green=normalized_green,
-                progress_path=str(paths.progress.relative_to(project_path)),
-                status_info=status_info,
-                ts=ts,
-            ),
-            "events",
+        conflict_detector=lambda base, current: _detect_implementation_conflict(
+            project_path,
+            branch_name,
+            session_key=session_key,
+            stage=normalized_stage,
+            selected_step=selected_step,
+            explicit_step_id=step_id,
+            base_state=base,
+            current_state=current,
         ),
     )
+    if not projection_meta.get("accepted", True):
+        return projection_meta
 
     payload = {
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
-        "step_id": selected_step,
-        "tdd_phase": status_info.get("tddPhase"),
+        "step_id": projection_meta.get("step_id", selected_step),
+        "tdd_phase": projection_meta.get("tdd_phase"),
     }
     payload.update(projection_meta)
     return payload
@@ -389,6 +709,7 @@ def complete_implementation_step(
     stage: str,
     *,
     session_key: str = SYSTEM_SESSION_KEY,
+    expected_revision: int | None = None,
     step_id: str | None = None,
     summary: str,
     red_evidence: list[str] | None = None,
@@ -449,7 +770,6 @@ def complete_implementation_step(
         }
 
     ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
-    paths = get_memory_paths(project_path, branch_name)
     progress, active_session = load_progress(
         project_path,
         branch_name,
@@ -501,8 +821,6 @@ def complete_implementation_step(
 
     metadata = progress.get("stepMetadata", {}).get(selected_step, {})
     status_info = progress.setdefault("stepStatus", {}).setdefault(selected_step, {})
-    ts = now_iso()
-    completed_at = ts.split("T", 1)[0]
     status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
     status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
     if normalized_refactor_note is not None:
@@ -537,22 +855,6 @@ def complete_implementation_step(
     else:
         status_info["tddPhase"] = "waived"
 
-    status_info["status"] = "completed"
-    status_info["completedAt"] = completed_at
-    if selected_step not in completed_steps:
-        completed_steps.append(selected_step)
-
-    next_step = select_next_executable_step(progress)
-    progress["currentImplementStep"] = next_step
-    if next_step:
-        for candidate, candidate_status in progress.get("stepStatus", {}).items():
-            if not isinstance(candidate_status, dict):
-                continue
-            if candidate == next_step and candidate_status.get("status") == "in_progress":
-                continue
-            if candidate != selected_step and candidate_status.get("status") == "in_progress":
-                candidate_status["status"] = "planned"
-
     policy_payload = evaluate_branch_policies(
         project_path,
         branch_name,
@@ -579,98 +881,53 @@ def complete_implementation_step(
             "errors": ["; ".join(item["message"] for item in policy_payload["violations"])],
         }
 
-    active_session["stage"] = normalized_stage
-    active_session["current_step"] = next_step
-    active_session["active_goal"] = (
-        f"Implement {next_step}" if next_step else normalized_summary
-    )
-    active_session["last_checkpoint_at"] = ts
-    active_session["updated_at"] = ts
-
-    records: list[dict[str, Any]] = []
-    records.extend(
-        tag_records_for_stream(
-            build_completion_event(
-                branch_name=branch_name,
-                normalized_stage=normalized_stage,
-                selected_step=selected_step,
-                normalized_summary=normalized_summary,
-                normalized_evidence=normalized_evidence,
-                progress_path=str(paths.progress.relative_to(project_path)),
-                status_info=status_info,
-                next_step=next_step,
-                completed_at=completed_at,
-                ts=ts,
-            ),
-            "events",
-        )
-    )
-    records.extend(
-        tag_records_for_stream(
-            build_completion_semantic_records(
-                branch_name=branch_name,
-                normalized_stage=normalized_stage,
-                selected_step=selected_step,
-                normalized_evidence=normalized_evidence,
-                values=normalized_facts,
-                semantic_kind="fact",
-                ts=ts,
-            ),
-            "facts",
-        )
-    )
-    records.extend(
-        tag_records_for_stream(
-            build_completion_semantic_records(
-                branch_name=branch_name,
-                normalized_stage=normalized_stage,
-                selected_step=selected_step,
-                normalized_evidence=normalized_evidence,
-                values=normalized_decisions,
-                semantic_kind="decision",
-                ts=ts,
-            ),
-            "decisions",
-        )
-    )
-    records.extend(
-        tag_records_for_stream(
-            build_completion_semantic_records(
-                branch_name=branch_name,
-                normalized_stage=normalized_stage,
-                selected_step=selected_step,
-                normalized_evidence=normalized_evidence,
-                values=normalized_contracts,
-                semantic_kind="contract",
-                ts=ts,
-            ),
-            "contracts",
-        )
-    )
+    base_state = load_canonical_branch_state(project_path, branch_name)
     projection_meta = commit_runtime_mutation(
         project_path,
         branch_name=branch_name,
         stage=normalized_stage,
-        stage_snapshots=build_runtime_snapshot_specs(
+        mutation_kind="complete-step",
+        scope="step",
+        session_key=session_key,
+        expected_revision=expected_revision if expected_revision is not None else base_state.runtime_revision,
+        base_state=base_state,
+        plan_builder=lambda latest_state: _build_complete_step_plan(
             project_path,
             branch_name,
-            {"progress": progress},
+            normalized_stage,
+            session_key=session_key,
+            selected_step=selected_step,
+            normalized_summary=normalized_summary,
+            normalized_red=normalized_red,
+            normalized_green=normalized_green,
+            normalized_refactor_note=normalized_refactor_note,
+            normalized_evidence=normalized_evidence,
+            normalized_facts=normalized_facts,
+            normalized_decisions=normalized_decisions,
+            normalized_contracts=normalized_contracts,
+            canonical=latest_state,
         ),
-        sessions=[{"session_key": session_key, "payload": active_session}],
-        records=records,
+        conflict_detector=lambda base, current: _detect_implementation_conflict(
+            project_path,
+            branch_name,
+            session_key=session_key,
+            stage=normalized_stage,
+            selected_step=selected_step,
+            explicit_step_id=step_id,
+            base_state=base,
+            current_state=current,
+        ),
     )
+    if not projection_meta.get("accepted", True):
+        return projection_meta
 
     payload = {
         "accepted": True,
         "branch": branch_name,
         "stage": normalized_stage,
-        "step_id": selected_step,
-        "next_step": progress.get("currentImplementStep"),
-        "written": {
-            "facts": len(normalized_facts),
-            "decisions": len(normalized_decisions),
-            "contracts": len(normalized_contracts),
-        },
+        "step_id": projection_meta.get("step_id", selected_step),
+        "next_step": projection_meta.get("next_step"),
+        "written": projection_meta.get("written"),
     }
     payload.update(projection_meta)
     return payload

@@ -1,14 +1,15 @@
 {
-  "epic": "epic-2-sqlite-first-canonical-writes",
+  "epic": "epic-3-revision-aware-optimistic-concurrency",
   "roadmap_document": "dev/parallel-memory-roadmap.md",
   "default_session_key": "active",
   "scope": "docs+contracts+behavior",
   "behavior_change": true,
   "architecture": {
-    "current_runtime_write_mode": "sqlite-first-then-project",
+    "current_runtime_write_mode": "sqlite-first-compare-and-apply",
     "current_mutation_authority": "sqlite",
     "target_mutation_authority": "sqlite",
-    "projection_role": "compatible-rebuildable-projections"
+    "projection_role": "compatible-rebuildable-projections",
+    "runtime_revision_mode": "branch-level-optimistic-concurrency"
   },
   "session_scoped_commands": [
     "madspec memory retrieve",

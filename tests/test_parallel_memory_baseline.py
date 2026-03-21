@@ -21,7 +21,7 @@ def _invoke_help(invoke_cli, command: str):
 def test_parallel_memory_contract_manifest_matches_runtime_baseline(repo_root, invoke_cli) -> None:
     manifest = _load_manifest(repo_root)
 
-    assert manifest["epic"] == "epic-2-sqlite-first-canonical-writes"
+    assert manifest["epic"] == "epic-3-revision-aware-optimistic-concurrency"
     assert manifest["roadmap_document"] == "dev/parallel-memory-roadmap.md"
     assert manifest["scope"] == "docs+contracts+behavior"
     assert manifest["behavior_change"] is True
@@ -30,11 +30,15 @@ def test_parallel_memory_contract_manifest_matches_runtime_baseline(repo_root, i
     all_commands = sorted(
         set(manifest["session_scoped_commands"]) | set(manifest["revision_aware_mutating_commands"])
     )
+    revision_aware_commands = set(manifest["revision_aware_mutating_commands"])
     for command in all_commands:
         result = _invoke_help(invoke_cli, command)
         assert result.exit_code == 0, result.stdout
         assert "--session-key" in result.stdout
-        assert "--expected-revision" not in result.stdout
+        if command in revision_aware_commands:
+            assert "--expected-revision" in result.stdout
+        else:
+            assert "--expected-revision" not in result.stdout
 
 
 def test_parallel_memory_contract_manifest_imports_request_models(repo_root) -> None:
@@ -46,6 +50,8 @@ def test_parallel_memory_contract_manifest_imports_request_models(repo_root) -> 
         obj = getattr(module, attr_name)
         assert inspect.isclass(obj)
         assert hasattr(obj, "__dataclass_fields__")
+        if attr_name in {"CaptureStageRequest", "CheckpointStageRequest", "RegisterStepRequest", "ImplementationStepRequest"}:
+            assert "expected_revision" in obj.__dataclass_fields__
 
 
 def test_parallel_memory_roadmap_and_manifest_stay_in_sync(repo_root) -> None:
@@ -88,7 +94,10 @@ def test_parallel_memory_docs_describe_current_runtime_truth(repo_root) -> None:
     assert "все mutating runtime-команды теперь сначала коммитят изменения в `SQLite`" in memory_docs
     assert "branch `memory/*.json`, `memory/*.jsonl` и generated markdown остаются rebuildable projections" in memory_docs
     assert "`--session-key`" in memory_docs
+    assert "`--expected-revision`" in memory_docs
+    assert "`runtime_revision`" in memory_docs
     assert "session `active`" in memory_docs
     assert "не является встроенным координатором выполнения" in agents_docs
     assert "Оркестрация с `task`, `work-item` и `proposal`" in agents_docs
     assert "`--session-key`" in agents_docs
+    assert "`--expected-revision`" in agents_docs

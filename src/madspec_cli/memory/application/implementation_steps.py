@@ -16,6 +16,7 @@ class ImplementationStepRequest:
     branch_name: str
     stage: str
     session_key: str
+    expected_revision: int | None
     options: dict[str, Any]
 
 
@@ -33,6 +34,7 @@ def start(request: ImplementationStepRequest) -> ImplementationStepResult:
         request.branch_name,
         request.stage,
         session_key=request.session_key,
+        expected_revision=request.expected_revision,
         **request.options,
     )
     return ImplementationStepResult(payload=payload)
@@ -45,6 +47,7 @@ def checkpoint(request: ImplementationStepRequest) -> ImplementationStepResult:
         request.branch_name,
         request.stage,
         session_key=request.session_key,
+        expected_revision=request.expected_revision,
         **request.options,
     )
     return ImplementationStepResult(payload=payload)
@@ -57,6 +60,7 @@ def complete(request: ImplementationStepRequest) -> ImplementationStepResult:
         request.branch_name,
         request.stage,
         session_key=request.session_key,
+        expected_revision=request.expected_revision,
         **request.options,
     )
     return ImplementationStepResult(payload=payload)

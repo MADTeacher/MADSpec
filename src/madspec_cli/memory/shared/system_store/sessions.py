@@ -53,6 +53,24 @@ def load_runtime_session(
     return payload
 
 
+def read_runtime_session_payload(
+    project_path: Path,
+    *,
+    branch_name: str,
+    session_key: str = SYSTEM_SESSION_KEY,
+) -> dict[str, Any]:
+    ensure_system_memory_layout(project_path)
+    store = MemoryStore(project_path)
+    payload = store.fetch_session(branch=branch_name, session_key=session_key)
+    if payload is None:
+        return default_session_payload(branch_name=branch_name, session_key=session_key)
+    return normalize_session_payload(
+        payload,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
+
+
 def save_runtime_session(
     project_path: Path,
     *,

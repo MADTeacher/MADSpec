@@ -16,9 +16,12 @@
 
 - все mutating runtime-команды теперь сначала коммитят изменения в `SQLite`, а уже потом пересобирают файловые projections ветки;
 - `SQLite` считается каноническим источником для `progress`, stage snapshots, session-local state и runtime record streams;
+- для runtime состояния ветки ведется единая top-level ревизия `runtime_revision`, которая увеличивается после каждого успешного mutating commit;
 - файл `.madspec/<branch>/memory/working/active-session.json` больше не считается источником истины и поддерживается только как производная проекция для session `active`;
 - для `retrieve`, `search`, `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step`, `complete-step` и связанных вызовов субагентного контекста доступен `--session-key`, по умолчанию используется `active`;
+- mutating runtime-команды `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` и `complete-step` принимают optional `--expected-revision`; если флаг не передан, команда использует ревизию, которую увидела в начале собственного выполнения;
 - branch `memory/*.json`, `memory/*.jsonl` и generated markdown остаются rebuildable projections и могут быть пересобраны через `madspec memory consolidate`;
+- успешный mutating ответ теперь возвращает `runtime_revision_before` и `runtime_revision_after`, а при конфликте возвращается structured payload с `kind="conflict"` и полем `conflict.retry_guidance`;
 - если post-commit projection refresh падает, canonical commit не откатывается: команда возвращает `projection_status="stale"` и `projection_refresh_required=true`, а последующий `madspec memory consolidate` восстанавливает projections из `SQLite`.
 
 ## Когда Использовать
@@ -108,6 +111,7 @@
 
 - `--branch <name>`: явно выбрать ветку для операции
 - `--session-key <key>`: выбрать session-local runtime-контекст; по умолчанию используется `active`
+- `--expected-revision <n>`: для mutating runtime-команд проверить, что запись делается поверх ожидаемой ревизии ветки
 - `--json-output`: вывести JSON в удобном для автоматической обработки виде
 - `--from-file <path>`: прочитать все аргументы из JSON-файла вместо командной строки
 
@@ -135,6 +139,7 @@
 Предпочтительный формат - канонические внутренние ключи, которые соответствуют именам полей в словаре `options` конкретной команды. Поля верхнего уровня (`stage`, `branch`, `json_output`, `status`, `summary`) извлекаются отдельно.
 
 Для session-scoped операций в JSON также можно передать верхнеуровневый ключ `session_key`. Если он не указан, команда использует session `active`.
+Для mutating runtime-команд в JSON также можно передать верхнеуровневый ключ `expected_revision`. Это полезно для multi-agent и automation-сценариев, когда запись должна опираться на заранее прочитанную ревизию.
 
 CLI также принимает ключи-псевдонимы в стиле флагов, включая `snake_case` и `hyphen-case`. Например:
 
@@ -169,6 +174,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 Ответ `retrieve` теперь также содержит:
 
+- top-level `runtime_revision`
 - top-level `session_key`
 - `policy_context.required[]`
 - `policy_context.advisory[]`
@@ -184,6 +190,43 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - `--scope <step|stage|branch|project>` — область поиска
 - `--recall-limit` — сколько кандидатов брать из каждого канала поиска
 - `--disable-semantic` — отключить семантический поиск по векторному индексу и оставить только `SQLite` с точным и полнотекстовым поиском
+
+Ответ `search` также содержит top-level `runtime_revision`, чтобы вызывающая сторона могла понять, на каком canonical runtime state был собран результат.
+
+## Ревизии И Конфликты Runtime
+
+Для runtime-операций MADSpec использует optimistic concurrency на уровне ветки. Это значит:
+
+- `retrieve`, `search` и `explain` возвращают top-level `runtime_revision`;
+- mutating команды могут принять `--expected-revision`, чтобы явно зафиксировать, поверх какой ревизии должна выполняться запись;
+- если флаг не указан, CLI по-прежнему остается совместимым с legacy single-agent сценарием и использует ревизию, прочитанную в начале команды;
+- после успешного коммита ответ включает `runtime_revision_before` и `runtime_revision_after`.
+
+Если между чтением и записью произошли конкурентные изменения, runtime пытается безопасно переиграть intent на свежем canonical state только для совместимых случаев. Для несовместимых случаев команда возвращает конфликт и завершает выполнение с кодом `1`.
+
+Форма conflict-ответа:
+
+```json
+{
+  "accepted": false,
+  "kind": "conflict",
+  "conflict": {
+    "kind": "progress_conflict",
+    "scope": "plan-catalog",
+    "expected_revision": 3,
+    "actual_revision": 4,
+    "step_id": "step-02-session-persistence",
+    "conflicting_fields": ["plannedSteps", "stepStatus"],
+    "retry_guidance": "Run retrieve or explain to refresh runtime state, then retry with the latest runtime_revision."
+  }
+}
+```
+
+Практически это означает:
+
+- перед цепочкой нескольких mutating команд стоит сделать `madspec memory retrieve --stage <stage> --json-output` и взять из ответа `runtime_revision`;
+- затем эту ревизию можно передавать через `--expected-revision`;
+- если команда вернула `kind="conflict"`, нужно перечитать состояние, взять свежий `runtime_revision` и повторить операцию уже на обновленном контексте.
 
 ## Слои Памяти
 
@@ -253,11 +296,27 @@ madspec memory retrieve --stage mvp.plan --json-output
 madspec memory retrieve --stage mvp.plan --session-key planner --json-output
 ```
 
+В JSON-ответе этой команды теперь есть `runtime_revision`, который можно использовать для последующей записи с `--expected-revision`.
+
 Если этот контекст должен читать агент, можно сразу использовать TOON:
 
 ```bash
 madspec memory retrieve --stage mvp.plan --toon-output
 ```
+
+### Зафиксировать запись поверх ожидаемой ревизии
+
+```bash
+madspec memory register-step \
+  --stage mvp.plan \
+  --step-id step-02-session-persistence \
+  --covers "Session persistence" \
+  --step-kind code \
+  --expected-revision 7 \
+  --json-output
+```
+
+Если за время между чтением и записью другая команда уже изменила runtime state ветки, ответ вернет `kind="conflict"` и подскажет повторить операцию после чтения свежего `runtime_revision`.
 
 ### Посмотреть результаты поиска по явному запросу
 
