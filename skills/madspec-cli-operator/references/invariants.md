@@ -3,6 +3,7 @@
 ## Обязательные правила
 
 - Для команд `memory capture`, `memory checkpoint`, `memory register-step`, `memory start-step`, `memory checkpoint-step` и `memory complete-step` обязательно используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>`. Это гарантирует работу на всех платформах и устраняет проблемы с экранированием спецсимволов в оболочке.
+- Для временных args-файлов используй проектную `.madspec/.tmp/`: после успешной команды CLI сам удалит такой файл, а при ошибке сохранит его для повторной правки. Не рассчитывай на auto-cleanup для путей вне `.madspec/.tmp/`.
 - Для session-scoped runtime передавай `--session-key`, когда работа ведется не в основном потоке `active`; не переключай чужие сеансы вручную через файлы ветки.
 - Для работы с правилами сначала считывай `policy_context` из `madspec memory retrieve --stage ... --toon-output`, если вывод читает агент: `required`, `advisory`, `pending_proposals_count`, а также `violations/confirmations`, если они уже рассчитаны для стадии.
 - Если нужен явный результат проверки правил или объяснение блокировки, используй `madspec policy validate --stage <stage> --step-id <step-id> --toon-output`; `--json-output` оставляй для машинной интеграции.
@@ -50,6 +51,7 @@
 - `madspec memory capture` с большим количеством параметров легко превышает этот лимит при заполнении данными архитектуры, дизайна или концепции.
 - Решение: используй `--from-file <path>` — запиши все аргументы в JSON-файл и передай путь к нему.
 - Пример: `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`.
+- Если команда завершилась ошибкой, исправляй тот же файл и повторяй вызов; если завершилась успешно, файл в `.madspec/.tmp/` будет удален автоматически.
 - Предпочитай канонические внутренние ключи из словаря `options` соответствующей команды, плюс `stage`, `branch`, `json_output`, `status` и `summary` на верхнем уровне.
 - CLI также принимает ключи-псевдонимы в стиле флагов, включая `snake_case` и `hyphen-case`, например `audience`, `pain`, `pending-action`, `related-artifact`.
 - Если указаны и канонический ключ, и его псевдоним, приоритет имеет канонический ключ.

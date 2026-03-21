@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 
 from madspec_cli.shared.cli.banners import console, show_banner
-from madspec_cli.shared.cli.file_input import read_args_file
+from madspec_cli.shared.cli.file_input import ArgsFileLifecycle, read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
 from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
@@ -169,6 +169,7 @@ def create_command(
     body_file: str = typer.Option(..., "--body-file", help="Путь к Markdown-файлу с текстом субагента"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file)
     try:
         payload_data = read_args_file(
             from_file,
@@ -187,6 +188,7 @@ def create_command(
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc
+    args_file_lifecycle.cleanup_after_success()
     if json_output:
         emit_json(payload)
         return
@@ -201,6 +203,7 @@ def update_command(
     body_file: str = typer.Option(None, "--body-file", help="Необязательный Markdown-файл с текстом субагента"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file)
     try:
         payload_data = read_args_file(
             from_file,
@@ -219,6 +222,7 @@ def update_command(
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc
+    args_file_lifecycle.cleanup_after_success()
     if json_output:
         emit_json(payload)
         return

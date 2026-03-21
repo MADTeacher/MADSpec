@@ -29,7 +29,7 @@ $ARGUMENTS
 - Для накопления состояния используй `madspec memory capture --stage feature.init ...`.
 - Для завершения этапа используй `madspec memory checkpoint --stage feature.init --summary ...`.
 - После любого изменения memory workflow views должны пересобираться через `madspec memory consolidate` и проходить `madspec memory validate`.
-- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `feature_goal`, `problem`, `existing_modules`, `modified_files`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы во временный JSON-файл в `.madspec/.tmp/` и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). При ошибке исправляй тот же файл и повторяй вызов; после успешной команды CLI удалит файл автоматически. Ключи JSON соответствуют именам полей в `options` (например, `feature_goal`, `problem`, `existing_modules`, `modified_files`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
 
 ## Цель этапа
 

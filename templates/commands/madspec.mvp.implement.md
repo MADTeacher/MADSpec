@@ -34,7 +34,7 @@ $ARGUMENTS
 - Для промежуточных TDD checkpoint используй `madspec memory checkpoint-step --stage mvp.implement`.
 - Для завершения шага, продвижения workflow и записи step-level knowledge используй `madspec memory complete-step --stage mvp.implement`.
 - Не редактируй `memory/progress.json`, `implementation-context.md` или `project-context.md` вручную, если то же изменение должно быть выражено через memory-команды и step records.
-- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory start-step`, `madspec memory checkpoint-step` и `madspec memory complete-step` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory complete-step --from-file .madspec/.tmp/complete-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `step_id`, `summary`, `tdd_phase`, `facts`, `decisions`), плюс `stage`, `branch`, `json_output` на верхнем уровне.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory start-step`, `madspec memory checkpoint-step` и `madspec memory complete-step` используй `--from-file`: записывай аргументы во временный JSON-файл в `.madspec/.tmp/` и передавай путь через `--from-file <path>` (например, `madspec memory complete-step --from-file .madspec/.tmp/complete-args.json --json-output`). При ошибке исправляй тот же файл и повторяй вызов; после успешной команды CLI удалит файл автоматически. Ключи JSON соответствуют именам полей в `options` (например, `step_id`, `summary`, `tdd_phase`, `facts`, `decisions`), плюс `stage`, `branch`, `json_output` на верхнем уровне.
 
 ## Описание
 

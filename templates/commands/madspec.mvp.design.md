@@ -50,7 +50,7 @@ $ARGUMENTS
   - `--evidence` — ссылки на `.madspec/<BRANCH>/ui-design.md` и `.madspec/<BRANCH>/ui-prototype/index.html`.
 - В обычных ходах диалога опирайся на `design_status`: какие обязательные поля еще пусты, какие concept-функции еще не покрыты экранами, каких prototype-файлов не хватает.
 - Полный `artifact_state.design` запрашивай только перед финальной валидацией, итоговым обзором и `checkpoint`, используя `madspec memory retrieve --stage mvp.design --toon-output --full-artifact`, если этот вывод читает агент.
-- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `screens`, `flows`, `flow_steps`, `navigation`, `screen_data`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы во временный JSON-файл в `.madspec/.tmp/` и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). При ошибке исправляй тот же файл и повторяй вызов; после успешной команды CLI удалит файл автоматически. Ключи JSON соответствуют именам полей в `options` (например, `screens`, `flows`, `flow_steps`, `navigation`, `screen_data`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
 
 ## Работа в нескольких чатах (обязательно)
 

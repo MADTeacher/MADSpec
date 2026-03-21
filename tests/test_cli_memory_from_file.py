@@ -547,3 +547,99 @@ def test_memory_from_file_missing_required_fields(
     assert result.exit_code == 1
     assert expected_message in result.stdout
 
+
+def test_memory_capture_from_tmp_file_deletes_args_on_success(
+    make_madspec_project,
+    invoke_cli,
+) -> None:
+    project_path = make_madspec_project()
+    tmp_dir = project_path / ".madspec" / ".tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    args_file = tmp_dir / "capture-args.json"
+    args_file.write_text(
+        json.dumps(
+            {
+                "stage": "mvp.concept",
+                "branch": "main",
+                "project_name": "TmpCleanupProject",
+                "system_overview": "A system built via .madspec/.tmp.",
+                "audiences": ["Developers"],
+                "scenarios": ["Run capture from temp input"],
+                "pain_points": ["Temp files accumulate"],
+                "feature_p1": ["Cleanup::Delete temp file on success"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = invoke_cli(["memory", "capture", "--from-file", ".madspec/.tmp/capture-args.json", "--json-output"])
+
+    assert result.exit_code == 0, result.stdout
+    assert not args_file.exists()
+
+
+@pytest.mark.parametrize(
+    ("command", "file_name", "payload", "setup"),
+    [
+        ("capture", "capture-fail.json", {"summary": "Missing stage"}, None),
+        ("checkpoint", "checkpoint-fail.json", {"stage": "mvp.concept"}, None),
+        ("register-step", "register-fail.json", {"stage": "mvp.plan"}, "planning"),
+        ("start-step", "start-fail.json", {"step_id": "step-01"}, None),
+        ("checkpoint-step", "checkpoint-step-fail.json", {"stage": "mvp.implement"}, None),
+        ("complete-step", "complete-step-fail.json", {"stage": "mvp.implement"}, None),
+    ],
+)
+def test_memory_tmp_args_file_is_kept_on_failure(
+    make_madspec_project,
+    invoke_cli,
+    write_concept_markdown,
+    create_step_artifacts,
+    command,
+    file_name,
+    payload,
+    setup,
+) -> None:
+    project_path = make_madspec_project()
+    if setup == "planning":
+        branch_dir = project_path / ".madspec" / "main"
+        branch_dir.mkdir(parents=True, exist_ok=True)
+        write_concept_markdown(branch_dir, variant="auth_short")
+        init_result = invoke_cli(["memory", "init", "--branch", "main"])
+        assert init_result.exit_code == 0, init_result.stdout
+        create_step_artifacts(branch_dir, "step-01-auth")
+
+    tmp_dir = project_path / ".madspec" / ".tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    args_file = tmp_dir / file_name
+    args_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = invoke_cli(["memory", command, "--from-file", f".madspec/.tmp/{file_name}"])
+
+    assert result.exit_code == 1
+    assert args_file.exists()
+
+
+def test_memory_capture_from_external_file_keeps_args_on_success(
+    make_madspec_project,
+    invoke_cli,
+    write_args_file,
+) -> None:
+    make_madspec_project()
+    args_file = write_args_file(
+        "external-capture.json",
+        {
+            "stage": "mvp.concept",
+            "branch": "main",
+            "project_name": "ExternalFileProject",
+            "system_overview": "A system built from an external args file.",
+            "audiences": ["Developers"],
+            "scenarios": ["Use external temp path"],
+            "pain_points": ["Unexpected deletions"],
+            "feature_p1": ["Safety::Do not delete external input"],
+        },
+    )
+
+    result = invoke_cli(["memory", "capture", "--from-file", str(args_file), "--json-output"])
+
+    assert result.exit_code == 0, result.stdout
+    assert args_file.exists()

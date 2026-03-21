@@ -6,7 +6,7 @@ import typer
 
 from madspec_cli.memory.stage_capture import CAPTURE_STAGES
 from madspec_cli.shared.cli.banners import console, show_banner
-from madspec_cli.shared.cli.file_input import read_args_file
+from madspec_cli.shared.cli.file_input import ArgsFileLifecycle, read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.capture_stage import CaptureStageRequest, execute as capture_stage
@@ -228,6 +228,7 @@ def memory_capture(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Capture incremental non-iterative stage memory before final checkpoint."""
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file) if from_file else None
     if from_file:
         file_data = read_args_file(
             from_file,
@@ -339,12 +340,16 @@ def memory_capture(
         emit_json(payload)
         if not result.accepted:
             raise typer.Exit(1)
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         return
 
     show_banner()
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
     console.print(f"[cyan]Stage:[/cyan] {stage}")
     if result.accepted:
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         written = payload["written"]
         console.print(f"[green]Captured stage memory:[/green] {stage}")
         console.print(

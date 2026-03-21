@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 
 from madspec_cli.shared.cli.banners import console, show_banner
-from madspec_cli.shared.cli.file_input import read_args_file
+from madspec_cli.shared.cli.file_input import ArgsFileLifecycle, read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.determine_next_step import DetermineNextStepRequest, execute as determine_next_step
@@ -100,6 +100,7 @@ def memory_register_step(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Register a planned step and update coverage metadata in progress.json."""
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file) if from_file else None
     if from_file:
         file_data = read_args_file(
             from_file,
@@ -160,6 +161,8 @@ def memory_register_step(
         emit_json(payload)
         if not result.accepted:
             raise typer.Exit(1)
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         return
 
     show_banner()
@@ -167,6 +170,8 @@ def memory_register_step(
     console.print(f"[cyan]Stage:[/cyan] {stage}")
     console.print(f"[cyan]Step:[/cyan] {step_id}")
     if result.accepted:
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         metrics = payload["progressMetrics"]
         console.print(f"[green]Registered step:[/green] {step_id}")
         console.print(

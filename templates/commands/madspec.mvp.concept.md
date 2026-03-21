@@ -54,7 +54,7 @@ $ARGUMENTS
 - В обычных ходах диалога опирайся на `concept_status`: какие обязательные поля еще пусты, какие уже заполнены и сколько элементов накоплено по каждому разделу.
 - Полный `artifact_state.concept` запрашивай только перед финальной валидацией, итоговым обзором для пользователя и `checkpoint`, используя `madspec memory retrieve --stage mvp.concept --toon-output --full-artifact`, если этот вывод читает агент.
 - Если нужного поля нет в кратком контексте или в полном `artifact_state.concept`, задай следующий вопрос пользователю и не синтезируй значение из "живого" контекста чата.
-- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `facts`, `decisions`, `project_name`, `system_overview`, `audiences`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы во временный JSON-файл в `.madspec/.tmp/` и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). При ошибке исправляй тот же файл и повторяй вызов; после успешной команды CLI удалит файл автоматически. Ключи JSON соответствуют именам полей в `options` (например, `facts`, `decisions`, `project_name`, `system_overview`, `audiences`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
 
 ## Описание
 

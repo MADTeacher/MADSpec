@@ -36,7 +36,7 @@ $ARGUMENTS
 - После каждого подтвержденного finding, decision, open question или improvement используй `madspec memory capture --stage review ...`.
 - После завершения анализа ратифицируй этап через `madspec memory checkpoint --stage review --summary ...`.
 - `madspec memory capture` и `madspec memory checkpoint` сами запускают `madspec memory consolidate` и `madspec memory validate`.
-- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). Ключи JSON соответствуют именам полей в `options` (например, `facts`, `decisions`, `questions`, `pending_actions`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
+- **ОБЯЗАТЕЛЬНО**: для вызовов `madspec memory capture` и `madspec memory checkpoint` используй `--from-file`: записывай аргументы во временный JSON-файл в `.madspec/.tmp/` и передавай путь через `--from-file <path>` (например, `madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output`). При ошибке исправляй тот же файл и повторяй вызов; после успешной команды CLI удалит файл автоматически. Ключи JSON соответствуют именам полей в `options` (например, `facts`, `decisions`, `questions`, `pending_actions`), плюс `stage`, `branch`, `json_output`, `status` на верхнем уровне.
 
 ## Описание
 

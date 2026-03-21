@@ -34,7 +34,9 @@ $ARGUMENTS
 2. Для базовой рекомендации используй `madspec agents recommend --json-output`.
 3. Для просмотра effective catalog используй `madspec agents subagents list --json-output` и `madspec agents subagents show --subagent-id ... --json-output`.
 4. Для создания проектной роли используй `madspec agents subagents create --subagent-id ... --from-file ... --body-file ... --json-output`.
+Для временного metadata JSON используй `.madspec/.tmp/`: при ошибке исправляй тот же файл и повторяй вызов, а после успешного `create` CLI удалит файл автоматически.
 5. Для изменения project role или override built-in роли используй `madspec agents subagents update --subagent-id ... --from-file ... [--body-file ...] --json-output`.
+Для временного metadata JSON здесь действует тот же lifecycle: `.madspec/.tmp/` очищается только после успешного `update`.
 6. Для удаления project role или project override используй `madspec agents subagents remove --subagent-id ... [--force] --json-output`.
 7. Для изменения набора активных ролей сначала создай proposal через `madspec agents propose-profile --json-output`.
 8. Применяй профиль только через `madspec agents apply-profile --proposal-id ... --json-output`.

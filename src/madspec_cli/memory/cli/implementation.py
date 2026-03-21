@@ -6,7 +6,7 @@ import typer
 
 from madspec_cli.memory.workflow.implementation_shared import IMPLEMENTATION_STAGES
 from madspec_cli.shared.cli.banners import console, show_banner
-from madspec_cli.shared.cli.file_input import read_args_file
+from madspec_cli.shared.cli.file_input import ArgsFileLifecycle, read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from .runtime_feedback import render_runtime_rejection
@@ -82,6 +82,7 @@ def memory_start_step(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Select and start an implementation step in structured memory."""
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file) if from_file else None
     if from_file:
         file_data = read_args_file(from_file, allowed_keys=START_STEP_FROM_FILE_ALLOWED_KEYS)
         stage = file_data.pop("stage", stage)
@@ -115,12 +116,16 @@ def memory_start_step(
         emit_json(payload)
         if not result.accepted:
             raise typer.Exit(1)
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         return
 
     show_banner()
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
     console.print(f"[cyan]Stage:[/cyan] {stage}")
     if result.accepted:
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         console.print(f"[green]Started step:[/green] {payload['step_id']}")
         return
 
@@ -149,6 +154,7 @@ def memory_checkpoint_step(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Persist an in-progress implementation checkpoint into structured memory."""
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file) if from_file else None
     if from_file:
         file_data = read_args_file(from_file, allowed_keys=CHECKPOINT_STEP_FROM_FILE_ALLOWED_KEYS)
         stage = file_data.pop("stage", stage)
@@ -198,12 +204,16 @@ def memory_checkpoint_step(
         emit_json(payload)
         if not result.accepted:
             raise typer.Exit(1)
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         return
 
     show_banner()
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
     console.print(f"[cyan]Stage:[/cyan] {stage}")
     if result.accepted:
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         console.print(f"[green]Checkpointed step:[/green] {payload['step_id']}")
         console.print(f"[cyan]TDD phase:[/cyan] {payload['tdd_phase']}")
         return
@@ -230,6 +240,7 @@ def memory_complete_step(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Mark an implementation step complete and advance structured memory state."""
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file) if from_file else None
     if from_file:
         file_data = read_args_file(
             from_file,
@@ -291,12 +302,16 @@ def memory_complete_step(
         emit_json(payload)
         if not result.accepted:
             raise typer.Exit(1)
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         return
 
     show_banner()
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
     console.print(f"[cyan]Stage:[/cyan] {stage}")
     if result.accepted:
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         console.print(f"[green]Completed step:[/green] {payload['step_id']}")
         console.print(f"[cyan]Next step:[/cyan] {payload.get('next_step') or 'none'}")
         return

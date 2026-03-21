@@ -6,7 +6,7 @@ import typer
 
 from madspec_cli.memory.checkpoint import CHECKPOINT_STAGES
 from madspec_cli.shared.cli.banners import console, show_banner
-from madspec_cli.shared.cli.file_input import read_args_file
+from madspec_cli.shared.cli.file_input import ArgsFileLifecycle, read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from .runtime_feedback import render_runtime_rejection
@@ -55,6 +55,7 @@ def memory_checkpoint(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     """Persist a non-iterative stage checkpoint into structured memory."""
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file) if from_file else None
     if from_file:
         file_data = read_args_file(
             from_file,
@@ -111,12 +112,16 @@ def memory_checkpoint(
         emit_json(payload)
         if not result.accepted:
             raise typer.Exit(1)
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         return
 
     show_banner()
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
     console.print(f"[cyan]Stage:[/cyan] {stage}")
     if result.accepted:
+        if args_file_lifecycle is not None:
+            args_file_lifecycle.cleanup_after_success()
         written = payload["written"]
         console.print(f"[green]Checkpoint saved for stage:[/green] {stage}")
         console.print(

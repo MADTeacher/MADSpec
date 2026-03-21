@@ -510,6 +510,107 @@ def test_remove_enabled_project_subagent_requires_force(
     assert "api-auditor" not in payload["profile"]["enabledSubagentIds"]
 
 
+def test_agents_subagent_create_deletes_tmp_args_file_on_success(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+    write_args_file,
+) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    from tests.support import write_madspec_config
+
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    tmp_dir = project_path / ".madspec" / ".tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    payload_file = tmp_dir / "domain-expert.json"
+    payload_file.write_text(
+        json.dumps(
+            {
+                "title": "Domain Expert",
+                "description": "Understands domain rules for this project.",
+                "purpose": "Capture domain-specific assumptions.",
+                "defaultStage": "feature.plan",
+                "executionModeHint": "parallel",
+                "dependencies": ["architecture"],
+                "toolPolicy": {"read": True, "search": True, "edit": False, "write": False, "bash": False},
+                "outputContract": {"deliverable": "domain notes", "writeBack": "through canonical CLI only"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    body_file = write_args_file(
+        "domain-expert.md",
+        "You are responsible for domain-specific constraints in the current product.\n",
+    )
+
+    result = invoke_cli(
+        [
+            "agents",
+            "subagents",
+            "create",
+            "--subagent-id",
+            "domain-expert",
+            "--from-file",
+            ".madspec/.tmp/domain-expert.json",
+            "--body-file",
+            str(body_file),
+            "--json-output",
+        ]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert not payload_file.exists()
+
+
+def test_agents_subagent_update_keeps_tmp_args_file_on_failure(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    from tests.support import write_madspec_config
+
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    tmp_dir = project_path / ".madspec" / ".tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    payload_file = tmp_dir / "bad-update.json"
+    payload_file.write_text(
+        json.dumps(
+            {
+                "title": "Broken Override",
+                "description": "Missing required fields should fail validation.",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = invoke_cli(
+        [
+            "agents",
+            "subagents",
+            "update",
+            "--subagent-id",
+            "architecture",
+            "--from-file",
+            ".madspec/.tmp/bad-update.json",
+            "--json-output",
+        ]
+    )
+
+    assert result.exit_code == 1
+    assert payload_file.exists()
+
+
 def test_legacy_agents_state_migrates_to_enabled_ids_and_catalog(
     tmp_path,
     monkeypatch,
