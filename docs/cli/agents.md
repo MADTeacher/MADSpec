@@ -174,6 +174,8 @@ JSON-файл должен содержать:
 
 Так как `madspec memory retrieve` теперь возвращает также `runtime_revision`, субагент может использовать этот номер как основу для последующих mutating memory-команд. Если после чтения контекста роль должна вызвать `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` или `complete-step`, в automation- и multi-agent сценариях стоит передавать `--expected-revision`, чтобы запись не затерла более свежее состояние ветки.
 
+Для hot write paths одного `--expected-revision` теперь недостаточно: `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` могут вернуть `kind="scope_busy"`, если другой writer уже удерживает scoped lease на тот же runtime scope. Это временная занятость scope, а не ревизионный конфликт, и именно поэтому в контракте фигурирует payload kind `` `scope_busy` ``.
+
 В текущей реализации это экспорт контекста, ограниченный конкретной ролью и текущим состоянием проекта и ветки. Команда не является встроенным координатором выполнения, не управляет жизненным циклом `task` и `work-item` и не вводит отдельный протокол оркестрации по сессиям.
 
 ## Встроенные И Запасные Адаптеры

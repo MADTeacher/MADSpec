@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 import uuid
 from pathlib import Path
 from typing import Any
 
+from .leases import normalize_writer_lease_row
 from .constants import LEASE_TTL_SECONDS
 from .layout import get_system_memory_paths
 from .text import (
@@ -1302,15 +1304,34 @@ class MemoryStore:
         owner_id: str,
         *,
         ttl_seconds: int = LEASE_TTL_SECONDS,
-    ) -> bool:
+        conn: sqlite3.Connection | None = None,
+    ) -> dict[str, Any]:
         from .jobs import acquire_lease
 
-        return acquire_lease(self, lease_name, owner_id, ttl_seconds=ttl_seconds)
+        return acquire_lease(self, lease_name, owner_id, ttl_seconds=ttl_seconds, conn=conn)
 
-    def release_lease(self, lease_name: str, owner_id: str) -> None:
+    def release_lease(
+        self,
+        lease_name: str,
+        owner_id: str,
+        *,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
         from .jobs import release_lease
 
-        release_lease(self, lease_name, owner_id)
+        release_lease(self, lease_name, owner_id, conn=conn)
+
+    def list_writer_leases(self) -> list[dict[str, Any]]:
+        now = int(time.time())
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT lease_name, owner_id, expires_at, updated_at
+                FROM writer_leases
+                ORDER BY lease_name ASC
+                """
+            ).fetchall()
+        return [normalize_writer_lease_row(dict(row), now_epoch=now) for row in rows]
 
     def process_pending_jobs(self, *, branch: str | None = None, limit: int = 100) -> dict[str, Any]:
         from .jobs import process_pending_jobs

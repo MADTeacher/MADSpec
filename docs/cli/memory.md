@@ -17,11 +17,13 @@
 - все mutating runtime-команды теперь сначала коммитят изменения в `SQLite`, а уже потом пересобирают файловые projections ветки;
 - `SQLite` считается каноническим источником для `progress`, stage snapshots, session-local state и runtime record streams;
 - для runtime состояния ветки ведется единая top-level ревизия `runtime_revision`, которая увеличивается после каждого успешного mutating commit;
+- для самых горячих write paths runtime дополнительно использует scoped writer leases и может вернуть `kind="scope_busy"`, если другой writer уже держит тот же hot scope;
 - файл `.madspec/<branch>/memory/working/active-session.json` больше не считается источником истины и поддерживается только как производная проекция для session `active`;
 - для `retrieve`, `search`, `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step`, `complete-step` и связанных вызовов субагентного контекста доступен `--session-key`, по умолчанию используется `active`;
 - mutating runtime-команды `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` и `complete-step` принимают optional `--expected-revision`; если флаг не передан, команда использует ревизию, которую увидела в начале собственного выполнения;
 - branch `memory/*.json`, `memory/*.jsonl` и generated markdown остаются rebuildable projections и могут быть пересобраны через `madspec memory consolidate`;
 - успешный mutating ответ теперь возвращает `runtime_revision_before` и `runtime_revision_after`, а при конфликте возвращается structured payload с `kind="conflict"` и полем `conflict.retry_guidance`;
+- hot write paths `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` используют scoped lease вместо глобальной блокировки всей ветки;
 - если post-commit projection refresh падает, canonical commit не откатывается: команда возвращает `projection_status="stale"` и `projection_refresh_required=true`, а последующий `madspec memory consolidate` восстанавливает projections из `SQLite`.
 
 ## Когда Использовать
@@ -204,6 +206,8 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 Если между чтением и записью произошли конкурентные изменения, runtime пытается безопасно переиграть intent на свежем canonical state только для совместимых случаев. Для несовместимых случаев команда возвращает конфликт и завершает выполнение с кодом `1`.
 
+Для hot scopes, защищенных lease-механизмом, команда может завершиться раньше с `kind="scope_busy"`. Это не конфликт ревизий, а признак того, что другой writer сейчас держит lease на тот же scope.
+
 Форма conflict-ответа:
 
 ```json
@@ -227,6 +231,28 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - перед цепочкой нескольких mutating команд стоит сделать `madspec memory retrieve --stage <stage> --json-output` и взять из ответа `runtime_revision`;
 - затем эту ревизию можно передавать через `--expected-revision`;
 - если команда вернула `kind="conflict"`, нужно перечитать состояние, взять свежий `runtime_revision` и повторить операцию уже на обновленном контексте.
+
+Форма `scope_busy`-ответа:
+
+```json
+{
+  "accepted": false,
+  "kind": "scope_busy",
+  "scope_busy": {
+    "scope": "step",
+    "lease_name": "implement-step:main:step-01-authentication",
+    "owner_id": "runtime:checkpoint-step:impl:12345:uuid",
+    "expires_at": 1770000000,
+    "retry_guidance": "Retry after the active writer releases the lease or after the lease TTL expires."
+  }
+}
+```
+
+Практически это означает:
+
+- `scope_busy` не равен `conflict`: он говорит о временной занятости hot scope, а не о несовместимости ревизий;
+- после `scope_busy` можно повторить ту же операцию без нового `retrieve`, если контекст еще актуален и нужно только дождаться освобождения scope;
+- `madspec memory doctor` теперь показывает active и expired writer lease для диагностики зависших hot scopes.
 
 ## Слои Памяти
 

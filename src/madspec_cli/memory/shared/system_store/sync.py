@@ -230,11 +230,16 @@ def _path_context(path: Path) -> tuple[Path, str, tuple[str, ...]] | None:
     if ".madspec" not in parts:
         return None
     index = parts.index(".madspec")
-    if len(parts) <= index + 2:
+    memory_index = None
+    for candidate in range(index + 2, len(parts)):
+        if parts[candidate] == "memory":
+            memory_index = candidate
+            break
+    if memory_index is None or memory_index <= index + 1:
         return None
-    branch_name = parts[index + 1]
+    branch_name = "/".join(parts[index + 1 : memory_index])
     if branch_name == "system":
         return None
     project_path = Path(*parts[:index])
-    relative = parts[index + 2 :]
+    relative = parts[memory_index:]
     return project_path, branch_name, relative

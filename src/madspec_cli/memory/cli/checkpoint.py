@@ -9,6 +9,7 @@ from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.file_input import read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
+from .runtime_feedback import render_runtime_rejection
 from ..application.checkpoint_stage import CheckpointStageRequest, execute as checkpoint_stage
 from ..domain.branch_layout import resolve_target_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
@@ -128,13 +129,16 @@ def memory_checkpoint(
         return
 
     errors = payload.get("errors", [])
-    show_allowed_stages = any(error.startswith("stage must be one of:") for error in errors)
-    if show_allowed_stages:
-        console.print("[red]Checkpoint rejected.[/red] " f"Allowed stages: {', '.join(sorted(CHECKPOINT_STAGES))}")
+    if payload.get("kind") in {"scope_busy", "conflict"}:
+        render_runtime_rejection(payload, fallback_title="Checkpoint rejected.")
     else:
-        console.print("[red]Checkpoint rejected.[/red] Fix the validation errors below.")
-    for error in errors:
-        console.print(f"[red]- {error}[/red]")
+        show_allowed_stages = any(error.startswith("stage must be one of:") for error in errors)
+        if show_allowed_stages:
+            console.print("[red]Checkpoint rejected.[/red] " f"Allowed stages: {', '.join(sorted(CHECKPOINT_STAGES))}")
+        else:
+            console.print("[red]Checkpoint rejected.[/red] Fix the validation errors below.")
+        for error in errors:
+            console.print(f"[red]- {error}[/red]")
     raise typer.Exit(1)
 
 

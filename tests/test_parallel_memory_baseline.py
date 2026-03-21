@@ -21,7 +21,7 @@ def _invoke_help(invoke_cli, command: str):
 def test_parallel_memory_contract_manifest_matches_runtime_baseline(repo_root, invoke_cli) -> None:
     manifest = _load_manifest(repo_root)
 
-    assert manifest["epic"] == "epic-3-revision-aware-optimistic-concurrency"
+    assert manifest["epic"] == "epic-4-scoped-leases-and-ownership"
     assert manifest["roadmap_document"] == "dev/parallel-memory-roadmap.md"
     assert manifest["scope"] == "docs+contracts+behavior"
     assert manifest["behavior_change"] is True
@@ -96,8 +96,11 @@ def test_parallel_memory_docs_describe_current_runtime_truth(repo_root) -> None:
     assert "`--session-key`" in memory_docs
     assert "`--expected-revision`" in memory_docs
     assert "`runtime_revision`" in memory_docs
+    assert "`scope_busy`" in memory_docs
+    assert "writer lease" in memory_docs
     assert "session `active`" in memory_docs
     assert "не является встроенным координатором выполнения" in agents_docs
     assert "Оркестрация с `task`, `work-item` и `proposal`" in agents_docs
     assert "`--session-key`" in agents_docs
     assert "`--expected-revision`" in agents_docs
+    assert "`scope_busy`" in agents_docs

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import time
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from .leases import normalize_writer_lease_row
 from .text import _dump_json, _flatten_for_search, _now_iso, _record_search_text
 from .vector import VectorMemoryIndex, _chunk_source_text
 
@@ -18,37 +20,77 @@ def acquire_lease(
     owner_id: str,
     *,
     ttl_seconds: int,
-) -> bool:
+    conn: sqlite3.Connection | None = None,
+) -> dict[str, Any]:
     now = int(time.time())
     expires_at = now + ttl_seconds
     updated_at = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now))
-    with store.connect() as conn:
-        current = conn.execute(
-            "SELECT owner_id, expires_at FROM writer_leases WHERE lease_name = ?",
-            (lease_name,),
-        ).fetchone()
-        if current and current["expires_at"] > now and current["owner_id"] != owner_id:
-            return False
-        conn.execute(
-            """
-            INSERT INTO writer_leases (lease_name, owner_id, expires_at, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(lease_name) DO UPDATE SET
-                owner_id=excluded.owner_id,
-                expires_at=excluded.expires_at,
-                updated_at=excluded.updated_at
-            """,
-            (lease_name, owner_id, expires_at, updated_at),
-        )
-    return True
+    if conn is None:
+        with store.connect() as managed_conn:
+            return acquire_lease(
+                store,
+                lease_name,
+                owner_id,
+                ttl_seconds=ttl_seconds,
+                conn=managed_conn,
+            )
+    current = conn.execute(
+        "SELECT owner_id, expires_at, updated_at FROM writer_leases WHERE lease_name = ?",
+        (lease_name,),
+    ).fetchone()
+    if current and current["expires_at"] > now and current["owner_id"] != owner_id:
+        return {
+            "acquired": False,
+            "lease": normalize_writer_lease_row(
+                {
+                    "lease_name": lease_name,
+                    "owner_id": current["owner_id"],
+                    "expires_at": current["expires_at"],
+                    "updated_at": current["updated_at"],
+                },
+                now_epoch=now,
+            ),
+        }
+    conn.execute(
+        """
+        INSERT INTO writer_leases (lease_name, owner_id, expires_at, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(lease_name) DO UPDATE SET
+            owner_id=excluded.owner_id,
+            expires_at=excluded.expires_at,
+            updated_at=excluded.updated_at
+        """,
+        (lease_name, owner_id, expires_at, updated_at),
+    )
+    return {
+        "acquired": True,
+        "lease": normalize_writer_lease_row(
+            {
+                "lease_name": lease_name,
+                "owner_id": owner_id,
+                "expires_at": expires_at,
+                "updated_at": updated_at,
+            },
+            now_epoch=now,
+        ),
+    }
 
 
-def release_lease(store: MemoryStore, lease_name: str, owner_id: str) -> None:
-    with store.connect() as conn:
-        conn.execute(
-            "DELETE FROM writer_leases WHERE lease_name = ? AND owner_id = ?",
-            (lease_name, owner_id),
-        )
+def release_lease(
+    store: MemoryStore,
+    lease_name: str,
+    owner_id: str,
+    *,
+    conn: sqlite3.Connection | None = None,
+) -> None:
+    if conn is None:
+        with store.connect() as managed_conn:
+            release_lease(store, lease_name, owner_id, conn=managed_conn)
+        return
+    conn.execute(
+        "DELETE FROM writer_leases WHERE lease_name = ? AND owner_id = ?",
+        (lease_name, owner_id),
+    )
 
 
 def process_pending_jobs(
@@ -58,7 +100,8 @@ def process_pending_jobs(
     limit: int = 100,
 ) -> dict[str, Any]:
     owner_id = f"{os.getpid()}-{uuid.uuid4()}"
-    if not acquire_lease(store, "indexer", owner_id, ttl_seconds=30):
+    lease_result = acquire_lease(store, "indexer", owner_id, ttl_seconds=30)
+    if not lease_result["acquired"]:
         return {"processed": 0, "failed": 0, "lease_acquired": False}
     index = VectorMemoryIndex(store.paths.lancedb_dir)
     index.ensure_layout()

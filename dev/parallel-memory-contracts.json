@@ -1,5 +1,5 @@
 {
-  "epic": "epic-3-revision-aware-optimistic-concurrency",
+  "epic": "epic-4-scoped-leases-and-ownership",
   "roadmap_document": "dev/parallel-memory-roadmap.md",
   "default_session_key": "active",
   "scope": "docs+contracts+behavior",
@@ -9,7 +9,8 @@
     "current_mutation_authority": "sqlite",
     "target_mutation_authority": "sqlite",
     "projection_role": "compatible-rebuildable-projections",
-    "runtime_revision_mode": "branch-level-optimistic-concurrency"
+    "runtime_revision_mode": "branch-level-optimistic-concurrency",
+    "hot_scope_protection": "scoped-writer-leases"
   },
   "session_scoped_commands": [
     "madspec memory retrieve",

@@ -51,13 +51,14 @@ from ..shared.storage import (
     normalize_runtime_progress,
     now_iso,
 )
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.constants import LEASE_TTL_SECONDS, SYSTEM_SESSION_KEY
 from ..shared.system_store.canonical_state import (
     CanonicalBranchState,
     build_runtime_snapshot_specs,
     load_canonical_branch_state,
     tag_records_for_stream,
 )
+from ..shared.system_store.leases import build_stage_checkpoint_lease
 from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
 from ..shared.system_store.sessions import read_runtime_session_payload
 
@@ -518,6 +519,13 @@ def checkpoint_stage_memory(
             base,
             current,
             normalized_stage=normalized_stage,
+        ),
+        lease=build_stage_checkpoint_lease(
+            branch_name=branch_name,
+            stage=normalized_stage,
+            mutation_kind="checkpoint",
+            session_key=session_key,
+            ttl_seconds=LEASE_TTL_SECONDS,
         ),
     )
     if not projection_meta.get("accepted", True):

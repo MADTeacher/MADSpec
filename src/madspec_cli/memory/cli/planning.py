@@ -10,6 +10,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.determine_next_step import DetermineNextStepRequest, execute as determine_next_step
 from ..application.register_step import RegisterStepRequest, execute as register_step
+from .runtime_feedback import render_runtime_rejection
 from ..domain.branch_layout import resolve_target_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
@@ -179,8 +180,7 @@ def memory_register_step(
         console.print("[cyan]TDD:[/cyan] " f"kind={metadata.get('kind')} " f"policy={metadata.get('tddPolicy')}")
         return
 
-    for error in payload.get("errors", []):
-        console.print(f"[red]- {error}[/red]")
+    render_runtime_rejection(payload, fallback_title="Register step rejected.")
     raise typer.Exit(1)
 
 

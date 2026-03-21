@@ -27,7 +27,8 @@ from ..shared.system_store.canonical_state import (
     load_canonical_branch_state,
     tag_records_for_stream,
 )
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.constants import LEASE_TTL_SECONDS, SYSTEM_SESSION_KEY
+from ..shared.system_store.leases import build_plan_catalog_lease
 from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
 from ..shared.system_store.sessions import read_runtime_session_payload
 from ..stages.concept.state import is_empty_concept_state, load_concept_state, migrate_legacy_concept_markdown
@@ -571,6 +572,12 @@ def register_planned_step(
             base,
             current,
             step_id=step_id,
+        ),
+        lease=build_plan_catalog_lease(
+            branch_name=branch_name,
+            mutation_kind="register-step",
+            session_key=session_key,
+            ttl_seconds=LEASE_TTL_SECONDS,
         ),
     )
     if not projection_meta.get("accepted", True):

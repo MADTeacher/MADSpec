@@ -249,3 +249,84 @@ def test_runtime_mutation_recomputes_progress_derived_fields(memory_project) -> 
     assert planning_metadata["progressMetrics"]["overallProgress"] > 0
     assert refreshed.progress["stepStatus"]["step-01-authentication"]["status"] == "planned"
     assert str(paths.progress).endswith("progress.json")
+
+
+def test_scope_busy_does_not_replace_stale_revision_conflict(memory_project) -> None:
+    memory_project.write_mvp_concept(variant="auth_sessions")
+    memory_project.create_step_artifacts("step-01-authentication")
+    memory_project.create_step_artifacts("step-02-session-persistence")
+
+    base_state = load_canonical_branch_state(memory_project.project_path, "main")
+    known_functions = {
+        item: priority
+        for priority, items in extract_function_catalog(
+            memory_project.project_path,
+            "main",
+            "mvp.plan",
+        ).items()
+        for item in items
+    }
+
+    store = MemoryStore(memory_project.project_path)
+    held = store.acquire_lease("plan-catalog:main", "external-owner", ttl_seconds=30)
+    assert held["acquired"] is True
+
+    busy = register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        step_id="step-01-authentication",
+        covers=["Authentication"],
+        step_kind="code",
+    )
+    assert busy["accepted"] is False
+    assert busy["kind"] == "scope_busy"
+
+    store.release_lease("plan-catalog:main", "external-owner")
+
+    first = register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        step_id="step-01-authentication",
+        covers=["Authentication"],
+        step_kind="code",
+    )
+    assert first["accepted"] is True
+
+    stale = commit_runtime_mutation(
+        memory_project.project_path,
+        branch_name="main",
+        stage="mvp.plan",
+        mutation_kind="register-step",
+        scope="plan-catalog",
+        session_key="active",
+        expected_revision=0,
+        base_state=base_state,
+        plan_builder=lambda latest_state: _build_register_step_plan(
+            memory_project.project_path,
+            "main",
+            "mvp.plan",
+            session_key="active",
+            step_id="step-02-session-persistence",
+            normalized_covers=["Sessions"],
+            known_functions=known_functions,
+            step_kind="code",
+            effective_tdd_policy="required",
+            waiver_reason=None,
+            depends_on=["step-01-authentication"],
+            summary="Stale mutation should conflict after lease contention is resolved.",
+            title=None,
+            related_artifacts=[],
+            size=None,
+            complexity=None,
+            canonical=latest_state,
+        ),
+        conflict_detector=lambda base, current: _detect_register_step_conflict(
+            base,
+            current,
+            step_id="step-01-authentication",
+        ),
+    )
+    assert stale["accepted"] is False
+    assert stale["kind"] == "conflict"

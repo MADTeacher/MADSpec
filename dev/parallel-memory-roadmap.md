@@ -610,6 +610,8 @@ Ownership задается по scope и используется для writer-
 - lease применяется только к mutation scopes с высокой вероятностью конфликта;
 - read-only operations не требуют lease;
 - ошибка lease acquisition возвращает structured `scope busy` payload.
+- runtime writer owner id имеет формат `runtime:<mutation-kind>:<session-key>:<pid>:<uuid>`;
+- `doctor` диагностирует active и expired writer lease по hot scopes ветки.
 
 **Deliverables**
 

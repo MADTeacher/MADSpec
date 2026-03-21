@@ -30,6 +30,13 @@ RECOMMENDED_SQLITE_TABLES = {
     "records_fts",
     "stage_snapshots_fts",
 }
+WRITER_LEASE_PREFIXES = (
+    "plan-catalog:",
+    "implement-step:",
+    "artifact:",
+    "review:",
+    "security:",
+)
 
 
 @dataclass(frozen=True)
@@ -99,6 +106,9 @@ def execute(request: MemoryDoctorRequest) -> MemoryDoctorResult:
     indexing_payload, indexing_check = _indexing_diagnostics(request.project_path, request.branch_name)
     checks.append(indexing_check)
 
+    lease_payload, lease_check = _lease_diagnostics(request.project_path, request.branch_name)
+    checks.append(lease_check)
+
     generated_view_errors = validate_generated_stage_views(
         paths,
         project_path=request.project_path,
@@ -128,6 +138,7 @@ def execute(request: MemoryDoctorRequest) -> MemoryDoctorResult:
             "vector": vector_payload,
             "generated_views": generated_views,
             "indexing": indexing_payload,
+            "writer_leases": lease_payload,
         }
     )
 
@@ -249,6 +260,71 @@ def _indexing_diagnostics(project_path: Path, branch_name: str) -> tuple[dict[st
     if status == "warn":
         summary = "index queue requires attention"
     return payload, _make_check("indexing", status, summary, details)
+
+
+def _lease_diagnostics(project_path: Path, branch_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    store = MemoryStore(project_path)
+    payload = {
+        "leases": [],
+        "active": [],
+        "expired": [],
+    }
+    if not store.paths.sqlite_file.exists():
+        return (
+            payload,
+            _make_check(
+                "writer_leases",
+                "error",
+                "writer leases cannot be inspected because SQLite is missing",
+                [str(store.paths.sqlite_file.relative_to(project_path))],
+            ),
+        )
+    all_leases = store.list_writer_leases()
+    leases = [
+        lease
+        for lease in all_leases
+        if lease["lease_name"].startswith(WRITER_LEASE_PREFIXES)
+        and _lease_matches_branch(lease["lease_name"], branch_name)
+    ]
+    active = [lease for lease in leases if not lease["expired"]]
+    expired = [lease for lease in leases if lease["expired"]]
+    payload = {
+        "leases": leases,
+        "active": active,
+        "expired": expired,
+    }
+    details: list[str] = []
+    status = "ok"
+    if active:
+        details.extend(
+            f"active lease: {lease['lease_name']} owner={lease['owner_id']}"
+            for lease in active
+        )
+    if expired:
+        status = "warn"
+        details.extend(
+            f"expired lease: {lease['lease_name']} owner={lease['owner_id']}"
+            for lease in expired
+        )
+    summary = "writer lease state is healthy"
+    if active:
+        summary = "writer lease state includes active hot-scope locks"
+    if expired:
+        summary = "writer lease state includes expired hot-scope locks"
+    return payload, _make_check("writer_leases", status, summary, details)
+
+
+def _lease_matches_branch(lease_name: str, branch_name: str) -> bool:
+    if lease_name.startswith("plan-catalog:"):
+        return lease_name == f"plan-catalog:{branch_name}"
+    if lease_name.startswith(("implement-step:", "artifact:")):
+        parts = lease_name.split(":", 2)
+        return len(parts) == 3 and parts[1] == branch_name
+    if lease_name.startswith("review:"):
+        return lease_name == f"review:{branch_name}"
+    if lease_name.startswith("security:"):
+        return lease_name == f"security:{branch_name}"
+    return False
 
 
 def _make_check(name: str, status: str, summary: str, details: list[str]) -> dict[str, Any]:

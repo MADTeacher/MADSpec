@@ -9,6 +9,7 @@ from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.file_input import read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
+from .runtime_feedback import render_runtime_rejection
 from ..application.implementation_steps import (
     ImplementationStepRequest,
     checkpoint as checkpoint_step,
@@ -123,9 +124,12 @@ def memory_start_step(
         console.print(f"[green]Started step:[/green] {payload['step_id']}")
         return
 
-    console.print("[red]Failed to start step.[/red] " f"Allowed stages: {', '.join(sorted(IMPLEMENTATION_STAGES))}")
-    for error in payload.get("errors", []):
-        console.print(f"[red]- {error}[/red]")
+    if payload.get("kind") in {"scope_busy", "conflict"}:
+        render_runtime_rejection(payload, fallback_title="Failed to start step.")
+    else:
+        console.print("[red]Failed to start step.[/red] " f"Allowed stages: {', '.join(sorted(IMPLEMENTATION_STAGES))}")
+        for error in payload.get("errors", []):
+            console.print(f"[red]- {error}[/red]")
     raise typer.Exit(1)
 
 
@@ -204,8 +208,7 @@ def memory_checkpoint_step(
         console.print(f"[cyan]TDD phase:[/cyan] {payload['tdd_phase']}")
         return
 
-    for error in payload.get("errors", []):
-        console.print(f"[red]- {error}[/red]")
+    render_runtime_rejection(payload, fallback_title="Checkpoint rejected.")
     raise typer.Exit(1)
 
 
@@ -298,8 +301,7 @@ def memory_complete_step(
         console.print(f"[cyan]Next step:[/cyan] {payload.get('next_step') or 'none'}")
         return
 
-    for error in payload.get("errors", []):
-        console.print(f"[red]- {error}[/red]")
+    render_runtime_rejection(payload, fallback_title="Complete step rejected.")
     raise typer.Exit(1)
 
 

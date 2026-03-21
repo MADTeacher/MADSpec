@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from madspec_cli.memory import append_jsonl, get_memory_paths, make_record, write_json
+from madspec_cli.memory.shared.system_store.store import MemoryStore
 
 from tests.support import step_metadata, step_status
 
@@ -266,3 +267,22 @@ def test_memory_doctor_reports_healthy_state_and_generated_view_drift(init_memor
     doctor_text_result = invoke_cli(["memory", "doctor", "--branch", "main"])
     assert doctor_text_result.exit_code == 1, doctor_text_result.stdout
     assert "Overall status:" in doctor_text_result.stdout
+
+
+def test_memory_doctor_reports_active_and_expired_writer_leases(init_memory_branch, invoke_cli) -> None:
+    project_path = init_memory_branch(branch="main")
+    store = MemoryStore(project_path)
+
+    active = store.acquire_lease("plan-catalog:main", "planner-owner", ttl_seconds=30)
+    expired = store.acquire_lease("review:main", "review-owner", ttl_seconds=0)
+    assert active["acquired"] is True
+    assert expired["acquired"] is True
+
+    result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    writer_leases = payload["writer_leases"]
+    assert any(item["lease_name"] == "plan-catalog:main" and item["expired"] is False for item in writer_leases["leases"])
+    assert any(item["lease_name"] == "review:main" and item["expired"] is True for item in writer_leases["leases"])
+    checks = {item["name"]: item for item in payload["checks"]}
+    assert checks["writer_leases"]["status"] == "warn"

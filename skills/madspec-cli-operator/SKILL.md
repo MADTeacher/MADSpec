@@ -34,10 +34,11 @@ description: Операционный навык по MADSpec Framework и MADSp
 - Канонические данные и производные представления нельзя путать: Markdown-контекст часто является только проекцией.
 - Runtime state ветки теперь канонически хранится в `SQLite`: `progress`, stage snapshots, session-local state и runtime record streams сначала коммитятся туда, а branch files остаются производными projections. Файл `active-session.json` поддерживается только как проекция для session `active`.
 - Runtime state ветки имеет общую ревизию `runtime_revision`; успешные mutating команды возвращают `runtime_revision_before` и `runtime_revision_after`, а при устаревшей записи возможен structured `conflict`.
+- Для горячих write paths MADSpec использует scoped writer lease. Если mutating команда вернула `kind="scope_busy"`, это значит, что другой writer временно держит тот же hot scope; сначала дождись освобождения lease или истечения TTL, а уже потом повторяй запись.
 - Команды, привязанные к стадии, материализуют только артефакты текущей стадии; отсутствие несвязанных производных артефактов не считай признаком поломки, пока соответствующая стадия еще не запускалась.
 - Для `mvp.plan` и `feature.plan` предпочитай минимально достаточное число шагов: легкую задачу планируй одним полным шагом, если нет реальной причины делить её дальше.
 - Для `memory capture`, `memory checkpoint`, `memory register-step`, `memory start-step`, `memory checkpoint-step` и `memory complete-step` обязательно используй `--from-file`.
-- Для multi-agent, automation и любых повторных попыток после чтения контекста передавай `--expected-revision`; если команда вернула `kind="conflict"`, сначала перечитай состояние через `retrieve` или `explain`, получи свежий `runtime_revision` и только потом повторяй запись.
+- Для multi-agent, automation и любых повторных попыток после чтения контекста передавай `--expected-revision`; если команда вернула `kind="conflict"`, сначала перечитай состояние через `retrieve` или `explain`, получи свежий `runtime_revision` и только потом повторяй запись. Если команда вернула `kind="scope_busy"`, сначала устрани contention по hot scope, а не перечитывай контекст по инерции.
 - Для `mvp.design` источником утвержденного состояния служат память и связанные дизайн-артефакты; историю чата не считай источником истины.
 - Для `mvp.implement` и `feature.implement` рабочий цикл идет через `retrieve -> start-step -> checkpoint-step -> complete-step`.
 - Для `review` и `security` сначала проверяй статус соответствующих gate-проверок, затем формулируй выводы.

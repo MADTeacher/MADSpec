@@ -7,6 +7,7 @@ from typing import Any, Callable
 from ..storage import normalize_runtime_progress
 from .canonical_state import CanonicalBranchState, refresh_branch_projections
 from .layout import ensure_system_memory_layout
+from .leases import RuntimeLeaseDescriptor
 from .sessions import normalize_session_payload
 from .store import MemoryStore
 
@@ -31,6 +32,7 @@ def commit_runtime_mutation(
     base_state: CanonicalBranchState,
     plan_builder: Callable[[CanonicalBranchState], RuntimeMutationPlan],
     conflict_detector: Callable[[CanonicalBranchState, CanonicalBranchState], dict[str, Any] | None],
+    lease: RuntimeLeaseDescriptor | None = None,
     full: bool = False,
 ) -> dict[str, Any]:
     from .canonical_state import bootstrap_branch_canonical_state, load_canonical_branch_state
@@ -38,40 +40,60 @@ def commit_runtime_mutation(
     ensure_system_memory_layout(project_path)
     bootstrap_branch_canonical_state(project_path, branch_name)
     store = MemoryStore(project_path)
+    lease_acquired = False
 
-    with store.connect() as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        current_revision = store.fetch_branch_revision(branch_name, conn=conn)
-        current_state = base_state
-        if current_revision != base_state.runtime_revision:
-            current_state = load_canonical_branch_state(project_path, branch_name)
-
-        if current_revision != expected_revision:
-            conflict = conflict_detector(base_state, current_state)
-            if conflict is not None:
-                return _build_conflict_payload(
-                    mutation_kind=mutation_kind,
-                    scope=scope,
-                    expected_revision=expected_revision,
-                    actual_revision=current_revision,
-                    conflict=conflict,
+    try:
+        with store.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if lease is not None:
+                lease_result = store.acquire_lease(
+                    lease.lease_name,
+                    lease.owner_id,
+                    ttl_seconds=lease.ttl_seconds,
+                    conn=conn,
                 )
+                if not lease_result["acquired"]:
+                    return _build_scope_busy_payload(
+                        mutation_kind=mutation_kind,
+                        scope=lease.lease_scope,
+                        lease_name=lease.lease_name,
+                        lease_state=lease_result["lease"],
+                    )
+                lease_acquired = True
+            current_revision = store.fetch_branch_revision(branch_name, conn=conn)
+            current_state = base_state
+            if current_revision != base_state.runtime_revision:
+                current_state = load_canonical_branch_state(project_path, branch_name)
 
-        plan = plan_builder(current_state)
-        normalized_plan = _normalize_runtime_mutation_plan(
-            project_path,
-            branch_name,
-            plan,
-        )
-        branch_revision_after = current_revision + 1
-        store.commit_runtime_mutation(
-            branch=branch_name,
-            stage_snapshots=normalized_plan.stage_snapshots,
-            sessions=normalized_plan.sessions,
-            records=normalized_plan.records,
-            branch_revision_after=branch_revision_after,
-            conn=conn,
-        )
+            if current_revision != expected_revision:
+                conflict = conflict_detector(base_state, current_state)
+                if conflict is not None:
+                    return _build_conflict_payload(
+                        mutation_kind=mutation_kind,
+                        scope=scope,
+                        expected_revision=expected_revision,
+                        actual_revision=current_revision,
+                        conflict=conflict,
+                    )
+
+            plan = plan_builder(current_state)
+            normalized_plan = _normalize_runtime_mutation_plan(
+                project_path,
+                branch_name,
+                plan,
+            )
+            branch_revision_after = current_revision + 1
+            store.commit_runtime_mutation(
+                branch=branch_name,
+                stage_snapshots=normalized_plan.stage_snapshots,
+                sessions=normalized_plan.sessions,
+                records=normalized_plan.records,
+                branch_revision_after=branch_revision_after,
+                conn=conn,
+            )
+    finally:
+        if lease is not None and lease_acquired:
+            store.release_lease(lease.lease_name, lease.owner_id)
 
     generated_views: list[str] = []
     warnings: list[str] = []
@@ -179,3 +201,24 @@ def _build_conflict_payload(
     if conflict.get("details"):
         payload["conflict"]["details"] = conflict["details"]
     return payload
+
+
+def _build_scope_busy_payload(
+    *,
+    mutation_kind: str,
+    scope: str,
+    lease_name: str,
+    lease_state: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "accepted": False,
+        "kind": "scope_busy",
+        "scope_busy": {
+            "kind": mutation_kind,
+            "scope": scope,
+            "lease_name": lease_name,
+            "owner_id": lease_state.get("owner_id"),
+            "expires_at": lease_state.get("expires_at"),
+            "retry_guidance": "Retry after the active writer releases the lease or after the lease TTL expires.",
+        },
+    }

@@ -31,8 +31,9 @@ from ..shared.storage import (
     get_memory_paths,
     now_iso,
 )
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.constants import LEASE_TTL_SECONDS, SYSTEM_SESSION_KEY
 from ..shared.system_store.canonical_state import CanonicalBranchState, build_runtime_snapshot_specs, load_canonical_branch_state, tag_records_for_stream
+from ..shared.system_store.leases import build_implementation_step_lease
 from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
 from ..shared.system_store.sessions import read_runtime_session_payload
 
@@ -477,6 +478,13 @@ def start_implementation_step(
             base_state=base,
             current_state=current,
         ),
+        lease=build_implementation_step_lease(
+            branch_name=branch_name,
+            step_id=selected_step,
+            mutation_kind="start-step",
+            session_key=session_key,
+            ttl_seconds=LEASE_TTL_SECONDS,
+        ),
     )
     if not projection_meta.get("accepted", True):
         return projection_meta
@@ -687,6 +695,13 @@ def checkpoint_implementation_step(
             explicit_step_id=step_id,
             base_state=base,
             current_state=current,
+        ),
+        lease=build_implementation_step_lease(
+            branch_name=branch_name,
+            step_id=selected_step,
+            mutation_kind="checkpoint-step",
+            session_key=session_key,
+            ttl_seconds=LEASE_TTL_SECONDS,
         ),
     )
     if not projection_meta.get("accepted", True):
@@ -916,6 +931,13 @@ def complete_implementation_step(
             explicit_step_id=step_id,
             base_state=base,
             current_state=current,
+        ),
+        lease=build_implementation_step_lease(
+            branch_name=branch_name,
+            step_id=selected_step,
+            mutation_kind="complete-step",
+            session_key=session_key,
+            ttl_seconds=LEASE_TTL_SECONDS,
         ),
     )
     if not projection_meta.get("accepted", True):
