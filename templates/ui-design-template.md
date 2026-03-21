@@ -8,9 +8,9 @@
 
 ## Прототип интерфейса
 
-**Главный файл прототипа**: [.madspec/<BRANCH>/ui-prototype/index.html](.madspec/<BRANCH>/ui-prototype/index.html)
+**Точка входа приложения**: [.madspec/<BRANCH>/ui-prototype/index.html](.madspec/<BRANCH>/ui-prototype/index.html)
 
-**Инструкция по просмотру**: Откройте файл `.madspec/<BRANCH>/ui-prototype/index.html` в браузере и начните с primary review flow.
+**Инструкция по просмотру**: Откройте файл `.madspec/<BRANCH>/ui-prototype/index.html` в браузере и пройдите primary flow, начиная с реального входного экрана приложения.
 
 ## Review Journeys
 

@@ -20,7 +20,7 @@ def test_design_stage_retrieve_returns_design_status_and_full_artifact(memory_pr
             "settings::Settings::Profile and export configuration",
         ],
         screens=[
-            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/index.html::Shows upcoming bookings and reminder actions",
             "profile-studio::Profile studio::settings::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
             "export-hub::Export hub::settings::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
         ],
@@ -79,17 +79,19 @@ def test_design_stage_retrieve_returns_design_status_and_full_artifact(memory_pr
         include_history=True,
     )
     ui_design = (paths["branch_dir"] / "ui-design.md").read_text(encoding="utf-8")
+    project_context = (paths["branch_dir"] / "project-context.md").read_text(encoding="utf-8")
 
     assert checkpointed["accepted"] is True
     assert retrieved_full["artifact_state"]["design"]["checkpointSummary"] == "Design ratified for prototype review"
     assert retrieved_full["artifact_state"]["design"]["revision"] == 1
-    assert "## Точка входа для review" in ui_design
+    assert "## Точка входа приложения" in ui_design
     assert "## Review Journeys" in ui_design
     assert "Schedule board" in ui_design
     assert "Manage booking" in ui_design
     assert "Storyboard path" in ui_design
     assert "Покрытие функций" not in ui_design
     assert "- P1:" not in ui_design
+    assert "application entrypoint `.madspec/main/ui-prototype/index.html`" in project_context
     assert validate_branch_memory(memory_project.project_path, "main") == []
 
 
@@ -105,7 +107,7 @@ def test_design_checkpoint_can_be_repeated_and_increments_revision(memory_projec
         platforms=["Web"],
         zones=["operations::Operations::Daily scheduling workspace"],
         screens=[
-            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/index.html::Shows upcoming bookings and reminder actions",
             "profile-studio::Profile studio::operations::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
             "export-hub::Export hub::operations::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
         ],
@@ -169,7 +171,7 @@ def test_validate_detects_out_of_sync_generated_ui_design(memory_project) -> Non
         platforms=["Web"],
         zones=["operations::Operations::Daily scheduling workspace"],
         screens=[
-            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/index.html::Shows upcoming bookings and reminder actions",
             "profile-studio::Profile studio::operations::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
             "export-hub::Export hub::operations::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
         ],
@@ -212,7 +214,7 @@ def test_validate_detects_missing_design_coverage_and_prototype_files(memory_pro
         platforms=["Web"],
         zones=["operations::Operations::Daily scheduling workspace"],
         screens=[
-            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions"
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/index.html::Shows upcoming bookings and reminder actions"
         ],
         screen_features=["schedule-board::p1::Booking workflow"],
         flows=["manage-booking::Manage booking::Create and review a booking flow from one workspace"],
@@ -220,7 +222,7 @@ def test_validate_detects_missing_design_coverage_and_prototype_files(memory_pro
         navigation=["schedule-board::schedule-board::Refresh board"],
         status="proposed",
     )
-    (paths["branch_dir"] / "ui-prototype" / "schedule-board.html").unlink()
+    (paths["branch_dir"] / "ui-prototype" / "index.html").unlink()
 
     errors = validate_branch_memory(memory_project.project_path, "main")
 
@@ -228,3 +230,94 @@ def test_validate_detects_missing_design_coverage_and_prototype_files(memory_pro
     assert any("design references missing prototype file" in error for error in errors)
     assert any("design coverage missing P2 concept feature 'Profile studio'" in error for error in errors)
 
+
+def test_validate_detects_missing_app_entry_screen(memory_project) -> None:
+    memory_project.seed_concept_for_design()
+    memory_project.write_design_prototypes()
+
+    capture_stage_memory(
+        memory_project.project_path,
+        "main",
+        "mvp.design",
+        design_overview="Prototype without a real app entry.",
+        platforms=["Web"],
+        zones=["operations::Operations::Daily scheduling workspace"],
+        screens=[
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "profile-studio::Profile studio::operations::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
+        ],
+        screen_features=[
+            "schedule-board::p1::Booking workflow",
+            "profile-studio::p2::Profile studio",
+        ],
+        flows=["manage-booking::Manage booking::Create and review a booking flow from one workspace"],
+        flow_steps=["manage-booking::schedule-board::Create booking::Open booking details with reminders"],
+        navigation=["schedule-board::profile-studio::Profile settings shortcut"],
+        status="proposed",
+    )
+
+    errors = validate_branch_memory(memory_project.project_path, "main")
+
+    assert any("must include exactly one screen linked to app entry" in error for error in errors)
+
+
+def test_validate_detects_primary_flow_that_starts_away_from_app_entry(memory_project) -> None:
+    memory_project.seed_concept_for_design()
+    memory_project.write_design_prototypes()
+
+    capture_stage_memory(
+        memory_project.project_path,
+        "main",
+        "mvp.design",
+        design_overview="Prototype whose primary flow starts from the wrong screen.",
+        platforms=["Web"],
+        zones=["operations::Operations::Daily scheduling workspace"],
+        screens=[
+            "booking-entry::Booking entry::operations::.madspec/main/ui-prototype/index.html::Collect the booking context before entering the workspace",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "profile-studio::Profile studio::operations::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
+        ],
+        screen_features=[
+            "booking-entry::p1::Booking workflow",
+            "profile-studio::p2::Profile studio",
+        ],
+        flows=["manage-booking::Manage booking::Create and review a booking flow from one workspace"],
+        flow_steps=["manage-booking::schedule-board::Open board::Start directly from the workspace"],
+        navigation=["booking-entry::schedule-board::Continue to workspace"],
+        status="proposed",
+    )
+
+    errors = validate_branch_memory(memory_project.project_path, "main")
+
+    assert any("must start from the app entry screen" in error for error in errors)
+
+
+def test_validate_detects_duplicate_app_entry_screens(memory_project) -> None:
+    memory_project.seed_concept_for_design()
+    memory_project.write_design_prototypes()
+
+    capture_stage_memory(
+        memory_project.project_path,
+        "main",
+        "mvp.design",
+        design_overview="Prototype with two screens bound to index.",
+        platforms=["Web"],
+        zones=["operations::Operations::Daily scheduling workspace"],
+        screens=[
+            "booking-entry::Booking entry::operations::.madspec/main/ui-prototype/index.html::Collect the booking context before entering the workspace",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/index.html::Shows upcoming bookings and reminder actions",
+            "profile-studio::Profile studio::operations::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
+        ],
+        screen_features=[
+            "booking-entry::p1::Booking workflow",
+            "profile-studio::p2::Profile studio",
+        ],
+        flows=["manage-booking::Manage booking::Create and review a booking flow from one workspace"],
+        flow_steps=["manage-booking::booking-entry::Start setup::Enter the workspace flow"],
+        navigation=["booking-entry::schedule-board::Continue to workspace"],
+        status="proposed",
+    )
+
+    errors = validate_branch_memory(memory_project.project_path, "main")
+
+    assert any("must include exactly one screen linked to app entry" in error for error in errors)

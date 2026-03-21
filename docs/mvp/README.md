@@ -16,7 +16,7 @@
 ## Общие состояния стадий и артефакты
 
 - `mvp.concept` — `.madspec/<BRANCH>/memory/stages/mvp.concept.json`, производный `concept.md`
-- `mvp.design` — `.madspec/<BRANCH>/memory/stages/mvp.design.json`, производные `ui-design.md`, `ui-prototype/*`
+- `mvp.design` — `.madspec/<BRANCH>/memory/stages/mvp.design.json`, производные `ui-design.md`, `ui-prototype/*`, где `index.html` — точка входа приложения
 - `mvp.tech` — `.madspec/<BRANCH>/memory/stages/mvp.tech.json`, производный `tech-stack.md`
 - `mvp.architecture` — `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`, производные `architecture.md`, `data-model.md`, `contracts/openapi.yaml`
 - `mvp.plan` — `.madspec/<BRANCH>/memory/stages/mvp.plan.json` + `.madspec/<BRANCH>/memory/progress.json`, производные `implementation-plan.md`, `planning-context-cache.md`, `steps/*/planning-context.md`

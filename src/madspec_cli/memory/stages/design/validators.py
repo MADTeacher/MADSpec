@@ -11,6 +11,22 @@ def design_main_prototype_path(branch_name: str) -> Path:
     return Path(".madspec") / branch_name / "ui-prototype" / "index.html"
 
 
+def entry_screen_ids(
+    state: dict[str, Any],
+    *,
+    branch_name: str,
+) -> list[str]:
+    from .state import normalize_design_state
+
+    normalized, _ = normalize_design_state(state)
+    entry_prototype = design_main_prototype_path(branch_name).as_posix()
+    return [
+        screen.get("id", "")
+        for screen in normalized["screens"]
+        if screen.get("id", "") and screen.get("prototype", "") == entry_prototype
+    ]
+
+
 def extract_design_feature_coverage(state: dict[str, Any]) -> dict[str, list[str]]:
     from .state import normalize_design_state
 
@@ -101,6 +117,28 @@ def design_reference_errors(
             errors.append(f"design navigation references unknown screen '{item.get('from', '')}'")
         if item.get("to") not in screen_ids:
             errors.append(f"design navigation references unknown screen '{item.get('to', '')}'")
+
+    if branch_name is not None:
+        entry_ids = entry_screen_ids(normalized, branch_name=branch_name)
+        entry_prototype = design_main_prototype_path(branch_name).as_posix()
+        if not entry_ids:
+            errors.append(f"design must include exactly one screen linked to app entry '{entry_prototype}'")
+        elif len(entry_ids) > 1:
+            errors.append(f"design must include exactly one screen linked to app entry '{entry_prototype}'")
+
+        if normalized["flows"]:
+            primary_flow = normalized["flows"][0]
+            primary_steps = primary_flow.get("steps", [])
+            primary_entry = primary_steps[0].get("screenId", "") if primary_steps else ""
+            if not primary_steps:
+                errors.append(
+                    f"design primary flow '{primary_flow.get('id', '')}' must start from the app entry screen"
+                )
+            elif len(entry_ids) == 1 and primary_entry != entry_ids[0]:
+                errors.append(
+                    f"design primary flow '{primary_flow.get('id', '')}' must start from the app entry screen "
+                    f"'{entry_ids[0]}'"
+                )
 
     if project_path is not None and branch_name is not None:
         for missing in missing_prototype_files(normalized, project_path, branch_name):

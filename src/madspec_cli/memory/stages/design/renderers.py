@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ...shared.storage import PRIORITIES
-from .validators import design_main_prototype_path
+from .validators import design_main_prototype_path, entry_screen_ids
 
 
 def render_ui_design_markdown(
@@ -16,6 +16,8 @@ def render_ui_design_markdown(
 
     normalized, _ = normalize_design_state(state)
     main_prototype = design_main_prototype_path(branch_name).as_posix()
+    entry_ids = entry_screen_ids(normalized, branch_name=branch_name)
+    entry_screen_id = entry_ids[0] if len(entry_ids) == 1 else ""
     project_label = project_name or "Без названия"
     zone_titles = {
         zone.get("id", ""): zone.get("title", "") or zone.get("id", "")
@@ -45,20 +47,24 @@ def render_ui_design_markdown(
         "",
         "## Прототип интерфейса",
         "",
-        f"**Главный файл прототипа**: `{main_prototype}`",
+        f"**Точка входа приложения**: `{main_prototype}`",
         "",
-        "## Точка входа для review",
+        "## Точка входа приложения",
         "",
     ]
 
     if normalized["flows"]:
         primary_flow = normalized["flows"][0]
         primary_steps = primary_flow.get("steps", [])
-        entry_screen_id = primary_steps[0].get("screenId", "") if primary_steps else ""
+        primary_entry_screen_id = primary_steps[0].get("screenId", "") if primary_steps else ""
         lines.extend(
             [
                 f"- **Primary flow**: `{primary_flow.get('title', 'Без названия')}`",
                 f"- **Entry screen**: `{screen_titles.get(entry_screen_id, entry_screen_id or 'Не указан')}`",
+                (
+                    f"- **Primary flow starts at**: "
+                    f"`{screen_titles.get(primary_entry_screen_id, primary_entry_screen_id or 'Не указан')}`"
+                ),
                 "",
             ]
         )

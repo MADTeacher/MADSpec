@@ -20,7 +20,7 @@ def test_architecture_stage_retrieve_returns_status_and_full_artifact(memory_pro
             "settings::Settings::Profile and export configuration",
         ],
         screens=[
-            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/index.html::Shows upcoming bookings and reminder actions",
             "profile-studio::Profile studio::settings::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
             "export-hub::Export hub::settings::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
         ],
@@ -423,7 +423,7 @@ def test_validate_detects_out_of_sync_generated_architecture_artifacts(memory_pr
             "settings::Settings::Profile and export configuration",
         ],
         screens=[
-            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/schedule-board.html::Shows upcoming bookings and reminder actions",
+            "schedule-board::Schedule board::operations::.madspec/main/ui-prototype/index.html::Shows upcoming bookings and reminder actions",
             "profile-studio::Profile studio::settings::.madspec/main/ui-prototype/profile-studio.html::Lets the user customize profile details",
             "export-hub::Export hub::settings::.madspec/main/ui-prototype/export-hub.html::Lets the user export summaries and settings",
         ],
@@ -514,4 +514,3 @@ def test_validate_detects_out_of_sync_generated_architecture_artifacts(memory_pr
     assert "architecture.md is out of sync with memory/stages/mvp.architecture.json" in errors
     assert "data-model.md is out of sync with memory/stages/mvp.architecture.json" in errors
     assert "contracts/openapi.yaml is out of sync with memory/stages/mvp.architecture.json" in errors
-

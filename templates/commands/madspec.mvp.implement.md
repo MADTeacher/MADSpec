@@ -79,7 +79,7 @@ $ARGUMENTS
      - `.madspec/<BRANCH>/steps/<step-id>/tests.md`
      - `.madspec/<BRANCH>/steps/<step-id>/validation.md`
    - Если есть предыдущие шаги, используй `planning-context.md` и `implementation-context.md` только как generated context для ориентации, а не как первичный источник истины.
-   - Если шаг связан с UI, используй HTML storyboard-прототипы из `.madspec/<BRANCH>/ui-prototype/` как утвержденный UI contract при реализации.
+   - Если шаг связан с UI, используй конкретные HTML-прототипы экранов, flow steps и входной экран из `.madspec/<BRANCH>/ui-prototype/` как утвержденный UI contract при реализации.
 
 2. **Определение и запуск текущего шага**:
    - Если пользователь явно указал конкретный шаг в `$ARGUMENTS`, проверь его зависимости и запусти `madspec memory start-step --stage mvp.implement --step-id <step-id>`.
@@ -99,7 +99,7 @@ $ARGUMENTS
    - Следуй `description.md`, `tasks.md`, `tests.md` и `validation.md`.
    - Создавай или изменяй код и другие source files согласно задачам шага.
    - Отмечай выполненные задачи в `tasks.md`, если файл доступен для редактирования.
-   - Для UI-шагов проверяй соответствие `.madspec/<BRANCH>/ui-prototype/` и `ui-design.md`.
+   - Для UI-шагов проверяй соответствие `.madspec/<BRANCH>/ui-prototype/`, `ui-design.md`, конкретному flow и его входному экрану.
    - Если реализация должна отойти от утвержденного storyboard, сначала обнови `mvp.design` или получи явное одобрение drift от пользователя.
 
 5. **TDD и checkpoint discipline**:

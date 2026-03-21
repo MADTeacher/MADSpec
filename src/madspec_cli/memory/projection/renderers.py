@@ -92,7 +92,7 @@ def render_project_context(
             f"- Plan checkpoint summary: `{plan_state.get('checkpointSummary') or 'N/A'}`",
             (
                 f"- Design inventory: `{len(design_state.get('screens', []))}` screens, "
-                f"`{len(design_state.get('flows', []))}` review journeys, storyboard entrypoint "
+                f"`{len(design_state.get('flows', []))}` review journeys, application entrypoint "
                 f"`{design_main_prototype_path(branch_name).as_posix()}`"
             ),
             "- Tech slots: `"
