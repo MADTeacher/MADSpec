@@ -33,6 +33,7 @@ def retrieve_memory_context(
     include_conflicted: bool = False,
     full_artifact: bool = False,
     include_history: bool = False,
+    include_coordination: bool = True,
 ) -> dict[str, Any]:
     return _retrieve_memory_context(
         project_path,
@@ -49,4 +50,5 @@ def retrieve_memory_context(
         include_conflicted=include_conflicted,
         full_artifact=full_artifact,
         include_history=include_history,
+        include_coordination=include_coordination,
     )

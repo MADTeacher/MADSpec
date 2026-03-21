@@ -6,6 +6,14 @@
 - Если `.madspec/` есть, но артефакты лежат в корне, предложи `madspec migrate`.
 - Если git-ветка не определяется, используй `madspec git current-branch` и при необходимости `madspec git set-branch <name>`.
 
+## Phase 2 команды недоступны
+
+- Если `madspec memory tasks ...`, `work-items ...`, `proposals ...` или `coordinator explain` возвращают `reason="phase2_disabled"`, не считай это поломкой памяти.
+- Сначала проверь `.madspec/config.json` и блок `parallelRuntime`.
+- Для default-режима ожидаемо `phase1Enabled=true` и `phase2Enabled=false`.
+- Если нужен полный coordinator runtime, явно включи `parallelRuntime.phase2Enabled=true`.
+- `madspec migrate` не включает этот режим автоматически, потому что мигрирует только layout, а не rollout policy.
+
 ## Не хватает артефактов предыдущего этапа
 
 - Не перескакивай через процесс молча.

@@ -33,7 +33,7 @@
 - `madspec init` — развернуть шаблон проекта под выбранного агента (`cursor-agent`, `opencode`, `kilocode`, `roo`, `sourcecraft`, `qwen`, `copilot`)
 - `madspec check` — проверить наличие git и поддерживаемых агентных инструментов
 - `madspec version` — показать версию CLI и шаблона
-- `madspec migrate` — перенести старую плоскую `.madspec/` структуру в размещение, привязанное к веткам
+- `madspec migrate` — перенести старую плоскую `.madspec/` структуру в размещение, привязанное к веткам; не включает `parallelRuntime.phase2Enabled` и не меняет rollout policy
 
 ### Git-операции
 
@@ -73,6 +73,7 @@
 - `madspec memory start-step` — запустить шаг реализации; поддерживает `--from-file` и `--session-key`
 - `madspec memory checkpoint-step` — зафиксировать промежуточное состояние шага; поддерживает `--from-file` и `--session-key`
 - `madspec memory complete-step` — завершить шаг реализации; поддерживает `--from-file` и `--session-key`
+- `madspec memory tasks ...`, `madspec memory work-items ...`, `madspec memory proposals ...`, `madspec memory coordinator explain` — относятся к opt-in Phase 2 и требуют `parallelRuntime.phase2Enabled=true`
 
 ### Слой правил
 
@@ -117,7 +118,7 @@
 - `madspec agents subagents list` — показать доступные роли и их текущее состояние
 - `madspec agents subagents enable` — включить конкретную роль
 - `madspec agents subagents disable` — отключить конкретную роль
-- `madspec agents subagents context` — отдать канонический role-scoped context для выбранной роли; поддерживает `--session-key`
+- `madspec agents subagents context` — отдать канонический role-scoped context для выбранной роли; поддерживает `--session-key`, а coordinator payload добавляет только при `parallelRuntime.phase2Enabled=true`
 
 ## Когда обращаться к этому файлу
 

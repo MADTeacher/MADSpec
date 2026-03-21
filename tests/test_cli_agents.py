@@ -195,6 +195,41 @@ def test_subagent_context_accepts_session_key(tmp_path, monkeypatch, invoke_cli,
     assert payload["memory"]["session_key"] == "planner"
 
 
+def test_subagent_context_skips_phase2_coordination_when_opt_in_is_disabled(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    from tests.support import write_madspec_config
+
+    write_madspec_config(project_path, branch="main", agent_environment="copilot")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    result = invoke_cli(
+        [
+            "agents",
+            "subagents",
+            "context",
+            "--subagent-id",
+            "developer",
+            "--session-key",
+            "planner",
+            "--json-output",
+        ]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["parallel_runtime"]["phase2Enabled"] is False
+    assert payload["coordination"] is None
+    assert payload["proposal_summary"] is None
+    assert "coordination" not in payload["memory"]
+
+
 def test_agents_can_create_show_and_profile_custom_subagent(
     tmp_path,
     monkeypatch,

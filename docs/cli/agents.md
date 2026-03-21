@@ -163,6 +163,11 @@ JSON-файл должен содержать:
 - `--json-output`
 - `--toon-output` — отдать тот же контекст в TOON-представлении для прямого чтения агентом
 
+Для rollout важно различать два режима:
+
+- при default-конфиге с `parallelRuntime.phase2Enabled=false` команда остается session-aware, но не подгружает coordinator payload автоматически и не обещает Phase 2 semantics;
+- при `parallelRuntime.phase2Enabled=true` команда может читать `task/work-item` binding, related proposals и coordinator readiness.
+
 Контекст собирается на основе:
 
 - результата `madspec memory retrieve`
@@ -176,7 +181,7 @@ JSON-файл должен содержать:
 
 В top-level payload команда также возвращает `session_key`, а поле `active_session` пока остается совместимым псевдонимом для уже разрешенной session payload.
 
-Если у сеанса уже есть активный claim на work item, команда автоматически добавляет в payload блок `coordination`:
+Если `parallelRuntime.phase2Enabled=true` и у сеанса уже есть активный claim на work item, команда автоматически добавляет в payload блок `coordination`:
 
 - `task`
 - `work_item`
@@ -190,7 +195,7 @@ JSON-файл должен содержать:
 - `scheduler_hints`
 - `dependency_state`
 
-При необходимости этот же координационный контекст можно жестко зафиксировать через `--task-id` и `--work-item-id`.
+При необходимости этот же координационный контекст можно жестко зафиксировать через `--task-id` и `--work-item-id`, но только в opt-in режиме Phase 2.
 
 Если claimed session уже работает внутри task coordination, summary proposals помогает понять, есть ли pending apply, последний статус и какие `proposal_id` сейчас связаны с work item. Coordinator block дополнительно объясняет readiness, ownership и hard dependencies. Это read-only explain/export слой поверх coordinator runtime, а не process runner.
 
@@ -200,13 +205,13 @@ JSON-файл должен содержать:
 
 Для hot write paths одного `--expected-revision` теперь недостаточно: `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` могут вернуть `kind="scope_busy"`, если другой writer уже удерживает scoped lease на тот же runtime scope. Это временная занятость scope, а не ревизионный конфликт, и именно поэтому в контракте фигурирует payload kind `` `scope_busy` ``.
 
-В текущей реализации это по-прежнему граница экспорта контекста для конкретной роли и текущего runtime state ветки. Команда умеет читать уже существующую привязку `task` / `work-item` и coordinator readiness, но жизненный цикл состояния координации создается и изменяется не здесь, а через `madspec memory tasks ...`, `madspec memory work-items ...`, `madspec memory proposals ...` и `madspec memory coordinator explain`.
+В текущей реализации это по-прежнему граница экспорта контекста для конкретной роли и текущего runtime state ветки. Команда умеет читать уже существующую привязку `task` / `work-item` и coordinator readiness только в opt-in режиме `parallelRuntime.phase2Enabled=true`, а жизненный цикл состояния координации создается и изменяется не здесь, а через `madspec memory tasks ...`, `madspec memory work-items ...`, `madspec memory proposals ...` и `madspec memory coordinator explain`.
 
 ## Встроенные И Запасные Адаптеры
 
 В v1 MADSpec не реализует собственный диспетчер субагентов. Он управляет только каноническим состоянием и адаптерами среды.
 
-Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`, и теперь он расширен до coordinator runtime с explicit dependencies, readiness explain и proposal-based commit flow. Он по-прежнему не запускает субагентов сам и остается каноническим orchestration protocol для внешней среды.
+Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`, и теперь он расширен до coordinator runtime с explicit dependencies, readiness explain и proposal-based commit flow. Сейчас этот слой считается Phase 2 и остается opt-in через `parallelRuntime.phase2Enabled`, не запускает субагентов сам и остается каноническим orchestration protocol для внешней среды.
 
 - Встроенные адаптеры: Cursor, GitHub Copilot, OpenCode, Qwen Code
 - Запасные адаптеры: Kilo Code, Roo Code, SourceCraft

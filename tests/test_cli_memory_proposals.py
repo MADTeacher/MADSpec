@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from madspec_cli.memory.shared.system_store.sessions import save_runtime_session
 from madspec_cli.memory.shared.system_store.store import MemoryStore
 
 from tests.support import create_step_artifacts, write_concept_markdown, write_madspec_config
@@ -11,7 +12,7 @@ def _setup_claimed_work_item(tmp_path, monkeypatch, invoke_cli, init_memory_bran
     project_path = tmp_path / "demo"
     project_path.mkdir()
     monkeypatch.chdir(project_path)
-    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent", phase2_enabled=True)
     init_memory_branch(branch="main", project_path=project_path)
     return project_path
 
@@ -695,3 +696,116 @@ def test_memory_proposal_apply_rejected_when_coordinator_readiness_is_blocked(
     assert apply_result.exit_code == 1, apply_result.stdout
     payload = json.loads(apply_result.stdout)
     assert payload["proposal"]["apply_summary"]["reason"] == "readiness_blocked"
+
+
+def test_memory_proposals_are_blocked_when_phase2_is_disabled(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    result = invoke_cli(
+        [
+            "memory",
+            "proposals",
+            "list",
+            "--branch",
+            "main",
+            "--json-output",
+        ]
+    )
+
+    assert result.exit_code == 1, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["reason"] == "phase2_disabled"
+    assert payload["message"] == "Phase 2 coordinator runtime is opt-in"
+
+
+def test_direct_runtime_write_still_works_when_phase2_is_disabled_even_with_claimed_state(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    branch_dir = project_path / ".madspec" / "main"
+    write_concept_markdown(branch_dir, variant="auth_profile_export")
+    sync_result = invoke_cli(["memory", "init", "--branch", "main"])
+    assert sync_result.exit_code == 0, sync_result.stdout
+    create_step_artifacts(branch_dir, "step-01-authentication")
+
+    store = MemoryStore(project_path)
+    task = store.create_task(branch="main", title="Hidden phase2 task", summary=None, acceptance_note=None)
+    work_item = store.create_work_item(
+        branch="main",
+        task_id=task["task_id"],
+        title="Developer slice",
+        work_item_type="implementation",
+        subagent_id="developer",
+        step_id="step-01-authentication",
+        scope_descriptor={
+            "step_id": "step-01-authentication",
+            "paths": ["src/auth/service.py"],
+            "artifacts": [],
+            "concerns": ["implementation"],
+        },
+        acceptance_note=None,
+    )
+    store.claim_work_item(
+        branch="main",
+        work_item_id=work_item["work_item_id"],
+        session_key="impl",
+        subagent_id="developer",
+    )
+    save_runtime_session(
+        project_path,
+        branch_name="main",
+        session_key="impl",
+        payload={
+            "branch": "main",
+            "session_key": "impl",
+            "stage": "mvp.plan",
+            "current_step": None,
+            "task_id": task["task_id"],
+            "work_item_id": work_item["work_item_id"],
+            "subagent_id": "developer",
+            "open_questions": [],
+            "pending_actions": [],
+            "current_hypotheses": [],
+        },
+    )
+
+    result = invoke_cli(
+        [
+            "memory",
+            "register-step",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--session-key",
+            "impl",
+            "--step-id",
+            "step-01-authentication",
+            "--step-kind",
+            "code",
+            "--covers",
+            "Authentication",
+            "--json-output",
+        ]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["accepted"] is True

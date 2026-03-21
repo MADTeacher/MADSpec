@@ -8,6 +8,7 @@ from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
 
+from ..application.parallel_runtime import require_phase2_enabled
 from ..application.orchestration import (
     ClaimWorkItemRequest,
     CoordinationContextRequest,
@@ -35,6 +36,20 @@ work_items_app = typer.Typer(help="Work items for subagent-scoped ownership")
 coordinator_app = typer.Typer(help="Coordinator runtime explainability and orchestration diagnostics")
 
 
+def _exit_if_phase2_disabled(*, project_path: Path, command_name: str, json_output: bool) -> None:
+    payload = require_phase2_enabled(project_path, command_name=command_name)
+    if payload is None:
+        return
+    if json_output:
+        emit_json(payload)
+    else:
+        show_banner()
+        console.print(f"[red]{payload['message']}[/red]")
+        console.print(f"[cyan]Command:[/cyan] {command_name}")
+        console.print(f"[cyan]Guidance:[/cyan] {payload['guidance']}")
+    raise typer.Exit(1)
+
+
 @tasks_app.command("create")
 def create_task_command(
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
@@ -45,6 +60,11 @@ def create_task_command(
 ) -> None:
     try:
         project_path = Path.cwd()
+        _exit_if_phase2_disabled(
+            project_path=project_path,
+            command_name="madspec memory tasks create",
+            json_output=json_output,
+        )
         target_branch = resolve_target_branch(project_path, branch_name)
         payload = create_task(
             CreateTaskRequest(
@@ -55,6 +75,8 @@ def create_task_command(
                 acceptance_note=acceptance_note,
             )
         ).to_payload()
+    except typer.Exit:
+        raise
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc
@@ -73,10 +95,17 @@ def list_tasks_command(
 ) -> None:
     try:
         project_path = Path.cwd()
+        _exit_if_phase2_disabled(
+            project_path=project_path,
+            command_name="madspec memory tasks list",
+            json_output=json_output,
+        )
         target_branch = resolve_target_branch(project_path, branch_name)
         payload = list_tasks(
             ListTasksRequest(project_path=project_path, branch_name=target_branch)
         ).to_payload()
+    except typer.Exit:
+        raise
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc
@@ -105,6 +134,11 @@ def create_work_item_command(
 ) -> None:
     try:
         project_path = Path.cwd()
+        _exit_if_phase2_disabled(
+            project_path=project_path,
+            command_name="madspec memory work-items create",
+            json_output=json_output,
+        )
         target_branch = resolve_target_branch(project_path, branch_name)
         payload = create_work_item(
             CreateWorkItemRequest(
@@ -125,6 +159,8 @@ def create_work_item_command(
                 depends_on_work_item_ids=depends_on_work_item or [],
             )
         ).to_payload()
+    except typer.Exit:
+        raise
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc
@@ -145,6 +181,11 @@ def list_work_items_command(
 ) -> None:
     try:
         project_path = Path.cwd()
+        _exit_if_phase2_disabled(
+            project_path=project_path,
+            command_name="madspec memory work-items list",
+            json_output=json_output,
+        )
         target_branch = resolve_target_branch(project_path, branch_name)
         payload = list_work_items(
             ListWorkItemsRequest(
@@ -154,6 +195,8 @@ def list_work_items_command(
                 session_key=session_key,
             )
         ).to_payload()
+    except typer.Exit:
+        raise
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc
@@ -177,6 +220,11 @@ def claim_work_item_command(
 ) -> None:
     try:
         project_path = Path.cwd()
+        _exit_if_phase2_disabled(
+            project_path=project_path,
+            command_name="madspec memory work-items claim",
+            json_output=json_output,
+        )
         target_branch = resolve_target_branch(project_path, branch_name)
         payload = claim_work_item(
             ClaimWorkItemRequest(
@@ -187,6 +235,8 @@ def claim_work_item_command(
                 subagent_id=subagent_id,
             )
         ).to_payload()
+    except typer.Exit:
+        raise
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc
@@ -215,6 +265,11 @@ def release_work_item_command(
 ) -> None:
     try:
         project_path = Path.cwd()
+        _exit_if_phase2_disabled(
+            project_path=project_path,
+            command_name="madspec memory work-items release",
+            json_output=json_output,
+        )
         target_branch = resolve_target_branch(project_path, branch_name)
         payload = release_work_item(
             ReleaseWorkItemRequest(
@@ -224,6 +279,8 @@ def release_work_item_command(
                 session_key=session_key,
             )
         ).to_payload()
+    except typer.Exit:
+        raise
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc
@@ -244,6 +301,11 @@ def explain_coordinator_command(
 ) -> None:
     try:
         project_path = Path.cwd()
+        _exit_if_phase2_disabled(
+            project_path=project_path,
+            command_name="madspec memory coordinator explain",
+            json_output=json_output,
+        )
         target_branch = resolve_target_branch(project_path, branch_name)
         payload = explain_coordinator(
             ExplainCoordinatorRequest(
@@ -254,6 +316,8 @@ def explain_coordinator_command(
                 work_item_id=work_item_id,
             )
         ).to_payload()
+    except typer.Exit:
+        raise
     except Exception as exc:
         emit_error(exc, json_output=json_output)
         raise typer.Exit(1) from exc

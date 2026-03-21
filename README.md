@@ -15,6 +15,8 @@ MADSpec - фреймворк для разработки программног�
 - Отдельные артефакты по веткам в `.madspec/<branch>/` вместо одного общего состояния проекта
 - Проектное хранилище памяти в `.madspec/system/memory/`, артефакты памяти ветки в `.madspec/<branch>/memory/` и автоматически собираемые Markdown-файлы поверх них
 - Session-local runtime state в `SQLite` с выбором через `--session-key`, при этом `active-session.json` сохраняется как производная проекция для совместимости single-agent режима
+- Opt-in rollout для полного multi-agent protocol: новые проекты получают `parallelRuntime.phase2Enabled=false` по умолчанию, а `task/work-item/proposals/coordinator` включаются явно через `.madspec/config.json`
+- Ключ `parallelRuntime.phase2Enabled` задает, остается ли проект в stable default Phase 1 или явно включает full Phase 2 protocol
 - Слой объяснения и диагностики для структурированной памяти: `doctor`, `explain`, `timeline`, `why-next-step`, `conflicts`, `inspect-record`
 - Контролируемое сравнение и слияние памяти между ветками с циклом `compare/propose/preview/apply` и продвижением подтвержденных знаний на уровень проекта
 - Единый слой правил проекта в `.madspec/system/policy/` с циклом предложения и применения и автоматически собираемым `policy.md`
@@ -205,6 +207,24 @@ MADSpec не предполагает слепого выполнения все
 MADSpec хранит основное проектное состояние в `.madspec/system/memory/`, `.madspec/system/policy/` и `.madspec/system/agents/`, а артефакты процесса, привязанные к ветке, — в `.madspec/<branch>/memory/`, `.madspec/<branch>/change/` и `.madspec/<branch>/gates/`. Файлы вроде `concept.md`, `tech-stack.md`, `architecture.md`, `implementation-plan.md`, `change-summary.md`, `.madspec/system/policy.md` и `.madspec/system/agents.md` собираются автоматически и не являются основным источником истины. Производные артефакты ветки теперь материализуются по стадиям: feature- и MVP-стадии создают только релевантный минимум, а полный набор пересобирается через `madspec memory init`, `madspec memory consolidate` и `madspec memory validate`.
 
 Для session-scoped runtime и runtime-mutations MADSpec теперь использует каноническое состояние в `SQLite`: `progress`, stage snapshots, session-local state и runtime record streams сначала коммитятся в `.madspec/system/memory/memory.sqlite`, а branch `memory/*.json`, `memory/*.jsonl` и generated markdown пересобираются как projections. Команды `madspec memory retrieve/search/capture/checkpoint/register-step/start-step/checkpoint-step/complete-step` и `madspec agents subagents context` принимают `--session-key`, а значение по умолчанию остается `active`, чтобы не ломать текущий single-agent поток.
+
+Новые проекты получают в `.madspec/config.json` блок:
+
+```json
+{
+  "parallelRuntime": {
+    "phase1Enabled": true,
+    "phase2Enabled": false
+  }
+}
+```
+
+Это значит:
+
+- Phase 1 с parallel planning/implementation считается stable default;
+- полный Phase 2 protocol для `task/work-item/proposals/coordinator` остается opt-in;
+- старые проекты без этого блока продолжают работать в legacy-safe режиме без ручной миграции;
+- `madspec migrate` меняет только layout `.madspec/`, а не behavior rollout.
 
 Такой подход упрощает возобновление длинной работы и отделяет контекст разных веток друг от друга.
 

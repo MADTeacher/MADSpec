@@ -74,6 +74,7 @@ def write_madspec_config(
     branch: str = "main",
     version: str = "1.0.0",
     agent_environment: str | None = None,
+    phase2_enabled: bool | None = None,
 ) -> Path:
     madspec_dir = project_path / ".madspec"
     madspec_dir.mkdir(parents=True, exist_ok=True)
@@ -87,6 +88,11 @@ def write_madspec_config(
         payload["agentEnvironment"] = agent_environment
     if payload.get("agentEnvironment"):
         payload["agentsSchemaVersion"] = 1
+    if phase2_enabled is not None:
+        payload["parallelRuntime"] = {
+            "phase1Enabled": True,
+            "phase2Enabled": phase2_enabled,
+        }
     config_path.write_text(
         json.dumps(payload) + "\n",
         encoding="utf-8",

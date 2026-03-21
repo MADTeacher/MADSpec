@@ -8,6 +8,7 @@ import typer
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 
+from ..application.parallel_runtime import require_phase2_enabled
 from ..application.proposals import (
     ApplyProposalRequest,
     ListProposalsRequest,
@@ -22,6 +23,20 @@ from ..domain.branch_layout import resolve_target_branch
 
 
 proposals_app = typer.Typer(help="Proposal-based runtime commits for claimed work items")
+
+
+def _exit_if_phase2_disabled(*, project_path: Path, command_name: str, json_output: bool) -> None:
+    payload = require_phase2_enabled(project_path, command_name=command_name)
+    if payload is None:
+        return
+    if json_output:
+        emit_json(payload)
+    else:
+        show_banner()
+        console.print(f"[red]{payload['message']}[/red]")
+        console.print(f"[cyan]Command:[/cyan] {command_name}")
+        console.print(f"[cyan]Guidance:[/cyan] {payload['guidance']}")
+    raise typer.Exit(1)
 
 
 @proposals_app.command("publish")
@@ -39,6 +54,11 @@ def publish_proposal_command(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     project_path = Path.cwd()
+    _exit_if_phase2_disabled(
+        project_path=project_path,
+        command_name="madspec memory proposals publish",
+        json_output=json_output,
+    )
     target_branch = resolve_target_branch(project_path, branch_name)
     payload = publish(
         PublishProposalRequest(
@@ -76,6 +96,11 @@ def list_proposals_command(
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
     project_path = Path.cwd()
+    _exit_if_phase2_disabled(
+        project_path=project_path,
+        command_name="madspec memory proposals list",
+        json_output=json_output,
+    )
     target_branch = resolve_target_branch(project_path, branch_name)
     payload = list_proposals(
         ListProposalsRequest(
@@ -103,8 +128,14 @@ def preview_proposal_command(
     proposal_id: str = typer.Option(..., "--proposal-id", help="Proposal identifier"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
+    project_path = Path.cwd()
+    _exit_if_phase2_disabled(
+        project_path=project_path,
+        command_name="madspec memory proposals preview",
+        json_output=json_output,
+    )
     payload = preview(
-        PreviewProposalRequest(project_path=Path.cwd(), proposal_id=proposal_id)
+        PreviewProposalRequest(project_path=project_path, proposal_id=proposal_id)
     ).to_payload()
     if json_output:
         emit_json(payload)
@@ -125,8 +156,14 @@ def apply_proposal_command(
     proposal_id: str = typer.Option(..., "--proposal-id", help="Proposal identifier"),
     json_output: bool = typer.Option(False, "--json-output", help="Emit machine-readable JSON"),
 ) -> None:
+    project_path = Path.cwd()
+    _exit_if_phase2_disabled(
+        project_path=project_path,
+        command_name="madspec memory proposals apply",
+        json_output=json_output,
+    )
     result = apply(
-        ApplyProposalRequest(project_path=Path.cwd(), proposal_id=proposal_id)
+        ApplyProposalRequest(project_path=project_path, proposal_id=proposal_id)
     )
     payload = result.to_payload()
     if json_output:

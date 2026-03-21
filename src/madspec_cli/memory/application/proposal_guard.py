@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .parallel_runtime import is_phase2_enabled
 from ..shared.system_store.store import MemoryStore
 
 
@@ -23,6 +24,8 @@ def guard_direct_runtime_write(
     session_key: str,
     command_name: str,
 ) -> dict[str, Any] | None:
+    if not is_phase2_enabled(project_path):
+        return None
     coordination = MemoryStore(project_path).fetch_session_coordination(
         branch=branch_name,
         session_key=session_key,

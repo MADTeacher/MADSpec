@@ -9,6 +9,10 @@ from .ui import console
 
 MADSPEC_CONFIG_VERSION = "1.0.0"
 MADSPEC_AGENTS_SCHEMA_VERSION = 1
+DEFAULT_PARALLEL_RUNTIME_POLICY = {
+    "phase1Enabled": True,
+    "phase2Enabled": False,
+}
 
 
 def resolve_branch_name(project_path: Path, branch_name: str | None) -> str:
@@ -17,6 +21,19 @@ def resolve_branch_name(project_path: Path, branch_name: str | None) -> str:
 
 def emit_json(payload: dict) -> None:
     console.print_json(json.dumps(payload, ensure_ascii=False))
+
+
+def default_parallel_runtime_policy() -> dict[str, bool]:
+    return dict(DEFAULT_PARALLEL_RUNTIME_POLICY)
+
+
+def normalize_parallel_runtime_policy(payload: Any) -> dict[str, bool]:
+    if not isinstance(payload, dict):
+        return default_parallel_runtime_policy()
+    return {
+        "phase1Enabled": bool(payload.get("phase1Enabled", True)),
+        "phase2Enabled": bool(payload.get("phase2Enabled", False)),
+    }
 
 
 def get_madspec_config_path(project_path: Path) -> Path:
@@ -28,6 +45,7 @@ def default_madspec_config(branch_name: str, *, agent_environment: str | None = 
         "currentBranch": branch_name,
         "version": MADSPEC_CONFIG_VERSION,
         "agentsSchemaVersion": MADSPEC_AGENTS_SCHEMA_VERSION,
+        "parallelRuntime": default_parallel_runtime_policy(),
     }
     if agent_environment:
         config["agentEnvironment"] = agent_environment
@@ -42,7 +60,11 @@ def read_madspec_config(project_path: Path) -> dict[str, Any]:
         payload = json.loads(config_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
-    return payload if isinstance(payload, dict) else {}
+    if not isinstance(payload, dict):
+        return {}
+    payload = dict(payload)
+    payload["parallelRuntime"] = normalize_parallel_runtime_policy(payload.get("parallelRuntime"))
+    return payload
 
 
 def write_madspec_config(project_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
@@ -63,6 +85,7 @@ def update_madspec_config(project_path: Path, **updates: Any) -> dict[str, Any]:
         config["version"] = MADSPEC_CONFIG_VERSION
     if "agentsSchemaVersion" not in config:
         config["agentsSchemaVersion"] = MADSPEC_AGENTS_SCHEMA_VERSION
+    config["parallelRuntime"] = normalize_parallel_runtime_policy(config.get("parallelRuntime"))
     return write_madspec_config(project_path, config)
 
 
@@ -76,6 +99,7 @@ def create_madspec_config(project_path: Path, branch_name: str, *, agent_environ
         config["agentsSchemaVersion"] = existing.get("agentsSchemaVersion") or MADSPEC_AGENTS_SCHEMA_VERSION
         if agent_environment is not None:
             config["agentEnvironment"] = agent_environment
+    config["parallelRuntime"] = normalize_parallel_runtime_policy(config.get("parallelRuntime"))
     write_madspec_config(project_path, config)
 
 

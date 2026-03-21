@@ -26,6 +26,7 @@
 - hot write paths `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` используют scoped lease вместо глобальной блокировки всей ветки;
 - если post-commit projection refresh падает, canonical commit не откатывается: команда возвращает `projection_status="stale"` и `projection_refresh_required=true`, а последующий `madspec memory consolidate` восстанавливает projections из `SQLite`.
 - Phase 1 теперь официально поддерживает сценарий: реализация текущего шага и параллельное планирование следующего, если операции попадают в совместимую матрицу `register-step(step-02)` + `start/checkpoint/complete-step(step-01)`.
+- rollout для многосубагентного протокола теперь разделен: Phase 1 считается стабильным default, а полный Phase 2 включается только как opt-in режим через `parallelRuntime.phase2Enabled` в `.madspec/config.json`;
 - Для базового многосубагентного сценария появился отдельный слой координации: `task` как контейнер работы и `work-item` как каноническая единица владения поверх session-local runtime.
 - Каноническое состояние координации тоже хранится в `SQLite`: таблицы `tasks`, `work_items`, `work_item_claims`, а их lifecycle events попадают в `records` со scope `work-item`.
 - Для coordinator runtime также используется явный dependency graph: `work_item_dependencies` хранит жесткие зависимости между work items внутри одного task.
@@ -39,6 +40,13 @@
 - `retrieve`, `search`, `explain`, `timeline`, `doctor` и `conflicts` теперь возвращают additive observability payloads, чтобы session, task и work-item state можно было инспектировать без прямого SQL-доступа.
 - `doctor` теперь отдельно диагностирует `stale_projections`, `orphan_sessions`, `stuck_leases`, `unresolved_proposal_conflicts` и `revision_drift`, а также сообщает `probable_cause` и `repair_hint`.
 - `timeline` теперь нормализует runtime lifecycle в typed events с полями `event_type`, `category`, `reason`, `owner_id`, `session_key`, `task_id`, `work_item_id`, `proposal_id` и `scope`.
+
+Политика rollout для текущей версии:
+
+- новые проекты получают в `.madspec/config.json` блок `parallelRuntime` с default-значениями `phase1Enabled=true` и `phase2Enabled=false`;
+- если блок `parallelRuntime` отсутствует в старом проекте, MADSpec трактует это как legacy-safe default: `phase1Enabled=true`, `phase2Enabled=false`;
+- Phase 2 CLI-команды остаются видимыми в help, но при выключенном `parallelRuntime.phase2Enabled` завершаются structured payload с `reason="phase2_disabled"`;
+- `madspec migrate` не включает Phase 2 автоматически и остается только layout-migration командой.
 
 ## Когда Использовать
 
@@ -113,6 +121,8 @@
 
 ### Команды Координации Task / Work-Item
 
+Эта группа относится к Phase 2 и работает только при `parallelRuntime.phase2Enabled=true`. Если флаг не включен, команда вернет отказ с `reason="phase2_disabled"` и guidance включить Phase 2 в `.madspec/config.json`.
+
 | Команда | Назначение |
 | --- | --- |
 | `madspec memory tasks create --title ...` | Создать task как контейнер координации над общей веткой |
@@ -124,6 +134,8 @@
 | `madspec memory work-items release --work-item-id ... --session-key ...` | Снять активный claim и очистить привязку сеанса |
 
 ### Команды Proposal Flow
+
+Эта группа тоже относится к Phase 2 и требует `parallelRuntime.phase2Enabled=true`. В default-режиме Phase 1 команды остаются зарегистрированными в CLI, но не считаются доступным write path.
 
 | Команда | Назначение |
 | --- | --- |
@@ -158,6 +170,12 @@ madspec memory work-items create --task-id <task> --subagent-id developer --depe
 - Процесс реализации использует `start-step`, `checkpoint-step` и `complete-step` для управления текущим состоянием шага и TDD-доказательствами
 - `consolidate` и `validate` поддерживают синхронность производных файлов и основных записей
 - stage-scoped операции не обязаны заранее создавать несвязанные артефакты других стадий
+
+Для rollout Phase 2:
+
+- если нужен только planning/implementation parallel runtime на одной ветке, оставляй default-конфиг и работай в Phase 1;
+- если нужен `task/work-item/proposals/coordinator` protocol, явно включи `parallelRuntime.phase2Enabled=true` в `.madspec/config.json`;
+- если вы просто мигрируете старый проект, не требуется пересоздавать `.madspec/`, переносить branch memory layout заново или отказываться от session `active`.
 
 ## Общие Опции
 

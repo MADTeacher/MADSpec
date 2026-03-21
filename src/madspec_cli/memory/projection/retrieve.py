@@ -52,6 +52,7 @@ def retrieve_memory_context(
     include_conflicted: bool = False,
     full_artifact: bool = False,
     include_history: bool = False,
+    include_coordination: bool = True,
 ) -> dict[str, Any]:
     from ..shared.system_store import search_memory_store
     from ..shared.system_store.store import MemoryStore
@@ -236,9 +237,13 @@ def retrieve_memory_context(
         step_id=resolved_step_id,
         limit=resolved_limit,
     )
-    coordination = store.fetch_session_coordination(
-        branch=branch_name,
-        session_key=session_key,
+    coordination = (
+        store.fetch_session_coordination(
+            branch=branch_name,
+            session_key=session_key,
+        )
+        if include_coordination
+        else {}
     )
 
     return {

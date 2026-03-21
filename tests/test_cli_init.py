@@ -30,6 +30,10 @@ def test_init_creates_structured_memory_layout(tmp_path, monkeypatch, invoke_cli
     config = json.loads((project_path / ".madspec" / "config.json").read_text(encoding="utf-8"))
     assert config["agentEnvironment"] == "cursor-agent"
     assert config["agentsSchemaVersion"] == 1
+    assert config["parallelRuntime"] == {
+        "phase1Enabled": True,
+        "phase2Enabled": False,
+    }
     assert (project_path / ".madspec" / "system" / "agents" / "state.json").exists()
     assert "/madspec.gate" in result.stdout
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from madspec_cli.features.change.application.summary_change import SummaryChangeRequest, execute as summary_change
 from madspec_cli.features.gates.application.status_gate import GateStatusRequest, execute as gate_status
 from madspec_cli.features.policy.application.show_policy import ShowPolicyRequest, execute as show_policy
+from madspec_cli.memory.application.parallel_runtime import read_parallel_runtime_policy
 from madspec_cli.memory.application.orchestration import CoordinationContextRequest, resolve_coordination_context
 from madspec_cli.memory import retrieve_memory_context
 from madspec_cli.memory.domain.branch_layout import resolve_target_branch
@@ -37,6 +38,8 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
         raise ValueError(f"subagent '{request.subagent_id}' was not found")
     branch_name = resolve_target_branch(request.project_path, request.branch_name)
     stage = request.stage or str(subagent.get("defaultStage") or "feature.plan")
+    parallel_runtime = read_parallel_runtime_policy(request.project_path)
+    phase2_enabled = parallel_runtime.phase2_enabled
     memory_context = retrieve_memory_context(
         request.project_path,
         branch_name,
@@ -45,6 +48,7 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
         step_id=request.step_id,
         full_artifact=False,
         include_history=True,
+        include_coordination=phase2_enabled,
     )
     policy = show_policy(
         ShowPolicyRequest(project_path=request.project_path, stage=stage, status="active")
@@ -67,15 +71,21 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
         ).to_payload()
     except Exception:
         change = {"bundle": None, "highlights": None}
-    coordination = resolve_coordination_context(
-        CoordinationContextRequest(
-            project_path=request.project_path,
-            branch_name=branch_name,
-            session_key=request.session_key,
-            task_id=request.task_id,
-            work_item_id=request.work_item_id,
-        )
-    ).to_payload()
+    coordination = None
+    proposal_summary = None
+    if phase2_enabled:
+        coordination = resolve_coordination_context(
+            CoordinationContextRequest(
+                project_path=request.project_path,
+                branch_name=branch_name,
+                session_key=request.session_key,
+                task_id=request.task_id,
+                work_item_id=request.work_item_id,
+            )
+        ).to_payload()
+        proposal_summary = (coordination or {}).get("proposal_summary")
+    else:
+        memory_context.pop("coordination", None)
     return SubagentContextResult(
         payload={
             "subagent": subagent,
@@ -86,7 +96,8 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
             "session_key": request.session_key,
             "memory": memory_context,
             "coordination": coordination,
-            "proposal_summary": (coordination or {}).get("proposal_summary"),
+            "proposal_summary": proposal_summary,
+            "parallel_runtime": parallel_runtime.to_payload(),
             "policy": policy,
             "gates": gates,
             "change": change,
