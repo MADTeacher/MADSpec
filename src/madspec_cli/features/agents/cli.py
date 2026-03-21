@@ -9,6 +9,7 @@ from madspec_cli.shared.cli.file_input import read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
 from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
+from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
 
 from .application.apply_profile import ApplyProfileRequest, execute as apply_profile
 from .application.create_subagent import CreateSubagentRequest, execute as create_subagent
@@ -292,6 +293,7 @@ def context_command(
     subagent_id: str = typer.Option(..., "--subagent-id", help="Идентификатор субагента"),
     branch_name: str = typer.Option(None, "--branch", help="Необязательная замена ветки"),
     stage: str = typer.Option(None, "--stage", help="Необязательная замена стадии"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Ключ runtime-сеанса; по умолчанию legacy active"),
     step_id: str = typer.Option(None, "--step-id", help="Необязательный идентификатор шага"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
     toon_output: bool = typer.Option(False, "--toon-output", help="Вывести TOON для агентского контекста"),
@@ -304,6 +306,7 @@ def context_command(
                 subagent_id=subagent_id,
                 branch_name=branch_name,
                 stage=stage,
+                session_key=session_key,
                 step_id=step_id,
             )
         ).to_payload()

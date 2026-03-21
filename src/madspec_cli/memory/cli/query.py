@@ -10,13 +10,15 @@ from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_outp
 
 from ..application.retrieve_context import RetrieveMemoryContextRequest, execute as retrieve_context
 from ..domain.branch_layout import resolve_target_branch
-from ..shared.storage import _default_active_session, get_memory_paths, read_json
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.sessions import load_runtime_session
 from ..shared.system_store import search_memory_store
 
 
 def memory_retrieve(
     stage: str = typer.Option(..., "--stage", help="Target stage, e.g. mvp.plan or review"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to inspect"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier"),
     limit: int | None = typer.Option(None, "--limit", help="Max records per section"),
     query: str | None = typer.Option(None, "--query", help="Optional recall query for hybrid search"),
@@ -40,6 +42,7 @@ def memory_retrieve(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
+            session_key=session_key,
             step_id=step_id,
             limit=resolved_limit,
             query=query,
@@ -77,6 +80,7 @@ def memory_search(
     stage: str = typer.Option(..., "--stage", help="Target stage, e.g. mvp.plan or review"),
     query: str = typer.Option(..., "--query", help="Search query for exact, lexical, and semantic recall"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to inspect"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier"),
     scope: str = typer.Option("branch", "--scope", help="Search scope: step, stage, branch, or project"),
     recall_limit: int = typer.Option(5, "--recall-limit", help="Max candidates per retrieval lane"),
@@ -88,8 +92,11 @@ def memory_search(
     """Inspect hybrid recall candidates without loading full stage context."""
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
-    paths = get_memory_paths(project_path, target_branch)
-    active_session = read_json(paths.active_session, _default_active_session(target_branch))
+    active_session = load_runtime_session(
+        project_path,
+        branch_name=target_branch,
+        session_key=session_key,
+    )
     payload = search_memory_store(
         project_path,
         branch_name=target_branch,

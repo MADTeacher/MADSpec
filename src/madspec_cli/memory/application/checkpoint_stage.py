@@ -16,6 +16,7 @@ class CheckpointStageRequest:
     branch_name: str
     stage: str
     summary: str
+    session_key: str
     options: dict[str, Any]
 
 
@@ -33,6 +34,7 @@ def execute(request: CheckpointStageRequest) -> CheckpointStageResult:
             request.branch_name,
             stage=request.stage,
             operation="validate",
+            session_key=request.session_key,
             overrides={"summary": request.summary},
             include_ratification=False,
             record_history=False,
@@ -52,6 +54,7 @@ def execute(request: CheckpointStageRequest) -> CheckpointStageResult:
         request.branch_name,
         request.stage,
         request.summary,
+        session_key=request.session_key,
         **request.options,
     )
     return CheckpointStageResult(payload=payload)

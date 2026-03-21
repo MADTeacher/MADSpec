@@ -53,14 +53,17 @@ from ..stages.tech.state import (
 )
 from ..shared.records import make_record
 from ..shared.storage import (
-    _default_active_session,
     append_jsonl,
     ensure_memory_layout,
     get_memory_paths,
     now_iso,
-    read_json,
     read_jsonl,
-    write_json,
+)
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.sessions import (
+    clone_session_payload,
+    load_runtime_session,
+    save_runtime_session,
 )
 from ..shared.validation import validate_branch_memory
 from ..projection.materialize import consolidate_branch_memory
@@ -105,6 +108,7 @@ def checkpoint_stage_memory(
     stage: str,
     summary: str,
     *,
+    session_key: str = SYSTEM_SESSION_KEY,
     facts: list[str] | None = None,
     decisions: list[str] | None = None,
     contracts: list[str] | None = None,
@@ -165,7 +169,6 @@ def checkpoint_stage_memory(
         return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
 
     snapshots = {
-        paths.active_session: _snapshot_file(paths.active_session),
         paths.decision_log: _snapshot_file(paths.decision_log),
         paths.facts: _snapshot_file(paths.facts),
         paths.decisions: _snapshot_file(paths.decisions),
@@ -180,10 +183,16 @@ def checkpoint_stage_memory(
     }
 
     ts = now_iso()
-    active_session = read_json(paths.active_session, _default_active_session(branch_name))
+    active_session = load_runtime_session(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
+    previous_session = clone_session_payload(active_session)
     active_session.update(
         {
             "branch": branch_name,
+            "session_key": session_key,
             "active_goal": normalized_summary,
             "stage": normalized_stage,
             "current_step": None,
@@ -367,7 +376,12 @@ def checkpoint_stage_memory(
             save_feature_init_state(paths.feature_init_state, feature_init_state)
         elif normalized_stage == FEATURE_PLAN_STAGE:
             save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
-        write_json(paths.active_session, active_session)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=active_session,
+        )
         append_jsonl(paths.decision_log, [checkpoint_record])
         append_jsonl(paths.facts, fact_records)
         append_jsonl(paths.decisions, decision_records)
@@ -381,6 +395,12 @@ def checkpoint_stage_memory(
     except Exception as exc:
         for path, content in snapshots.items():
             _restore_file(path, content)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=previous_session,
+        )
         return {
             "accepted": False,
             "branch": branch_name,

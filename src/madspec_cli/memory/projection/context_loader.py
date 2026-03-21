@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from ..shared.storage import (
-    _default_active_session,
     _default_progress_state,
     get_memory_paths,
     now_iso,
     read_json,
     read_jsonl,
 )
+from ..shared.system_store.sessions import load_runtime_session
 from ..stages.architecture.state import load_architecture_state
 from ..stages.concept.state import load_concept_state
 from ..stages.design.state import load_design_state
@@ -63,7 +63,7 @@ class RetrieveProjectionState:
 def load_branch_projection_state(project_path: Path, branch_name: str) -> BranchProjectionState:
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
-    active_session = read_json(paths.active_session, _default_active_session(branch_name))
+    active_session = load_runtime_session(project_path, branch_name=branch_name)
     concept_state = load_concept_state(paths.concept_state)
     design_state = load_design_state(paths.design_state)
     tech_state = load_tech_state(paths.tech_state)
@@ -108,10 +108,20 @@ def load_materialization_records(
     )
 
 
-def load_retrieve_projection_state(project_path: Path, branch_name: str, stage_lower: str) -> RetrieveProjectionState:
+def load_retrieve_projection_state(
+    project_path: Path,
+    branch_name: str,
+    stage_lower: str,
+    *,
+    session_key: str,
+) -> RetrieveProjectionState:
     paths = get_memory_paths(project_path, branch_name)
     progress = read_json(paths.progress, _default_progress_state())
-    active_session = read_json(paths.active_session, _default_active_session(branch_name))
+    active_session = load_runtime_session(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
     return RetrieveProjectionState(
         paths=paths,
         progress=progress,

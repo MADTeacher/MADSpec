@@ -11,6 +11,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 from ..application.determine_next_step import DetermineNextStepRequest, execute as determine_next_step
 from ..application.register_step import RegisterStepRequest, execute as register_step
 from ..domain.branch_layout import resolve_target_branch
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
 REGISTER_STEP_FROM_FILE_ALIASES = {
@@ -19,6 +20,7 @@ REGISTER_STEP_FROM_FILE_ALIASES = {
 
 REGISTER_STEP_FROM_FILE_ALLOWED_KEYS = {
     "stage",
+    "session_key",
     "step_id",
     "covers",
     "step_kind",
@@ -79,6 +81,7 @@ def memory_next_step(
 def memory_register_step(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Planning stage, e.g. mvp.plan or feature.plan"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     step_id: str = typer.Option(None, "--step-id", help="New step identifier"),
     covers: list[str] = typer.Option(None, "--covers", help="Covered function ids/labels; repeat for multiple values."),
     step_kind: str = typer.Option(None, "--step-kind", help="Step kind: code or non-code"),
@@ -101,6 +104,7 @@ def memory_register_step(
             allowed_keys=REGISTER_STEP_FROM_FILE_ALLOWED_KEYS,
         )
         stage = file_data.pop("stage", stage)
+        session_key = file_data.pop("session_key", session_key)
         step_id = file_data.pop("step_id", step_id)
         covers = file_data.pop("covers", covers)
         step_kind = file_data.pop("step_kind", step_kind)
@@ -132,6 +136,7 @@ def memory_register_step(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
+            session_key=session_key,
             step_id=step_id,
             covers=covers or [],
             step_kind=step_kind,

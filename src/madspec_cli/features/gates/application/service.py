@@ -4,12 +4,13 @@ from pathlib import Path
 from typing import Any
 
 from madspec_cli.memory.shared.storage import (
-    _default_active_session,
     _default_progress_state,
     get_memory_paths,
     normalize_progress_state,
     read_json,
 )
+from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
+from madspec_cli.memory.shared.system_store.sessions import load_runtime_session
 
 from ..domain.status import aggregate_status, apply_waivers, dedupe_gates
 from ..infrastructure.storage import ensure_gate_layout, load_gate_state
@@ -35,13 +36,19 @@ def evaluate_gate_context(
     *,
     stage: str | None,
     operation: str | None,
+    session_key: str = SYSTEM_SESSION_KEY,
     step_id: str | None = None,
     overrides: dict[str, Any] | None = None,
     include_ratification: bool = True,
     record_history: bool = False,
 ) -> dict[str, Any]:
     ensure_gate_layout(project_path, branch_name)
-    normalized_stage = normalize_gate_stage(stage, project_path=project_path, branch_name=branch_name)
+    normalized_stage = normalize_gate_stage(
+        stage,
+        project_path=project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
     normalized_operation = normalize_gate_operation(operation)
     overrides = dict(overrides or {})
 
@@ -50,13 +57,15 @@ def evaluate_gate_context(
     if not isinstance(progress, dict):
         progress = _default_progress_state()
     progress, _ = normalize_progress_state(progress)
-    active_session = read_json(paths.active_session, _default_active_session(branch_name))
-    if not isinstance(active_session, dict):
-        active_session = _default_active_session(branch_name)
+    active_session = load_runtime_session(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
 
     resolved_step_id = resolve_step_id(
         progress=progress,
-        active_session=active_session,
+        session_payload=active_session,
         stage=normalized_stage,
         operation=normalized_operation,
         explicit_step_id=step_id or overrides.get("step_id"),
@@ -114,6 +123,7 @@ def evaluate_gate_context(
     payload = {
         "branch": branch_name,
         "stage": normalized_stage,
+        "session_key": session_key,
         "operation": normalized_operation,
         "step_id": resolved_step_id,
         "overall_status": overall_status,

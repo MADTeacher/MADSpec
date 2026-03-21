@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
 from madspec_cli.shared.kernel.result import PayloadResult
 
 from .common import evaluate_gate_context
@@ -17,6 +18,7 @@ class GateStatusRequest:
     operation: str | None
     step_id: str | None
     overrides: dict[str, Any]
+    session_key: str = SYSTEM_SESSION_KEY
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,7 @@ def execute(request: GateStatusRequest) -> GateStatusResult:
         request.branch_name,
         stage=request.stage,
         operation=request.operation,
+        session_key=request.session_key,
         step_id=request.step_id,
         overrides=request.overrides,
         include_ratification=True,

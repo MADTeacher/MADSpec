@@ -14,6 +14,7 @@ MADSpec - фреймворк для разработки программног�
 - Feature-процесс для добавления функциональности в существующий код
 - Отдельные артефакты по веткам в `.madspec/<branch>/` вместо одного общего состояния проекта
 - Проектное хранилище памяти в `.madspec/system/memory/`, артефакты памяти ветки в `.madspec/<branch>/memory/` и автоматически собираемые Markdown-файлы поверх них
+- Session-local runtime state в `SQLite` с выбором через `--session-key`, при этом `active-session.json` сохраняется как производная проекция для совместимости single-agent режима
 - Слой объяснения и диагностики для структурированной памяти: `doctor`, `explain`, `timeline`, `why-next-step`, `conflicts`, `inspect-record`
 - Контролируемое сравнение и слияние памяти между ветками с циклом `compare/propose/preview/apply` и продвижением подтвержденных знаний на уровень проекта
 - Единый слой правил проекта в `.madspec/system/policy/` с циклом предложения и применения и автоматически собираемым `policy.md`
@@ -203,6 +204,8 @@ MADSpec не предполагает слепого выполнения все
 
 MADSpec хранит основное проектное состояние в `.madspec/system/memory/`, `.madspec/system/policy/` и `.madspec/system/agents/`, а артефакты процесса, привязанные к ветке, — в `.madspec/<branch>/memory/`, `.madspec/<branch>/change/` и `.madspec/<branch>/gates/`. Файлы вроде `concept.md`, `tech-stack.md`, `architecture.md`, `implementation-plan.md`, `change-summary.md`, `.madspec/system/policy.md` и `.madspec/system/agents.md` собираются автоматически и не являются основным источником истины. Производные артефакты ветки теперь материализуются по стадиям: feature- и MVP-стадии создают только релевантный минимум, а полный набор пересобирается через `madspec memory init`, `madspec memory consolidate` и `madspec memory validate`.
 
+Для session-scoped runtime MADSpec уже использует канонические сеансы в `SQLite`: команды `madspec memory retrieve/search/capture/checkpoint/register-step/start-step/checkpoint-step/complete-step` и `madspec agents subagents context` принимают `--session-key`, а значение по умолчанию остается `active`, чтобы не ломать текущий single-agent поток.
+
 Такой подход упрощает возобновление длинной работы и отделяет контекст разных веток друг от друга.
 
 ## Дополнительно
@@ -223,7 +226,7 @@ MADSpec хранит основное проектное состояние в `
 
 ### Субагенты
 
-MADSpec хранит каноническое состояние субагентных ролей в `.madspec/system/agents/` и экспортирует контекст, подготовленный для конкретной роли, через `madspec agents subagents context`.
+MADSpec хранит каноническое состояние субагентных ролей в `.madspec/system/agents/` и экспортирует контекст, подготовленный для конкретной роли, через `madspec agents subagents context`. Эта команда теперь также принимает `--session-key`, чтобы читать session-local runtime-контекст нужного агента без вмешательства в чужие сеансы.
 
 Основные файлы:
 

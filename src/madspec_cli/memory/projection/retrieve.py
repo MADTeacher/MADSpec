@@ -7,6 +7,8 @@ from madspec_cli.features.change.infrastructure.storage import build_change_cont
 
 from ..domain.conflicts import PROJECT_MEMORY_BRANCH, semantic_fingerprint
 from ..domain.progress import select_next_executable_step
+from ..domain.step_resolution import resolve_runtime_step_id
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 from ..shared.storage import read_jsonl as _read_jsonl
 from ..stages.design.state import load_design_state
 from .context_loader import load_retrieve_projection_state
@@ -38,6 +40,7 @@ def retrieve_memory_context(
     branch_name: str,
     stage: str,
     *,
+    session_key: str = SYSTEM_SESSION_KEY,
     step_id: str | None = None,
     limit: int | None = None,
     query: str | None = None,
@@ -62,7 +65,12 @@ def retrieve_memory_context(
         "feature.init",
         "feature.plan",
     }
-    state = load_retrieve_projection_state(project_path, branch_name, stage_lower)
+    state = load_retrieve_projection_state(
+        project_path,
+        branch_name,
+        stage_lower,
+        session_key=session_key,
+    )
     change_context = build_change_context(project_path, branch_name)
     change_state = load_change_state(project_path, branch_name)
     resolved_limit = 3 if limit is None or limit <= 0 else limit
@@ -109,9 +117,12 @@ def retrieve_memory_context(
     semantic_facts = semantic_sets["validated"]["facts"]
     semantic_decisions = semantic_sets["validated"]["decisions"]
     semantic_contracts = semantic_sets["validated"]["contracts"]
-    resolved_step_id = step_id or state.active_session.get("current_step") or state.progress.get("currentImplementStep")
-    if not resolved_step_id and "implement" in stage_lower:
-        resolved_step_id = select_next_executable_step(state.progress)
+    resolved_step_id = resolve_runtime_step_id(
+        progress=state.progress,
+        session_payload=state.active_session,
+        stage=stage_lower,
+        explicit_step_id=step_id,
+    )
 
     stage_facts = [
         record
@@ -193,8 +204,10 @@ def retrieve_memory_context(
     return {
         "branch": branch_name,
         "stage": stage,
+        "session_key": session_key,
         "step_id": resolved_step_id,
         "active_session": {
+            "session_key": session_key,
             "active_goal": state.active_session.get("active_goal"),
             "stage": state.active_session.get("stage"),
             "current_step": state.active_session.get("current_step"),

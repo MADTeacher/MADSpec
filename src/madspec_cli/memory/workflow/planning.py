@@ -10,7 +10,6 @@ from madspec_cli.features.policy.application.common import evaluate_branch_polic
 from ..domain.progress import explain_next_executable_step
 from ..shared.records import STEP_ID_PATTERN, make_record
 from ..shared.storage import (
-    _default_active_session,
     _default_progress_state,
     _default_step_coverage,
     _default_step_metadata,
@@ -19,10 +18,12 @@ from ..shared.storage import (
     ensure_memory_layout,
     get_memory_paths,
     normalize_progress_state,
-    read_json,
     now_iso,
+    read_json,
     write_json,
 )
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.sessions import load_runtime_session, save_runtime_session
 from ..projection.materialize import consolidate_branch_memory
 from ..stages.concept.state import is_empty_concept_state, load_concept_state, migrate_legacy_concept_markdown
 from ..stages.feature_init.state import (
@@ -251,6 +252,7 @@ def register_planned_step(
     branch_name: str,
     stage: str,
     *,
+    session_key: str = SYSTEM_SESSION_KEY,
     step_id: str,
     covers: list[str],
     step_kind: str,
@@ -442,12 +444,21 @@ def register_planned_step(
     else:
         save_plan_state(paths.plan_state, plan_state)
 
-    active_session = read_json(paths.active_session, _default_active_session(branch_name))
+    active_session = load_runtime_session(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
     active_session["stage"] = stage
     active_session["current_step"] = step_id
     active_session["last_checkpoint_at"] = now_iso()
     active_session["updated_at"] = active_session["last_checkpoint_at"]
-    write_json(paths.active_session, active_session)
+    save_runtime_session(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+        payload=active_session,
+    )
 
     append_jsonl(
         paths.decision_log,

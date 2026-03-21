@@ -16,10 +16,12 @@ from ..application.implementation_steps import (
     start as start_step,
 )
 from ..domain.branch_layout import resolve_target_branch
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
 START_STEP_FROM_FILE_ALLOWED_KEYS = {
     "stage",
+    "session_key",
     "branch",
     "step_id",
     "summary",
@@ -29,6 +31,7 @@ START_STEP_FROM_FILE_ALLOWED_KEYS = {
 
 CHECKPOINT_STEP_FROM_FILE_ALLOWED_KEYS = {
     "stage",
+    "session_key",
     "branch",
     "step_id",
     "summary",
@@ -48,6 +51,7 @@ COMPLETE_STEP_FROM_FILE_ALIASES = {
 
 COMPLETE_STEP_FROM_FILE_ALLOWED_KEYS = {
     "stage",
+    "session_key",
     "summary",
     "branch",
     "step_id",
@@ -65,6 +69,7 @@ COMPLETE_STEP_FROM_FILE_ALLOWED_KEYS = {
 def memory_start_step(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to next executable step"),
     summary: str = typer.Option(None, "--summary", help="Optional active goal override"),
@@ -75,6 +80,7 @@ def memory_start_step(
     if from_file:
         file_data = read_args_file(from_file, allowed_keys=START_STEP_FROM_FILE_ALLOWED_KEYS)
         stage = file_data.pop("stage", stage)
+        session_key = file_data.pop("session_key", session_key)
         branch_name = file_data.pop("branch", branch_name)
         step_id = file_data.pop("step_id", step_id)
         summary = file_data.pop("summary", summary)
@@ -88,7 +94,13 @@ def memory_start_step(
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
     result = start_step(
-        ImplementationStepRequest(project_path=project_path, branch_name=target_branch, stage=stage, options={"step_id": step_id, "summary": summary, "evidence": evidence or []})
+        ImplementationStepRequest(
+            project_path=project_path,
+            branch_name=target_branch,
+            stage=stage,
+            session_key=session_key,
+            options={"step_id": step_id, "summary": summary, "evidence": evidence or []},
+        )
     )
 
     payload = result.to_payload()
@@ -114,6 +126,7 @@ def memory_start_step(
 def memory_checkpoint_step(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to current implementation step"),
     summary: str = typer.Option(None, "--summary", help="Optional checkpoint summary"),
@@ -128,6 +141,7 @@ def memory_checkpoint_step(
     if from_file:
         file_data = read_args_file(from_file, allowed_keys=CHECKPOINT_STEP_FROM_FILE_ALLOWED_KEYS)
         stage = file_data.pop("stage", stage)
+        session_key = file_data.pop("session_key", session_key)
         branch_name = file_data.pop("branch", branch_name)
         json_output = file_data.pop("json_output", json_output)
         options = {
@@ -161,6 +175,7 @@ def memory_checkpoint_step(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
+            session_key=session_key,
             options=options,
         )
     )
@@ -188,6 +203,7 @@ def memory_checkpoint_step(
 def memory_complete_step(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Implementation stage: mvp.implement or feature.implement"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     summary: str = typer.Option(None, "--summary", help="Completion summary for the implementation step"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to update"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier; defaults to current implementation step"),
@@ -208,6 +224,7 @@ def memory_complete_step(
             allowed_keys=COMPLETE_STEP_FROM_FILE_ALLOWED_KEYS,
         )
         stage = file_data.pop("stage", stage)
+        session_key = file_data.pop("session_key", session_key)
         summary = file_data.pop("summary", summary)
         branch_name = file_data.pop("branch", branch_name)
         json_output = file_data.pop("json_output", json_output)
@@ -249,6 +266,7 @@ def memory_complete_step(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
+            session_key=session_key,
             options=options,
         )
     )

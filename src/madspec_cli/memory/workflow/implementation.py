@@ -7,6 +7,7 @@ from madspec_cli.features.gates.application.common import evaluate_gate_context,
 from madspec_cli.features.policy.application.common import evaluate_branch_policies
 
 from ..domain.progress import select_next_executable_step
+from ..domain.step_resolution import resolve_runtime_step_id
 from .implementation_records import (
     build_checkpoint_event,
     build_completion_event,
@@ -33,6 +34,8 @@ from ..shared.storage import (
     now_iso,
     write_json,
 )
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.sessions import clone_session_payload, save_runtime_session
 from ..shared.validation import validate_branch_memory
 from ..projection.materialize import consolidate_branch_memory
 
@@ -42,6 +45,7 @@ def start_implementation_step(
     branch_name: str,
     stage: str,
     *,
+    session_key: str = SYSTEM_SESSION_KEY,
     step_id: str | None = None,
     summary: str | None = None,
     evidence: list[str] | None = None,
@@ -60,6 +64,7 @@ def start_implementation_step(
         branch_name,
         stage=normalized_stage,
         operation="start-step",
+        session_key=session_key,
         step_id=step_id,
         overrides={"summary": normalized_summary, "evidence": normalized_evidence},
         include_ratification=False,
@@ -77,12 +82,22 @@ def start_implementation_step(
     paths = get_memory_paths(project_path, branch_name)
     snapshots = {
         paths.progress: snapshot_file(paths.progress),
-        paths.active_session: snapshot_file(paths.active_session),
         paths.events: snapshot_file(paths.events),
     }
-    progress, active_session = load_progress(project_path, branch_name)
+    progress, active_session = load_progress(
+        project_path,
+        branch_name,
+        session_key=session_key,
+    )
+    previous_session = clone_session_payload(active_session)
 
-    selected_step = step_id or select_next_executable_step(progress)
+    selected_step = resolve_runtime_step_id(
+        progress=progress,
+        session_payload=active_session,
+        stage=normalized_stage,
+        explicit_step_id=step_id,
+        require_ready=step_id is None,
+    )
     if not selected_step:
         return {
             "accepted": False,
@@ -128,7 +143,12 @@ def start_implementation_step(
         active_session["active_goal"] = normalized_summary or f"Implement {selected_step}"
         active_session["last_checkpoint_at"] = ts
         active_session["updated_at"] = ts
-        write_json(paths.active_session, active_session)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=active_session,
+        )
 
         append_jsonl(
             paths.events,
@@ -151,6 +171,12 @@ def start_implementation_step(
     except Exception as exc:
         for path, content in snapshots.items():
             restore_file(path, content)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=previous_session,
+        )
         return {
             "accepted": False,
             "branch": branch_name,
@@ -174,6 +200,7 @@ def checkpoint_implementation_step(
     branch_name: str,
     stage: str,
     *,
+    session_key: str = SYSTEM_SESSION_KEY,
     step_id: str | None = None,
     summary: str | None = None,
     tdd_phase: str | None = None,
@@ -200,6 +227,7 @@ def checkpoint_implementation_step(
             branch_name,
             stage=normalized_stage,
             operation="checkpoint-step",
+            session_key=session_key,
             step_id=step_id,
             overrides={
                 "summary": normalized_summary,
@@ -226,6 +254,7 @@ def checkpoint_implementation_step(
         branch_name,
         stage=normalized_stage,
         operation="checkpoint-step",
+        session_key=session_key,
         step_id=step_id,
         overrides={
             "summary": normalized_summary,
@@ -250,12 +279,21 @@ def checkpoint_implementation_step(
     paths = get_memory_paths(project_path, branch_name)
     snapshots = {
         paths.progress: snapshot_file(paths.progress),
-        paths.active_session: snapshot_file(paths.active_session),
         paths.events: snapshot_file(paths.events),
     }
-    progress, active_session = load_progress(project_path, branch_name)
+    progress, active_session = load_progress(
+        project_path,
+        branch_name,
+        session_key=session_key,
+    )
+    previous_session = clone_session_payload(active_session)
 
-    selected_step = step_id or progress.get("currentImplementStep") or active_session.get("current_step")
+    selected_step = resolve_runtime_step_id(
+        progress=progress,
+        session_payload=active_session,
+        stage=normalized_stage,
+        explicit_step_id=step_id,
+    )
     if not selected_step:
         return {
             "accepted": False,
@@ -343,7 +381,12 @@ def checkpoint_implementation_step(
             active_session["active_goal"] = normalized_summary
         active_session["last_checkpoint_at"] = ts
         active_session["updated_at"] = ts
-        write_json(paths.active_session, active_session)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=active_session,
+        )
 
         append_jsonl(
             paths.events,
@@ -368,6 +411,12 @@ def checkpoint_implementation_step(
     except Exception as exc:
         for path, content in snapshots.items():
             restore_file(path, content)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=previous_session,
+        )
         return {
             "accepted": False,
             "branch": branch_name,
@@ -391,6 +440,7 @@ def complete_implementation_step(
     branch_name: str,
     stage: str,
     *,
+    session_key: str = SYSTEM_SESSION_KEY,
     step_id: str | None = None,
     summary: str,
     red_evidence: list[str] | None = None,
@@ -428,6 +478,7 @@ def complete_implementation_step(
         branch_name,
         stage=normalized_stage,
         operation="complete-step",
+        session_key=session_key,
         step_id=step_id,
         overrides={
             "summary": normalized_summary,
@@ -453,15 +504,24 @@ def complete_implementation_step(
     paths = get_memory_paths(project_path, branch_name)
     snapshots = {
         paths.progress: snapshot_file(paths.progress),
-        paths.active_session: snapshot_file(paths.active_session),
         paths.events: snapshot_file(paths.events),
         paths.facts: snapshot_file(paths.facts),
         paths.decisions: snapshot_file(paths.decisions),
         paths.contracts: snapshot_file(paths.contracts),
     }
-    progress, active_session = load_progress(project_path, branch_name)
+    progress, active_session = load_progress(
+        project_path,
+        branch_name,
+        session_key=session_key,
+    )
+    previous_session = clone_session_payload(active_session)
 
-    selected_step = step_id or progress.get("currentImplementStep") or active_session.get("current_step")
+    selected_step = resolve_runtime_step_id(
+        progress=progress,
+        session_payload=active_session,
+        stage=normalized_stage,
+        explicit_step_id=step_id,
+    )
     if not selected_step:
         return {
             "accepted": False,
@@ -565,7 +625,12 @@ def complete_implementation_step(
         )
         active_session["last_checkpoint_at"] = ts
         active_session["updated_at"] = ts
-        write_json(paths.active_session, active_session)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=active_session,
+        )
 
         append_jsonl(
             paths.events,
@@ -627,6 +692,12 @@ def complete_implementation_step(
     except Exception as exc:
         for path, content in snapshots.items():
             restore_file(path, content)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=previous_session,
+        )
         return {
             "accepted": False,
             "branch": branch_name,

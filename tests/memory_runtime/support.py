@@ -26,8 +26,8 @@ class MemoryProjectHarness:
     def create_step_artifacts(self, step_id: str) -> None:
         create_step_artifacts(self.branch_dir, step_id)
 
-    def write_mvp_concept(self) -> Path:
-        return write_concept_markdown(self.branch_dir)
+    def write_mvp_concept(self, variant: str = "default") -> Path:
+        return write_concept_markdown(self.branch_dir, variant=variant)
 
     def seed_concept_for_design(self) -> None:
         capture_stage_memory(
@@ -59,4 +59,3 @@ def bootstrap_memory_project(tmp_path: Path, branch: str = "main") -> MemoryProj
         paths=paths,
         branch=branch,
     )
-

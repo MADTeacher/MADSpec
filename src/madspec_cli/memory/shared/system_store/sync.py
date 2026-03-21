@@ -5,6 +5,7 @@ from typing import Any
 
 from .constants import SEARCHABLE_ARTIFACT_SUFFIXES
 from .layout import ensure_system_memory_layout
+from .sessions import project_active_session
 from .retrieval import RetrievalOrchestrator
 from .store import MemoryStore
 from .text import _artifact_stage, _iso_from_mtime
@@ -28,7 +29,7 @@ def sync_branch_memory_to_store(project_path: Path, branch_name: str) -> None:
 
     active_session = read_json(paths.active_session, {})
     if isinstance(active_session, dict):
-        store.upsert_session(branch=branch_name, payload=active_session)
+        store.upsert_session(branch=branch_name, session_key="active", payload=active_session)
 
     snapshot_specs = (
         ("mvp.concept", paths.concept_state),
@@ -99,7 +100,7 @@ def sync_json_path_to_store(path: Path, data: Any) -> None:
             source_path=str(path.relative_to(project_path)),
         )
     elif rel == "memory/working/active-session.json":
-        store.upsert_session(branch=branch_name, payload=data)
+        store.upsert_session(branch=branch_name, session_key="active", payload=data)
     elif rel == "memory/stages/mvp.concept.json":
         store.upsert_stage_snapshot(
             branch=branch_name,
@@ -214,6 +215,11 @@ def search_memory_store(
         include_conflicted=include_conflicted,
         active_session=active_session,
     )
+
+
+def rebuild_active_session_projection(project_path: Path, branch_name: str) -> Path:
+    ensure_system_memory_layout(project_path)
+    return project_active_session(project_path, branch_name=branch_name)
 
 
 def _path_context(path: Path) -> tuple[Path, str, tuple[str, ...]] | None:

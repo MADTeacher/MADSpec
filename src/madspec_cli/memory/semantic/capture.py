@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from ..projection.materialize import consolidate_branch_memory
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 from .capture_inputs import build_capture_inputs
 from .capture_persistence import persist_capture
 from .capture_prepare import prepare_capture
@@ -26,6 +27,8 @@ def capture_stage_memory(
     project_path: Path,
     branch_name: str,
     stage: str,
+    *,
+    session_key: str = SYSTEM_SESSION_KEY,
     **kwargs: Any,
 ) -> dict[str, Any]:
     normalized_stage = stage.strip().lower()
@@ -59,6 +62,7 @@ def capture_stage_memory(
     return persist_capture(
         project_path=project_path,
         branch_name=branch_name,
+        session_key=session_key,
         prepared=prepared,
         consolidate_fn=consolidate_branch_memory,
     )

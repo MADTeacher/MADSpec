@@ -50,10 +50,10 @@
 - `madspec memory init` — создать структуру памяти для ветки
 - `madspec memory status` — проверить текущее состояние памяти
 - `madspec memory db-status` — проверить состояние `SQLite` и векторного индекса
-- `madspec memory capture` — накапливать проверенные факты, решения, контракты и вопросы по стадии; поддерживает `--from-file`
-- `madspec memory checkpoint` — завершить неитеративную стадию и обновить производное состояние; поддерживает `--from-file`
-- `madspec memory retrieve` — получить минимальный контекст стадии или шага; поддерживает смешанный поиск через `--query`, `--disable-semantic`, `--recall-limit`, `--scope`; для `mvp.concept` по умолчанию возвращает краткий `concept_status`, для `mvp.design` — `design_status`, для `mvp.tech` — `tech_status`, для `mvp.plan` — `plan_status`, а полное состояние артефакта стадии отдает только по `--full-artifact`
-- `madspec memory search` — посмотреть кандидатов из точного, полнотекстового и семантического поиска без полного контекста стадии
+- `madspec memory capture` — накапливать проверенные факты, решения, контракты и вопросы по стадии; поддерживает `--from-file` и `--session-key`
+- `madspec memory checkpoint` — завершить неитеративную стадию и обновить производное состояние; поддерживает `--from-file` и `--session-key`
+- `madspec memory retrieve` — получить минимальный контекст стадии или шага; поддерживает `--session-key`, смешанный поиск через `--query`, `--disable-semantic`, `--recall-limit`, `--scope`; для `mvp.concept` по умолчанию возвращает краткий `concept_status`, для `mvp.design` — `design_status`, для `mvp.tech` — `tech_status`, для `mvp.plan` — `plan_status`, а полное состояние артефакта стадии отдает только по `--full-artifact`
+- `madspec memory search` — посмотреть кандидатов из точного, полнотекстового и семантического поиска без полного контекста стадии; поддерживает `--session-key`
 - `madspec memory doctor` — провести диагностическую проверку без изменения памяти ветки, слоя `SQLite`, векторного индекса и производных представлений
 - `madspec memory explain` — объяснить контекст стадии, влияние правил и результатов поиска по смыслу
 - `madspec memory timeline` — показать объединенную историю записей, снимков состояния и `retrieval_runs`
@@ -69,10 +69,10 @@
 - `madspec memory reindex` — обработать ожидающие задания индексирования и обновить векторные фрагменты
 - `madspec memory consolidate` — пересобрать Markdown-представления из структурированной памяти
 - `madspec memory validate` — проверить согласованность памяти и производных представлений
-- `madspec memory register-step` — зарегистрировать шаг планирования; поддерживает `--from-file`
-- `madspec memory start-step` — запустить шаг реализации; поддерживает `--from-file`
-- `madspec memory checkpoint-step` — зафиксировать промежуточное состояние шага; поддерживает `--from-file`
-- `madspec memory complete-step` — завершить шаг реализации; поддерживает `--from-file`
+- `madspec memory register-step` — зарегистрировать шаг планирования; поддерживает `--from-file` и `--session-key`
+- `madspec memory start-step` — запустить шаг реализации; поддерживает `--from-file` и `--session-key`
+- `madspec memory checkpoint-step` — зафиксировать промежуточное состояние шага; поддерживает `--from-file` и `--session-key`
+- `madspec memory complete-step` — завершить шаг реализации; поддерживает `--from-file` и `--session-key`
 
 ### Слой правил
 
@@ -117,7 +117,7 @@
 - `madspec agents subagents list` — показать доступные роли и их текущее состояние
 - `madspec agents subagents enable` — включить конкретную роль
 - `madspec agents subagents disable` — отключить конкретную роль
-- `madspec agents subagents context` — отдать канонический role-scoped context для выбранной роли
+- `madspec agents subagents context` — отдать канонический role-scoped context для выбранной роли; поддерживает `--session-key`
 
 ## Когда обращаться к этому файлу
 

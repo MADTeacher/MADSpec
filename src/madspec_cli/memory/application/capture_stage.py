@@ -14,6 +14,7 @@ class CaptureStageRequest:
     project_path: Path
     branch_name: str
     stage: str
+    session_key: str
     options: dict[str, Any]
 
 
@@ -29,6 +30,7 @@ def execute(request: CaptureStageRequest) -> CaptureStageResult:
         request.project_path,
         request.branch_name,
         request.stage,
+        session_key=request.session_key,
         **request.options,
     )
     return CaptureStageResult(payload=payload)

@@ -8,6 +8,7 @@ from madspec_cli.shared.kernel.result import PayloadResult
 
 from ..projection.materialize import consolidate_branch_memory
 from ..shared.storage import ensure_memory_layout, get_memory_paths
+from ..shared.system_store.sessions import clone_session_payload, load_runtime_session, save_runtime_session
 from ..shared.validation import validate_branch_memory
 from ..workflow.planning import register_planned_step
 
@@ -17,6 +18,7 @@ class RegisterStepRequest:
     project_path: Path
     branch_name: str
     stage: str
+    session_key: str
     step_id: str
     covers: list[str]
     step_kind: str
@@ -44,6 +46,7 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
         request.branch_name,
         stage=request.stage,
         operation="register-step",
+        session_key=request.session_key,
         step_id=request.step_id,
         overrides={
             "step_kind": request.step_kind,
@@ -66,6 +69,13 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
         )
     paths = get_memory_paths(request.project_path, request.branch_name)
     branch_dir = paths.branch_dir
+    previous_session = clone_session_payload(
+        load_runtime_session(
+            request.project_path,
+            branch_name=request.branch_name,
+            session_key=request.session_key,
+        )
+    )
     snapshot_targets = [
         paths.progress,
         paths.plan_state,
@@ -92,6 +102,7 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
         request.project_path,
         request.branch_name,
         request.stage,
+        session_key=request.session_key,
         step_id=request.step_id,
         covers=request.covers,
         step_kind=request.step_kind,
@@ -115,5 +126,11 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
                 else:
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(content, encoding="utf-8")
+            save_runtime_session(
+                request.project_path,
+                branch_name=request.branch_name,
+                session_key=request.session_key,
+                payload=previous_session,
+            )
             payload = {"accepted": False, "step_id": request.step_id, "errors": validation_errors}
     return RegisterStepResult(payload=payload)

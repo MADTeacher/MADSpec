@@ -11,6 +11,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.capture_stage import CaptureStageRequest, execute as capture_stage
 from ..domain.branch_layout import resolve_target_branch
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
 CAPTURE_FROM_FILE_ALIASES = {
@@ -69,6 +70,7 @@ CAPTURE_FROM_FILE_ALIASES = {
 
 CAPTURE_FROM_FILE_ALLOWED_KEYS = {
     "stage",
+    "session_key",
     "summary",
     "branch",
     "json_output",
@@ -148,6 +150,7 @@ CAPTURE_FROM_FILE_ALLOWED_KEYS = {
 def memory_capture(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
     stage: str = typer.Option(None, "--stage", help="Stage to capture: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     summary: str = typer.Option(None, "--summary", help="Optional stage note summary"),
     fact: list[str] = typer.Option(None, "--fact", help="Fact to capture; repeat for multiple values"),
     decision: list[str] = typer.Option(None, "--decision", help="Decision to capture; repeat for multiple values"),
@@ -230,6 +233,7 @@ def memory_capture(
             allowed_keys=CAPTURE_FROM_FILE_ALLOWED_KEYS,
         )
         stage = file_data.pop("stage", stage)
+        session_key = file_data.pop("session_key", session_key)
         branch_name = file_data.pop("branch", branch_name)
         json_output = file_data.pop("json_output", json_output)
         status = file_data.pop("status", status)
@@ -321,6 +325,7 @@ def memory_capture(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
+            session_key=session_key,
             options=options,
         )
     )

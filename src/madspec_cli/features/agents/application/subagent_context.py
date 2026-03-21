@@ -19,6 +19,7 @@ class SubagentContextRequest:
     subagent_id: str
     branch_name: str | None
     stage: str | None
+    session_key: str
     step_id: str | None
 
 
@@ -37,6 +38,7 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
         request.project_path,
         branch_name,
         stage,
+        session_key=request.session_key,
         step_id=request.step_id,
         full_artifact=False,
         include_history=True,
@@ -53,6 +55,7 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
             operation="validate",
             step_id=request.step_id,
             overrides={},
+            session_key=request.session_key,
         )
     ).to_payload()
     try:
@@ -68,6 +71,7 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
             "bodySource": subagent.get("bodySource"),
             "branch": branch_name,
             "stage": stage,
+            "session_key": request.session_key,
             "memory": memory_context,
             "policy": policy,
             "gates": gates,

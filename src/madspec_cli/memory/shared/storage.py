@@ -395,7 +395,7 @@ def ensure_memory_layout(
     scope = resolve_stage_scope(stage, full=full)
     created: list[Path] = []
 
-    from .system_store import ensure_system_memory_layout, sync_branch_memory_to_store
+    from .system_store import ensure_system_memory_layout, load_runtime_session, sync_branch_memory_to_store
 
     created.extend(ensure_system_memory_layout(project_path))
 
@@ -409,8 +409,9 @@ def ensure_memory_layout(
         write_json(paths.progress, _default_progress_state())
         created.append(paths.progress)
 
-    if not paths.active_session.exists():
-        write_json(paths.active_session, _default_active_session(branch_name))
+    active_session_exists = paths.active_session.exists()
+    load_runtime_session(project_path, branch_name=branch_name)
+    if not active_session_exists and paths.active_session.exists():
         created.append(paths.active_session)
 
     if "mvp.concept" in scope.stage_snapshot_keys:

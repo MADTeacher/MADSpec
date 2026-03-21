@@ -5,13 +5,16 @@ from pathlib import Path
 from typing import Any
 
 from ..shared.storage import (
-    _default_active_session,
     append_jsonl,
     ensure_memory_layout,
     get_memory_paths,
     now_iso,
-    read_json,
-    write_json,
+)
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.sessions import (
+    clone_session_payload,
+    load_runtime_session,
+    save_runtime_session,
 )
 from ..shared.validation import validate_branch_memory
 from ..stages.architecture.state import (
@@ -40,13 +43,13 @@ def persist_capture(
     *,
     project_path: Path,
     branch_name: str,
+    session_key: str = SYSTEM_SESSION_KEY,
     prepared: PreparedCapture,
     consolidate_fn: Callable[..., list[Path]],
 ) -> dict[str, Any]:
     ensure_memory_layout(project_path, branch_name, stage=prepared.inputs.stage)
     paths = get_memory_paths(project_path, branch_name)
     snapshots = {
-        paths.active_session: snapshot_file(paths.active_session),
         paths.decision_log: snapshot_file(paths.decision_log),
         paths.facts: snapshot_file(paths.facts),
         paths.decisions: snapshot_file(paths.decisions),
@@ -65,8 +68,14 @@ def persist_capture(
     bundles = prepared.bundles
     ts = now_iso()
 
-    active_session = read_json(paths.active_session, _default_active_session(branch_name))
+    active_session = load_runtime_session(
+        project_path,
+        branch_name=branch_name,
+        session_key=session_key,
+    )
+    previous_session = clone_session_payload(active_session)
     active_session["branch"] = branch_name
+    active_session["session_key"] = session_key
     active_session["stage"] = inputs.stage
     if inputs.summary:
         active_session["active_goal"] = inputs.summary
@@ -284,7 +293,12 @@ def persist_capture(
             save_feature_init_state(paths.feature_init_state, feature_init_state)
         elif inputs.stage == FEATURE_PLAN_STAGE:
             save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
-        write_json(paths.active_session, active_session)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=active_session,
+        )
         append_jsonl(paths.decision_log, note_records)
         append_jsonl(paths.facts, fact_records)
         append_jsonl(paths.decisions, decision_records)
@@ -302,6 +316,12 @@ def persist_capture(
     except Exception as exc:
         for path, content in snapshots.items():
             restore_file(path, content)
+        save_runtime_session(
+            project_path,
+            branch_name=branch_name,
+            session_key=session_key,
+            payload=previous_session,
+        )
         return {
             "accepted": False,
             "branch": branch_name,

@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from .constants import LEASE_TTL_SECONDS, SYSTEM_SESSION_KEY
+from .constants import LEASE_TTL_SECONDS
 from .layout import get_system_memory_paths
 from .text import (
     _content_hash,
@@ -323,7 +323,7 @@ class MemoryStore:
                 content_hash=content_hash,
             )
 
-    def upsert_session(self, *, branch: str, payload: dict[str, Any]) -> None:
+    def upsert_session(self, *, branch: str, session_key: str, payload: dict[str, Any]) -> None:
         payload_json = _dump_json(payload)
         content_hash = _content_hash(payload_json)
         updated_at = str(payload.get("updated_at") or payload.get("last_checkpoint_at") or "")
@@ -341,7 +341,7 @@ class MemoryStore:
                     content_hash=excluded.content_hash
                 """,
                 (
-                    SYSTEM_SESSION_KEY,
+                    session_key,
                     branch,
                     _normalized_optional_text(payload.get("stage")),
                     _normalized_optional_text(payload.get("current_step")),
@@ -350,6 +350,23 @@ class MemoryStore:
                     content_hash,
                 ),
             )
+
+    def fetch_session(self, *, branch: str, session_key: str) -> dict[str, Any] | None:
+        with self.connect_read_only() as conn:
+            row = conn.execute(
+                """
+                SELECT payload_json
+                FROM sessions
+                WHERE branch = ? AND session_key = ?
+                """,
+                (branch, session_key),
+            ).fetchone()
+        if row is None:
+            return None
+        payload = json.loads(row["payload_json"])
+        if isinstance(payload, dict):
+            return payload
+        return None
 
     def upsert_artifact(
         self,

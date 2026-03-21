@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from madspec_cli.features.gates.application.common import evaluate_gate_context
+from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
 from madspec_cli.shared.kernel.result import PayloadResult
 
 from .retrieve_context import RetrieveMemoryContextRequest, execute as retrieve_context
@@ -35,6 +36,7 @@ class ExplainStateRequest:
     include_obsolete: bool
     include_conflicted: bool
     include_history: bool
+    session_key: str = SYSTEM_SESSION_KEY
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,7 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
             project_path=request.project_path,
             branch_name=request.branch_name,
             stage=request.stage,
+            session_key=request.session_key,
             step_id=request.step_id,
             limit=request.limit,
             query=request.query,
@@ -77,6 +80,7 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
         request.branch_name,
         stage=request.stage,
         operation="validate",
+        session_key=request.session_key,
         step_id=context.get("step_id"),
         overrides={},
         include_ratification=True,

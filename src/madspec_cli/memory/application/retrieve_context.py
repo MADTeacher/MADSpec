@@ -14,6 +14,7 @@ class RetrieveMemoryContextRequest:
     project_path: Path
     branch_name: str
     stage: str
+    session_key: str
     step_id: str | None
     limit: int
     query: str | None
@@ -37,6 +38,7 @@ def execute(request: RetrieveMemoryContextRequest) -> RetrieveMemoryContextResul
         request.project_path,
         request.branch_name,
         request.stage,
+        session_key=request.session_key,
         step_id=request.step_id,
         limit=request.limit,
         query=request.query,

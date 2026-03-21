@@ -8,9 +8,17 @@
 
 Начиная с `Memory v2`, MADSpec использует смешанную модель хранения:
 
-- `SQLite` в `.madspec/system/memory/memory.sqlite` — каноническое хранилище состояния, записей, полнотекстового индекса и очереди индексирования
+- `SQLite` в `.madspec/system/memory/memory.sqlite` — проектное хранилище записей, снимков стадий, сеансов, полнотекстового индекса и очереди индексирования
 - `lancedb/` в `.madspec/system/memory/lancedb/` — локальный каталог векторного индекса для семантического поиска
-- `.madspec/<branch>/memory/` — структура памяти, привязанная к ветке, и служебные производные файлы, которые по-прежнему используют команды процесса
+- `.madspec/<branch>/memory/` — структура памяти, привязанная к ветке, и служебные производные файлы для совместимости и материализации контекста ветки
+
+Важно для текущего состояния реализации:
+
+- сеансы рантайма теперь читаются и обновляются через `SQLite`, а таблица `sessions` считается каноническим источником session-local state;
+- файл `.madspec/<branch>/memory/working/active-session.json` больше не считается источником истины и поддерживается только как производная проекция для session `active`;
+- для `retrieve`, `search`, `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step`, `complete-step` и связанных вызовов субагентного контекста доступен `--session-key`, по умолчанию используется `active`;
+- переход всех изменяющих состояние команд `madspec memory` на `SQLite`-first path относится к `dev/parallel-memory-roadmap.md`;
+- остальные runtime-артефакты ветки, включая `progress`, снимки стадий, `episodes` и `semantic/*`, пока остаются на file-first path и будут канонизированы позже.
 
 ## Когда Использовать
 
@@ -98,6 +106,7 @@
 У многих команд группы `memory` есть:
 
 - `--branch <name>`: явно выбрать ветку для операции
+- `--session-key <key>`: выбрать session-local runtime-контекст; по умолчанию используется `active`
 - `--json-output`: вывести JSON в удобном для автоматической обработки виде
 - `--from-file <path>`: прочитать все аргументы из JSON-файла вместо командной строки
 
@@ -124,6 +133,8 @@
 
 Предпочтительный формат - канонические внутренние ключи, которые соответствуют именам полей в словаре `options` конкретной команды. Поля верхнего уровня (`stage`, `branch`, `json_output`, `status`, `summary`) извлекаются отдельно.
 
+Для session-scoped операций в JSON также можно передать верхнеуровневый ключ `session_key`. Если он не указан, команда использует session `active`.
+
 CLI также принимает ключи-псевдонимы в стиле флагов, включая `snake_case` и `hyphen-case`. Например:
 
 - `audience` -> `audiences`
@@ -143,6 +154,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 У `retrieve` дополнительно есть:
 
+- `--session-key`
 - `--step-id`
 - `--limit`
 - `--query`
@@ -156,13 +168,17 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 Ответ `retrieve` теперь также содержит:
 
+- top-level `session_key`
 - `policy_context.required[]`
 - `policy_context.advisory[]`
 - `policy_context.pending_proposals_count`
 - `artifact_state.policy` при `--full-artifact`
 
+Поле `active_session` пока остается в ответе как совместимый псевдоним для уже разрешенной session payload, чтобы не ломать существующих потребителей.
+
 У `search` есть:
 
+- `--session-key` — выбрать сеанс, из которого берутся `active_goal`, `open_questions` и `current_hypotheses` для автодополнения запроса
 - `--query` — обязательный поисковый запрос
 - `--scope <step|stage|branch|project>` — область поиска
 - `--recall-limit` — сколько кандидатов брать из каждого канала поиска
@@ -174,7 +190,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 ## Stage-aware materialization
 
-- Общий минимальный runtime-набор ветки включает `progress.json`, `active-session.json`, `decision-log.jsonl`, `events.jsonl` и `semantic/*.jsonl`.
+- Общий минимальный runtime-набор ветки включает `progress.json`, проекцию `active-session.json`, `decision-log.jsonl`, `events.jsonl` и `semantic/*.jsonl`.
 - Операции, привязанные к стадии, дополнительно создают каноническое состояние и производные представления только для текущей стадии.
 - Отсутствие нерелевантных производных артефактов не считается ошибкой, пока соответствующая стадия еще не была инициализирована.
 - `madspec memory validate` в своем полном сценарии по-прежнему проверяет полный набор материализованных артефактов ветки.
@@ -194,6 +210,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 | `.madspec/system/memory/lancedb/` | векторные фрагменты для памяти и артефактов | `memory reindex`, фоновое индексирование при извлечении | при семантическом поиске | Семантическое расширение контекста |
 | `episodes/events.jsonl` | События хода работы | `start-step`, `checkpoint-step`, `complete-step`, `memory learn` | `memory retrieve` для стадий реализации, `review` и `security`; для ранних стадий планирования только с `--include-history` | Операционная история |
 | `working/decision-log.jsonl` | Кандидаты решений, заметки контрольных точек, процедурные подсказки | `memory capture`, `memory checkpoint`, `memory learn` | `memory retrieve`, `memory promote` | Буфер решений и кандидатов на обучение |
+| `working/active-session.json` | Производная проекция канонического session state только для session `active` | session access layer поверх `SQLite` | совместимость веточного runtime-контекста и производных представлений | Совместимость и материализация |
 | `semantic/facts.jsonl` | Подтвержденные факты | `complete-step` и `memory promote` | извлечение контекста и сборка производных представлений | Каноническое знание |
 | `semantic/decisions.jsonl` | Подтвержденные решения | `complete-step` и `memory promote` | извлечение контекста и сборка производных представлений | Каноническое знание |
 | `semantic/contracts.jsonl` | Подтвержденные контракты и обязательства | `complete-step` и `memory promote` | извлечение контекста и сборка производных представлений | Каноническое знание |
@@ -203,6 +220,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 Практически это означает:
 
 - `SQLite` отвечает на вопросы "какое состояние сейчас каноническое", "что индексировать дальше" и "что подходит под точный и полнотекстовый поиск"
+- `SQLite` также хранит session-local runtime state для всех `session_key`, а файловая проекция поддерживается только для `active`
 - `lancedb/` отвечает на вопрос "что еще семантически похоже и стоит подтянуть в рабочий контекст"
 - `episodes` отвечает на вопрос "что происходило по ходу работы"
 - `decision_log` отвечает на вопрос "что еще нужно осмыслить, утвердить или продвинуть"
@@ -231,6 +249,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 ```bash
 madspec memory retrieve --stage mvp.plan --json-output
+madspec memory retrieve --stage mvp.plan --session-key planner --json-output
 ```
 
 Если этот контекст должен читать агент, можно сразу использовать TOON:
@@ -243,6 +262,7 @@ madspec memory retrieve --stage mvp.plan --toon-output
 
 ```bash
 madspec memory search --stage mvp.plan --query "billing step dependencies" --json-output
+madspec memory search --stage mvp.plan --session-key impl --query "billing step dependencies" --json-output
 ```
 
 ### Зафиксировать состояние стадии и ратифицировать его

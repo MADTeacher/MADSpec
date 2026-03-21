@@ -15,6 +15,7 @@ class ImplementationStepRequest:
     project_path: Path
     branch_name: str
     stage: str
+    session_key: str
     options: dict[str, Any]
 
 
@@ -27,17 +28,35 @@ class ImplementationStepResult(PayloadResult):
 
 def start(request: ImplementationStepRequest) -> ImplementationStepResult:
     ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
-    payload = start_implementation_step(request.project_path, request.branch_name, request.stage, **request.options)
+    payload = start_implementation_step(
+        request.project_path,
+        request.branch_name,
+        request.stage,
+        session_key=request.session_key,
+        **request.options,
+    )
     return ImplementationStepResult(payload=payload)
 
 
 def checkpoint(request: ImplementationStepRequest) -> ImplementationStepResult:
     ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
-    payload = checkpoint_implementation_step(request.project_path, request.branch_name, request.stage, **request.options)
+    payload = checkpoint_implementation_step(
+        request.project_path,
+        request.branch_name,
+        request.stage,
+        session_key=request.session_key,
+        **request.options,
+    )
     return ImplementationStepResult(payload=payload)
 
 
 def complete(request: ImplementationStepRequest) -> ImplementationStepResult:
     ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
-    payload = complete_implementation_step(request.project_path, request.branch_name, request.stage, **request.options)
+    payload = complete_implementation_step(
+        request.project_path,
+        request.branch_name,
+        request.stage,
+        session_key=request.session_key,
+        **request.options,
+    )
     return ImplementationStepResult(payload=payload)

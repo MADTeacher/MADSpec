@@ -1,0 +1,115 @@
+{
+  "epic": "epic-1-session-scoped-runtime",
+  "roadmap_document": "dev/parallel-memory-roadmap.md",
+  "default_session_key": "active",
+  "scope": "docs+contracts+behavior",
+  "behavior_change": true,
+  "architecture": {
+    "current_runtime_write_mode": "file-first-then-sync",
+    "current_mutation_authority": "sqlite-for-sessions-and-branch-memory-files-for-other-runtime-state",
+    "target_mutation_authority": "sqlite",
+    "projection_role": "compatible-rebuildable-projections"
+  },
+  "session_scoped_commands": [
+    "madspec memory retrieve",
+    "madspec memory search",
+    "madspec memory capture",
+    "madspec memory checkpoint",
+    "madspec memory register-step",
+    "madspec memory start-step",
+    "madspec memory checkpoint-step",
+    "madspec memory complete-step",
+    "madspec agents subagents context"
+  ],
+  "revision_aware_mutating_commands": [
+    "madspec memory capture",
+    "madspec memory checkpoint",
+    "madspec memory register-step",
+    "madspec memory start-step",
+    "madspec memory checkpoint-step",
+    "madspec memory complete-step"
+  ],
+  "reserved_cli_flags": [
+    "--session-key",
+    "--expected-revision"
+  ],
+  "reserved_payload_kinds": [
+    "conflict",
+    "scope_busy"
+  ],
+  "internal_extension_points": {
+    "request_models": [
+      "madspec_cli.memory.application.retrieve_context.RetrieveMemoryContextRequest",
+      "madspec_cli.memory.application.capture_stage.CaptureStageRequest",
+      "madspec_cli.memory.application.checkpoint_stage.CheckpointStageRequest",
+      "madspec_cli.memory.application.register_step.RegisterStepRequest",
+      "madspec_cli.memory.application.implementation_steps.ImplementationStepRequest",
+      "madspec_cli.features.agents.application.subagent_context.SubagentContextRequest"
+    ],
+    "future_canonical_boundary": "madspec_cli.memory.shared.system_store",
+    "future_projection_boundary": "madspec_cli.memory.projection",
+    "legacy_compatibility_boundary": "madspec_cli.memory.shared.storage"
+  },
+  "ownership_scopes": [
+    "plan-catalog",
+    "step",
+    "file-scope",
+    "artifact",
+    "work-item"
+  ],
+  "lease_scope_patterns": [
+    "plan-catalog:<branch>",
+    "implement-step:<branch>:<step-id>",
+    "artifact:<branch>:<path>",
+    "review:<branch>",
+    "security:<branch>"
+  ],
+  "phase_1_compatibility_matrix": {
+    "allowed": [
+      {
+        "left": "madspec memory register-step(step-02)",
+        "right": "madspec memory start-step(step-01)",
+        "outcome": "allowed"
+      },
+      {
+        "left": "madspec memory register-step(step-02)",
+        "right": "madspec memory checkpoint-step(step-01)",
+        "outcome": "allowed"
+      },
+      {
+        "left": "madspec memory register-step(step-02)",
+        "right": "madspec memory complete-step(step-01)",
+        "outcome": "allowed"
+      }
+    ],
+    "conflict_or_busy": [
+      {
+        "left": "madspec memory register-step(step-02)",
+        "right": "madspec memory register-step(step-02)",
+        "outcome": "conflict"
+      },
+      {
+        "left": "madspec memory checkpoint-step(step-01)",
+        "right": "madspec memory checkpoint-step(step-01)",
+        "outcome": "conflict"
+      },
+      {
+        "left": "dual writer",
+        "right": "implement-step:<branch>:<step-id>",
+        "outcome": "scope_busy"
+      }
+    ]
+  },
+  "rollout_order": [
+    "architecture baseline and ADR lock",
+    "session-scoped runtime",
+    "SQLite-first canonical writes",
+    "revision-aware optimistic concurrency",
+    "scoped leases and ownership",
+    "safe parallel planning and implementation",
+    "task/work-item model",
+    "proposal-based commits",
+    "coordinator runtime",
+    "diagnostics, migration and rollout hardening"
+  ]
+}

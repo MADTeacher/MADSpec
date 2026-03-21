@@ -3,11 +3,13 @@
 ## Обязательные правила
 
 - Для команд `memory capture`, `memory checkpoint`, `memory register-step`, `memory start-step`, `memory checkpoint-step` и `memory complete-step` обязательно используй `--from-file`: записывай аргументы в JSON-файл и передавай путь через `--from-file <path>`. Это гарантирует работу на всех платформах и устраняет проблемы с экранированием спецсимволов в оболочке.
+- Для session-scoped runtime передавай `--session-key`, когда работа ведется не в основном потоке `active`; не переключай чужие сеансы вручную через файлы ветки.
 - Для работы с правилами сначала считывай `policy_context` из `madspec memory retrieve --stage ... --toon-output`, если вывод читает агент: `required`, `advisory`, `pending_proposals_count`, а также `violations/confirmations`, если они уже рассчитаны для стадии.
 - Если нужен явный результат проверки правил или объяснение блокировки, используй `madspec policy validate --stage <stage> --step-id <step-id> --toon-output`; `--json-output` оставляй для машинной интеграции.
 - Если нужен единый ответ на вопрос "что именно блокирует переход", "какие проверки находятся в warning/pending" или "есть ли активные исключения", сначала используй `madspec gate status --stage <stage> --operation <operation> --toon-output`, а для подробностей — `madspec gate explain --toon-output`.
 - Для потока исключений соблюдай порядок `madspec gate propose-waiver -> явное подтверждение пользователя -> madspec gate apply-waiver`; не редактируй `.madspec/<branch>/gates/` вручную.
 - Для работы со слоем субагентов сначала проверяй `madspec agents profile --json-output`, не редактируй `.madspec/system/agents/*.json*` вручную и используй `madspec agents subagents context` как единственную каноническую точку получения role-scoped context.
+- Не считай `.madspec/<branch>/memory/working/active-session.json` источником истины: session-local state нужно читать и менять через CLI и канонический слой `SQLite`.
 - Для native-сред субагентов учитывай, что frontmatter не универсален: MADSpec рендерит его по явному `subagentFrontmatterProfile` среды и строго переводит общий `toolPolicy` в tools текущей среды, поэтому не копируй YAML между Cursor, Copilot, OpenCode и Qwen вручную.
 - Для изменения набора ролей соблюдай порядок `madspec agents propose-profile -> явное подтверждение пользователя -> madspec agents apply-profile`; точечные `enable/disable` используй как осознанное исключение, а не вместо объяснимого профиля.
 - Для работы со слоем изменений сначала проверяй, инициализирован ли `.madspec/<branch>/change/`, и не редактируй `state.json`, `proposals.jsonl`, `history.jsonl`, `change-summary.md` и файлы экспорта вручную.
