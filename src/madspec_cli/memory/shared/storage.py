@@ -26,6 +26,7 @@ class MemoryPaths:
     concept_state: Path
     design_state: Path
     tech_state: Path
+    deploy_state: Path
     architecture_state: Path
     plan_state: Path
     feature_init_state: Path
@@ -55,6 +56,7 @@ class MemoryPaths:
             "concept_state": self.concept_state,
             "design_state": self.design_state,
             "tech_state": self.tech_state,
+            "deploy_state": self.deploy_state,
             "architecture_state": self.architecture_state,
             "plan_state": self.plan_state,
             "feature_init_state": self.feature_init_state,
@@ -343,6 +345,7 @@ def get_memory_paths(project_path: Path, branch_name: str) -> MemoryPaths:
         concept_state=memory_dir / "stages" / "mvp.concept.json",
         design_state=memory_dir / "stages" / "mvp.design.json",
         tech_state=memory_dir / "stages" / "mvp.tech.json",
+        deploy_state=memory_dir / "stages" / "deploy.json",
         architecture_state=memory_dir / "stages" / "mvp.architecture.json",
         plan_state=memory_dir / "stages" / "mvp.plan.json",
         feature_init_state=memory_dir / "stages" / "feature.init.json",
@@ -428,6 +431,7 @@ def ensure_memory_layout(
     )
     from ..stages.design.state import default_design_state, save_design_state
     from ..stages.tech.state import default_tech_state, save_tech_state
+    from ..stages.deploy.state import default_deploy_state, save_deploy_state
     from ..stages.architecture.state import (
         default_architecture_state,
         save_architecture_state,
@@ -521,6 +525,17 @@ def ensure_memory_layout(
         save_tech_state(paths.tech_state, tech_state)
         if not tech_exists and paths.tech_state.exists():
             created.append(paths.tech_state)
+
+    if "deploy" in scope.stage_snapshot_keys:
+        deploy_exists = paths.deploy_state.exists()
+        deploy_state = (
+            canonical.snapshots["deploy"]
+            if "deploy" in canonical.present_snapshots
+            else default_deploy_state()
+        )
+        save_deploy_state(paths.deploy_state, deploy_state)
+        if not deploy_exists and paths.deploy_state.exists():
+            created.append(paths.deploy_state)
 
     if "mvp.architecture" in scope.stage_snapshot_keys:
         architecture_exists = paths.architecture_state.exists()

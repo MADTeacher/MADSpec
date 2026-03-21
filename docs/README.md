@@ -4,9 +4,9 @@
 
 ## Карта разделов
 
-- [`mvp/`](mvp/README.md) — команды для разработки нового проекта: `mvp.concept`, `mvp.design`, `mvp.tech`, `mvp.architecture`, `mvp.plan`, `mvp.implement`
+- [`mvp/`](mvp/README.md) — команды для разработки нового проекта: `mvp.concept`, `mvp.design`, `mvp.tech`, `mvp.architecture`, `deploy`, `mvp.plan`, `mvp.implement`
 - [`feature/`](feature/README.md) — команды для добавления новой функциональности: `feature.init`, `feature.plan`, `feature.implement`
-- [`other/`](other/README.md) — сквозные команды: `memory`, `policy`, `change`, `gate`, `review`, `security`
+- [`other/`](other/README.md) — сквозные команды: `memory`, `policy`, `change`, `gate`, `deploy`, `review`, `security`
 - [`cli/`](cli/README.md) — справка по терминальному `madspec` CLI: `init`, `git`, `policy`, `change`, `gate`, `memory`, `check`, `migrate`, `version`
 
 ## Как читать эту документацию
@@ -23,6 +23,7 @@
 | `madspec.mvp.design` | MVP | Описание UX/UI-структуры, экранов, пользовательских потоков и прототипов с реальной точкой входа приложения |
 | `madspec.mvp.tech` | MVP | Выбор технологического стека и организации кода |
 | `madspec.mvp.architecture` | MVP | Формализация структуры проекта, модели данных и API-контрактов |
+| `madspec.deploy` | Other | Фиксация окружений, единиц развертывания, CI/CD, секретов, наблюдаемости и стратегии релиза |
 | `madspec.mvp.plan` | MVP | Построение каталога шагов и синхронизация плана с `progress.json` |
 | `madspec.mvp.implement` | MVP | Выполнение шагов реализации через текущее состояние и контрольные точки TDD |
 | `madspec.feature.init` | Feature | Анализ существующего проекта и рамок новой функциональности |
@@ -48,6 +49,7 @@
 - `madspec memory checkpoint` ратифицирует состояние стадии и инициирует `consolidate + validate`
 - Команды реализации используют отдельные step-команды: `start-step`, `checkpoint-step`, `complete-step`
 
-## Что не входит в покрытие
+## Особенности процесса
 
-- `madspec.deploy` намеренно не включен: в репозитории нет шаблона команды в `templates/commands/`, поэтому этот процесс не документируется как актуальная команда
+- `madspec.deploy` можно запускать как рекомендуемый этап после `mvp.architecture` и перед `mvp.plan`
+- ту же команду можно запускать отдельно позже, если схема развертывания уточнилась только после реализации или перед релизом

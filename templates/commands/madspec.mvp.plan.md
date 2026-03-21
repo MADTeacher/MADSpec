@@ -15,7 +15,7 @@ $ARGUMENTS
 ## Обязательный skill `madspec-cli-operator`
 
 - Перед началом работы обязательно найди и прочитай skill `madspec-cli-operator`.
-- Дальше работай, опираясь на `madspec-cli-operator` как на базовый operational layer для workflow `madspec.*`, branch-aware артефактов `.madspec/` и команд MADSpec CLI.
+- Дальше работай, опираясь на `madspec-cli-operator` как на базовый операционный навык для команд `madspec.*`, артефактов `.madspec/`, привязанных к ветке, и MADSpec CLI.
 
 Ты **ОБЯЗАН** учитывать пользовательский ввод перед продолжением (если он не пустой).
 
@@ -97,9 +97,9 @@ $ARGUMENTS
   - `.madspec/<BRANCH>/architecture.md`
   - `.madspec/<BRANCH>/data-model.md`
   - `.madspec/<BRANCH>/contracts/`
-- Рекомендуется (если выполнялась команда `/madspec.deploy`): `.madspec/<BRANCH>/deployment.md`
-  - Если `.madspec/<BRANCH>/deployment.md` существует — ты **ОБЯЗАН** прочитать его и учитывать ограничения деплоя при планировании шагов
-  - Если файла нет — продолжай планирование, но при появлении вопросов про окружения/CI/CD/секреты/миграции/наблюдаемость предложи сначала выполнить `/madspec.deploy`
+- Рекомендуется: `.madspec/<BRANCH>/deployment.md`
+  - Если `.madspec/<BRANCH>/deployment.md` существует — ты **ОБЯЗАН** прочитать его и учитывать зафиксированные ограничения развертывания при планировании шагов
+  - Если файла нет — продолжай планирование, но при появлении существенных вопросов про окружения, CI/CD, секреты, миграции, наблюдаемость или откат предложи выполнить `/madspec.deploy`
 - Если файлы отсутствуют, предложи выполнить предыдущие этапы MVP (`/madspec.mvp.concept`, `/madspec.mvp.design`, `/madspec.mvp.tech`, `/madspec.mvp.architecture`)
 - **ВАЖНО**: При планировании шага, который реализует функцию:
   - Проверь наличие связанных артефактов (UI-дизайн, контракты API, модели данных)
@@ -152,7 +152,7 @@ $ARGUMENTS
      - `.madspec/<BRANCH>/concept.md` (для понимания функций и приоритетов)
      - `madspec memory retrieve --stage mvp.architecture --toon-output` (как основной summary архитектуры, если этот вывод читает агент; из ответа также прочитай `policy_context`)
      - `.madspec/<BRANCH>/architecture.md`, `.madspec/<BRANCH>/ui-design.md`, `.madspec/<BRANCH>/tech-stack.md`, `.madspec/<BRANCH>/data-model.md` (как generated views, если нужны детали)
-     - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его и учитывай ограничения деплоя при планировании шагов
+     - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его и учитывай ограничения развертывания при планировании шагов
    
    - Проанализируй архитектуру и определи базовые шаги
    
@@ -177,7 +177,7 @@ $ARGUMENTS
        - **ВАЖНО**: Создавай только один шаг за запуск для соблюдения инкрементального подхода
        - **ВАЖНО**: Если для функции существуют связанные артефакты (UI-дизайн, контракты API, модели данных), включи ссылки на них в описание шага
        - Для UI-шагов укажи в `description.md` и `planning-context.md`, какие screen prototypes, flow steps и входной экран являются acceptance contract
-       - Если `.madspec/<BRANCH>/deployment.md` существует: добавляй в `tasks.md/tests.md/validation.md` требования, которые нужны для выбранного деплоя (например, контейнеризация, CI pipeline, конфигурация/секреты, миграции, healthchecks, логирование/метрики/алерты, стратегия отката), но не добавляй лишние задачи без необходимости
+       - Если `.madspec/<BRANCH>/deployment.md` существует: добавляй в `tasks.md/tests.md/validation.md` только те требования, которые действительно нужны для выбранного способа развертывания
    
    - Инициализируй `.madspec/<BRANCH>/memory/progress.json`:
      - Если файл не существует, создай на основе шаблона `.madspec/templates/planning-state-template.json`
@@ -221,7 +221,7 @@ $ARGUMENTS
      - `.madspec/<BRANCH>/planning-context-cache.md` (для понимания структуры - используется вместо полного `architecture.md` для экономии контекста)
        - Если кэш не существует, сначала загрузи `madspec memory retrieve --stage mvp.architecture --toon-output --full-artifact`, если этот вывод читает агент, затем используй `architecture.md` и `data-model.md` как generated detail views и создай кэш
        - Если кэш существует, но дата последнего обновления старше даты последнего изменения generated architecture artifacts, обнови кэш
-     - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его полностью и учитывай ограничения деплоя при планировании каждого шага
+     - Если существует `.madspec/<BRANCH>/deployment.md` — загрузи его полностью и учитывай ограничения развертывания при планировании каждого шага
      - `.madspec/<BRANCH>/implementation-plan.md` (для понимания уже запланированных шагов)
      - Список уже запланированных шагов из `.madspec/<BRANCH>/memory/progress.json` (`plannedSteps` и `planningMetadata.stepDependencies`)
    
@@ -256,7 +256,7 @@ $ARGUMENTS
        - Конкретные storyboard flows / входные экраны, которые задают expected behavior
        - Контракты API (`.madspec/<BRANCH>/contracts/openapi.yaml`, `.madspec/<BRANCH>/contracts/*.graphql`, `.madspec/<BRANCH>/contracts/*.proto`, и т.д.)
        - Модели данных (`.madspec/<BRANCH>/data-model.md`)
-     - Если `.madspec/<BRANCH>/deployment.md` существует: добавь в `tasks.md/tests.md/validation.md` требования, которые нужны для выбранного деплоя (например, контейнеризация, CI pipeline, конфигурация/секреты, миграции, healthchecks, логирование/метрики/алерты, стратегия отката), но не добавляй лишние задачи без необходимости
+     - Если `.madspec/<BRANCH>/deployment.md` существует: добавь в `tasks.md/tests.md/validation.md` только те требования, которые действительно нужны для выбранного способа развертывания
      - **ОБЯЗАТЕЛЬНО**: Создай `planning-context.md` из шаблона `.madspec/templates/planning-context-template.md` (шаблоны хранятся в корне `.madspec/templates/`):
        - Заполни все поля шаблона:
          - Почему этот шаг создан (обоснование выбора для текущей итерации)

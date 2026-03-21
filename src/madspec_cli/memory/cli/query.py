@@ -37,7 +37,7 @@ def memory_retrieve(
     ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
     target_branch = resolve_target_branch(project_path, branch_name)
-    resolved_limit = limit if limit is not None else (3 if stage.strip().lower() in {"mvp.concept", "mvp.design", "mvp.tech", "mvp.architecture", "mvp.plan", "feature.init", "feature.plan"} else 5)
+    resolved_limit = limit if limit is not None else (3 if stage.strip().lower() in {"mvp.concept", "mvp.design", "mvp.tech", "deploy", "mvp.architecture", "mvp.plan", "feature.init", "feature.plan"} else 5)
     result = retrieve_context(
         RetrieveMemoryContextRequest(
             project_path=project_path,

@@ -17,6 +17,7 @@ from .policy_gate_summary import build_retrieve_policy_context
 from .projections import (
     build_architecture_status,
     build_concept_status,
+    build_deploy_status,
     build_design_status,
     build_feature_init_status,
     build_feature_plan_status,
@@ -63,6 +64,7 @@ def retrieve_memory_context(
         "mvp.concept",
         "mvp.design",
         "mvp.tech",
+        "deploy",
         "mvp.architecture",
         "mvp.plan",
         "feature.init",
@@ -324,6 +326,11 @@ def retrieve_memory_context(
             if stage_lower == "mvp.tech" and state.tech_state is not None
             else None
         ),
+        "deploy_status": (
+            build_deploy_status(state.deploy_state)
+            if stage_lower == "deploy" and state.deploy_state is not None
+            else None
+        ),
         "architecture_status": (
             build_architecture_status(
                 state.architecture_state,
@@ -354,6 +361,7 @@ def retrieve_memory_context(
             "concept": state.concept_state if (stage_lower == "mvp.concept" and full_artifact) else None,
             "design": state.design_state if (stage_lower == "mvp.design" and full_artifact) else None,
             "tech": state.tech_state if (stage_lower == "mvp.tech" and full_artifact) else None,
+            "deploy": state.deploy_state if (stage_lower == "deploy" and full_artifact) else None,
             "architecture": state.architecture_state if (stage_lower == "mvp.architecture" and full_artifact) else None,
             "plan": (
                 state.plan_state

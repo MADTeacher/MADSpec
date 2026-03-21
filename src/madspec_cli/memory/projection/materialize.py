@@ -10,6 +10,7 @@ from ..stages.architecture.state import render_data_model_markdown, render_opena
 from ..stages.concept.state import render_concept_markdown
 from ..stages.design.state import render_ui_design_markdown
 from ..stages.feature_plan.state import is_empty_plan_state as is_empty_feature_plan_state
+from ..stages.deploy.state import render_deployment_markdown
 from .context_loader import load_branch_projection_state, load_materialization_records
 from .materializers import feature as feature_materializer
 from .materializers import mvp as mvp_materializer
@@ -167,6 +168,22 @@ def consolidate_branch_memory(
             updated_at=state.generated_at,
         )
 
+    if "deployment" in scope.view_keys:
+        _write_generated(
+            state.paths.branch_dir / "deployment.md",
+            render_deployment_markdown(
+                state.deploy_state,
+                branch_name=branch_name,
+                project_name=state.concept_state.get("projectName", ""),
+            ),
+            generated,
+            artifacts,
+            project_path=project_path,
+            branch_name=branch_name,
+            stage="deploy",
+            updated_at=state.generated_at,
+        )
+
     if "data-model" in scope.view_keys:
         _write_generated(
             state.paths.branch_dir / "data-model.md",
@@ -205,6 +222,7 @@ def consolidate_branch_memory(
                 state.concept_state,
                 state.design_state,
                 state.tech_state,
+                state.deploy_state,
                 state.architecture_state,
                 state.plan_state,
                 state.feature_init_state,

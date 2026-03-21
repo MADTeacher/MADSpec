@@ -20,6 +20,11 @@ from ..stages.design.state import (
     render_ui_design_markdown,
     uncovered_design_features,
 )
+from ..stages.deploy.state import (
+    deploy_schema_errors,
+    load_deploy_state,
+    render_deployment_markdown,
+)
 from ..stages.feature_init.state import (
     load_feature_init_state,
     render_feature_architecture_markdown,
@@ -64,6 +69,7 @@ def validate_generated_stage_views(
     )
     design_state = load_design_state(paths.design_state)
     tech_state = load_tech_state(paths.tech_state)
+    deploy_state = load_deploy_state(paths.deploy_state)
     architecture_state = load_architecture_state(paths.architecture_state)
     plan_state = load_plan_state(paths.plan_state)
     feature_plan_state = load_feature_plan_state(paths.feature_plan_state)
@@ -124,6 +130,21 @@ def validate_generated_stage_views(
             errors.append("tech-stack.md is missing; rebuild generated views with `madspec memory consolidate`")
         elif tech_path.read_text(encoding="utf-8") != tech_text:
             errors.append("tech-stack.md is out of sync with memory/stages/mvp.tech.json")
+
+    if "deploy" in scope.stage_snapshot_keys:
+        deploy_state_raw = read_json(paths.deploy_state, None)
+        errors.extend(f"{paths.deploy_state.name}: {item}" for item in deploy_schema_errors(deploy_state_raw))
+    if "deployment" in scope.view_keys:
+        deployment_text = render_deployment_markdown(
+            deploy_state,
+            branch_name=branch_name,
+            project_name=concept_state.get("projectName", ""),
+        )
+        deployment_path = paths.branch_dir / "deployment.md"
+        if not deployment_path.exists():
+            errors.append("deployment.md is missing; rebuild generated views with `madspec memory consolidate`")
+        elif deployment_path.read_text(encoding="utf-8") != deployment_text:
+            errors.append("deployment.md is out of sync with memory/stages/deploy.json")
 
     if "mvp.architecture" in scope.stage_snapshot_keys:
         architecture_state_raw = read_json(paths.architecture_state, None)

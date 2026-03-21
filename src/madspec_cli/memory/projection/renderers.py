@@ -14,6 +14,7 @@ def render_project_context(
     concept_state: dict[str, Any],
     design_state: dict[str, Any],
     tech_state: dict[str, Any],
+    deploy_state: dict[str, Any],
     architecture_state: dict[str, Any],
     plan_state: dict[str, Any],
     feature_init_state: dict[str, Any] | None,
@@ -65,6 +66,7 @@ def render_project_context(
             f"- `.madspec/{branch_name}/memory/stages/mvp.concept.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.design.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.tech.json`",
+            f"- `.madspec/{branch_name}/memory/stages/deploy.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.architecture.json`",
             f"- `.madspec/{branch_name}/memory/stages/mvp.plan.json`",
             f"- `.madspec/{branch_name}/memory/stages/feature.init.json`",
@@ -79,6 +81,7 @@ def render_project_context(
             f"- `.madspec/{branch_name}/concept.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/ui-design.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/tech-stack.md` (generated from structured memory)",
+            f"- `.madspec/{branch_name}/deployment.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/architecture.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/data-model.md` (generated from structured memory)",
             f"- `.madspec/{branch_name}/contracts/openapi.yaml` (generated from structured memory)",
@@ -88,6 +91,7 @@ def render_project_context(
             f"- Concept checkpoint summary: `{concept_state.get('checkpointSummary') or 'N/A'}`",
             f"- Design checkpoint summary: `{design_state.get('checkpointSummary') or 'N/A'}`",
             f"- Tech checkpoint summary: `{tech_state.get('checkpointSummary') or 'N/A'}`",
+            f"- Deploy checkpoint summary: `{deploy_state.get('checkpointSummary') or 'N/A'}`",
             f"- Architecture checkpoint summary: `{architecture_state.get('checkpointSummary') or 'N/A'}`",
             f"- Plan checkpoint summary: `{plan_state.get('checkpointSummary') or 'N/A'}`",
             (
@@ -103,6 +107,10 @@ def render_project_context(
                 or "N/A"
             )
             + "`",
+            (
+                f"- Deployment inventory: `{len(deploy_state.get('environments', []))}` environments, "
+                f"`{len(deploy_state.get('deploymentUnits', []))}` deployment units"
+            ),
             (
                 f"- Architecture inventory: `{len(architecture_state.get('projectStructure', {}).get('directories', []))}` directories, "
                 f"`{len(architecture_state.get('dataModel', {}).get('entities', []))}` entities, "
@@ -250,6 +258,8 @@ def render_security_artifact(
     lines.extend(_render_gate_section("Gate Summary", gate_summary))
     lines.extend(format_record_lines(security_records))
     return "\n".join(lines) + "\n"
+
+
 
 
 def _render_change_context(change_context: dict[str, Any] | None) -> list[str]:

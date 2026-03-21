@@ -5,6 +5,7 @@ from .parsers import (
     parse_architecture_capture,
     parse_concept_capture,
     parse_design_capture,
+    parse_deploy_capture,
     parse_feature_init_capture,
     parse_tech_capture,
 )
@@ -61,6 +62,10 @@ def build_parsed_stage_bundle(inputs: CaptureInputs) -> ParsedStageBundle:
         alternatives=inputs.alternatives,
         code_organization=inputs.code_organization,
     )
+    deploy_parse = parse_deploy_capture(
+        environments=inputs.environments,
+        deployment_units=inputs.deployment_units,
+    )
     architecture_parse = parse_architecture_capture(
         project_structure=inputs.project_structure,
         directories=inputs.directories,
@@ -99,6 +104,9 @@ def build_parsed_stage_bundle(inputs: CaptureInputs) -> ParsedStageBundle:
         tech_alternative_updates=tech_parse.alternative_updates,
         tech_code_organization=tech_parse.code_organization,
         tech_errors=tech_parse.errors,
+        deploy_environment_updates=deploy_parse.environment_updates,
+        deploy_unit_updates=deploy_parse.deployment_unit_updates,
+        deploy_errors=deploy_parse.errors,
         architecture_project_structure=architecture_parse.project_structure,
         architecture_directory_updates=architecture_parse.directory_updates,
         architecture_entity_updates=architecture_parse.entity_updates,

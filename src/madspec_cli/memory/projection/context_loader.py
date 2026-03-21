@@ -10,6 +10,7 @@ from ..shared.system_store.sessions import load_runtime_session
 from ..stages.architecture.state import load_architecture_state
 from ..stages.concept.state import load_concept_state
 from ..stages.design.state import load_design_state
+from ..stages.deploy.state import load_deploy_state
 from ..stages.feature_init.state import is_empty_feature_init_state, load_feature_init_state
 from ..stages.feature_plan.state import load_feature_plan_state
 from ..stages.plan.state import load_plan_state
@@ -24,6 +25,7 @@ class BranchProjectionState:
     concept_state: dict[str, Any]
     design_state: dict[str, Any]
     tech_state: dict[str, Any]
+    deploy_state: dict[str, Any]
     architecture_state: dict[str, Any]
     plan_state: dict[str, Any]
     feature_init_state: dict[str, Any]
@@ -49,6 +51,7 @@ class RetrieveProjectionState:
     concept_state: dict[str, Any]
     design_state: dict[str, Any] | None
     tech_state: dict[str, Any] | None
+    deploy_state: dict[str, Any] | None
     architecture_state: dict[str, Any] | None
     plan_state: dict[str, Any] | None
     feature_init_state: dict[str, Any] | None
@@ -63,6 +66,7 @@ def load_branch_projection_state(project_path: Path, branch_name: str) -> Branch
     concept_state = canonical.snapshots.get("mvp.concept") or load_concept_state(paths.concept_state)
     design_state = canonical.snapshots.get("mvp.design") or load_design_state(paths.design_state)
     tech_state = canonical.snapshots.get("mvp.tech") or load_tech_state(paths.tech_state)
+    deploy_state = canonical.snapshots.get("deploy") or load_deploy_state(paths.deploy_state)
     architecture_state = canonical.snapshots.get("mvp.architecture") or load_architecture_state(paths.architecture_state)
     plan_state = canonical.snapshots.get("mvp.plan") or load_plan_state(paths.plan_state)
     feature_init_state = canonical.snapshots.get("feature.init") or load_feature_init_state(paths.feature_init_state)
@@ -76,6 +80,7 @@ def load_branch_projection_state(project_path: Path, branch_name: str) -> Branch
         concept_state=concept_state,
         design_state=design_state,
         tech_state=tech_state,
+        deploy_state=deploy_state,
         architecture_state=architecture_state,
         plan_state=plan_state,
         feature_init_state=feature_init_state,
@@ -142,6 +147,7 @@ def load_retrieve_projection_state(
         concept_state=canonical.snapshots.get("mvp.concept") or load_concept_state(paths.concept_state),
         design_state=(canonical.snapshots.get("mvp.design") or load_design_state(paths.design_state)) if stage_lower == "mvp.design" else None,
         tech_state=(canonical.snapshots.get("mvp.tech") or load_tech_state(paths.tech_state)) if stage_lower == "mvp.tech" else None,
+        deploy_state=(canonical.snapshots.get("deploy") or load_deploy_state(paths.deploy_state)) if stage_lower == "deploy" else None,
         architecture_state=(canonical.snapshots.get("mvp.architecture") or load_architecture_state(paths.architecture_state)) if stage_lower == "mvp.architecture" else None,
         plan_state=(canonical.snapshots.get("mvp.plan") or load_plan_state(paths.plan_state)) if stage_lower == "mvp.plan" else None,
         feature_init_state=(canonical.snapshots.get("feature.init") or load_feature_init_state(paths.feature_init_state)) if stage_lower == "feature.init" else None,

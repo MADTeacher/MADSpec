@@ -40,6 +40,7 @@ def sync_branch_memory_to_store(project_path: Path, branch_name: str) -> None:
         ("mvp.concept", paths.concept_state),
         ("mvp.design", paths.design_state),
         ("mvp.tech", paths.tech_state),
+        ("deploy", paths.deploy_state),
         ("mvp.architecture", paths.architecture_state),
         ("mvp.plan", paths.plan_state),
         ("feature.init", paths.feature_init_state),
@@ -124,6 +125,13 @@ def sync_json_path_to_store(path: Path, data: Any) -> None:
         store.upsert_stage_snapshot(
             branch=branch_name,
             snapshot_key="mvp.tech",
+            payload=data,
+            source_path=str(path.relative_to(project_path)),
+        )
+    elif rel == "memory/stages/deploy.json":
+        store.upsert_stage_snapshot(
+            branch=branch_name,
+            snapshot_key="deploy",
             payload=data,
             source_path=str(path.relative_to(project_path)),
         )

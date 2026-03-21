@@ -47,7 +47,7 @@ $ARGUMENTS
 - Должен существовать реализованный код проекта или заметный набор изменений
 - Должен быть доступен branch context через `madspec git current-branch`
 - Желательно наличие `.madspec/<BRANCH>/tech-stack.md` и `.madspec/<BRANCH>/architecture.md`, но их отсутствие не должно автоматически блокировать аудит
-- Если есть `.madspec/<BRANCH>/deployment.md`, его нужно учитывать
+- Если есть `.madspec/<BRANCH>/deployment.md`, учитывай его как официальный производный артефакт этапа `deploy`
 - Если кода нет, предложи сначала завершить `madspec.mvp.implement` или `madspec.feature.implement`
 
 ## Цель команды
@@ -67,7 +67,7 @@ $ARGUMENTS
 
 - `--scope` - определяет глубину и фокус проверки:
   - `default` (по умолчанию) - code + dependencies + architecture risks + обработка ПД
-  - `release` - расширенная проверка перед релизом: code + dependencies + architecture + deployment context + observability + data handling
+  - `release` - расширенная проверка перед релизом: code + dependencies + architecture + план развертывания + observability + data handling
   - `privacy` - только риски обработки и защиты персональных данных по 152-ФЗ
   - `deep` - углубленный аудит по всем доступным направлениям с более широким поиском рисков
   - Можно комбинировать: `--scope default,privacy`
@@ -112,12 +112,12 @@ $ARGUMENTS
    - Используй generated views для навигации, а structured memory и runtime state как источник истины
 
 3. **Определи ограничения анализа**
-   - Проверь, есть ли код, тесты, dependency manifests и deployment context
+   - Проверь, есть ли код, тесты, dependency manifests и зафиксированный план развертывания
    - Если чего-то не хватает:
      - не останавливай аудит автоматически
      - явно зафиксируй limitation в findings
-   - Если есть `deployment.md`, учитывай secrets, CI/CD, environment separation, observability и rollout risks
-   - Если `deployment.md` нет, зафиксируй отсутствие deployment context как ограничение анализа
+   - Если есть `deployment.md`, учитывай secrets, CI/CD, разделение окружений, observability и риски выката
+   - Если `deployment.md` нет, зафиксируй отсутствие плана развертывания как ограничение анализа
 
 4. **Проведи аудит по стек-зависимым категориям**
 
@@ -201,7 +201,7 @@ $ARGUMENTS
 - исправить критичные и high severity проблемы
 - обновить уязвимые зависимости
 - устранить gaps по защите персональных данных
-- доработать deployment context, secrets handling и observability
+- доработать план развертывания, работу с секретами и наблюдаемость
 - повторить аудит после исправлений
 
 ---

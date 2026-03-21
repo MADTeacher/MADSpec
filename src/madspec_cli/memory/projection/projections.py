@@ -8,6 +8,7 @@ from ..domain.progress import select_next_executable_step
 from ..stages.architecture.state import architecture_completeness_errors
 from ..stages.concept.state import concept_completeness_errors
 from ..stages.design.state import design_completeness_errors, missing_prototype_files, uncovered_design_features
+from ..stages.deploy.state import deploy_completeness_errors
 from ..stages.feature_init.state import feature_init_completeness_errors
 from ..stages.feature_plan.state import feature_plan_completeness_errors
 from ..stages.tech.state import tech_completeness_errors
@@ -232,6 +233,78 @@ def build_tech_status(tech_state: dict[str, Any]) -> dict[str, Any]:
         "revision": tech_state.get("revision", 0),
         "ratified_at": tech_state.get("ratifiedAt"),
         "updated_at": tech_state.get("updatedAt"),
+    }
+
+
+def _deploy_missing_required_fields(deploy_state: dict[str, Any]) -> list[str]:
+    error_map = {
+        "deploy state must include a deployment overview before checkpoint": "deployOverview",
+        "deploy state must include at least one deployment goal before checkpoint": "goals",
+        "deploy state must include at least one environment before checkpoint": "environments",
+        "deploy state must include at least one deployment unit before checkpoint": "deploymentUnits",
+        "deploy state must include a release strategy before checkpoint": "releaseStrategy",
+        "deploy state must include a rollback strategy before checkpoint": "rollbackStrategy",
+    }
+    missing: list[str] = []
+    for error in deploy_completeness_errors(deploy_state):
+        field_name = error_map.get(error)
+        if field_name and field_name not in missing:
+            missing.append(field_name)
+    return missing
+
+
+def _deploy_filled_fields(deploy_state: dict[str, Any]) -> list[str]:
+    field_checks = (
+        ("deployOverview", bool(deploy_state.get("deployOverview"))),
+        ("goals", bool(deploy_state.get("goals"))),
+        ("environments", bool(deploy_state.get("environments"))),
+        ("deploymentUnits", bool(deploy_state.get("deploymentUnits"))),
+        ("configNotes", bool(deploy_state.get("configNotes"))),
+        ("secretNotes", bool(deploy_state.get("secretNotes"))),
+        ("cicdTriggers", bool(deploy_state.get("cicdTriggers"))),
+        ("cicdSteps", bool(deploy_state.get("cicdSteps"))),
+        ("releaseArtifacts", bool(deploy_state.get("releaseArtifacts"))),
+        ("migrationNotes", bool(deploy_state.get("migrationNotes"))),
+        ("backupNotes", bool(deploy_state.get("backupNotes"))),
+        ("recoveryChecks", bool(deploy_state.get("recoveryChecks"))),
+        ("observabilityNotes", bool(deploy_state.get("observabilityNotes"))),
+        ("securityControls", bool(deploy_state.get("securityControls"))),
+        ("constraints", bool(deploy_state.get("constraints"))),
+        ("releaseStrategy", bool(deploy_state.get("releaseStrategy"))),
+        ("rollbackStrategy", bool(deploy_state.get("rollbackStrategy"))),
+        ("nextActions", bool(deploy_state.get("nextActions"))),
+        ("checkpointSummary", bool(deploy_state.get("checkpointSummary"))),
+    )
+    return [field_name for field_name, is_filled in field_checks if is_filled]
+
+
+def build_deploy_status(deploy_state: dict[str, Any]) -> dict[str, Any]:
+    missing_required_fields = _deploy_missing_required_fields(deploy_state)
+    return {
+        "is_complete": not missing_required_fields,
+        "missing_required_fields": missing_required_fields,
+        "filled_fields": _deploy_filled_fields(deploy_state),
+        "counts": {
+            "goals": len(deploy_state.get("goals", [])),
+            "environments": len(deploy_state.get("environments", [])),
+            "deployment_units": len(deploy_state.get("deploymentUnits", [])),
+            "config_notes": len(deploy_state.get("configNotes", [])),
+            "secret_notes": len(deploy_state.get("secretNotes", [])),
+            "cicd_triggers": len(deploy_state.get("cicdTriggers", [])),
+            "cicd_steps": len(deploy_state.get("cicdSteps", [])),
+            "release_artifacts": len(deploy_state.get("releaseArtifacts", [])),
+            "migration_notes": len(deploy_state.get("migrationNotes", [])),
+            "backup_notes": len(deploy_state.get("backupNotes", [])),
+            "recovery_checks": len(deploy_state.get("recoveryChecks", [])),
+            "observability_notes": len(deploy_state.get("observabilityNotes", [])),
+            "security_controls": len(deploy_state.get("securityControls", [])),
+            "constraints": len(deploy_state.get("constraints", [])),
+            "next_actions": len(deploy_state.get("nextActions", [])),
+        },
+        "last_checkpoint_summary": deploy_state.get("checkpointSummary") or None,
+        "revision": deploy_state.get("revision", 0),
+        "ratified_at": deploy_state.get("ratifiedAt"),
+        "updated_at": deploy_state.get("updatedAt"),
     }
 
 

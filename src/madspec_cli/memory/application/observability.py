@@ -14,6 +14,7 @@ _SNAPSHOT_KEY_TO_PATH = {
     "mvp.concept": "concept_state",
     "mvp.design": "design_state",
     "mvp.tech": "tech_state",
+    "deploy": "deploy_state",
     "mvp.architecture": "architecture_state",
     "mvp.plan": "plan_state",
     "feature.init": "feature_init_state",

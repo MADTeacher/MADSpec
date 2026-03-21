@@ -9,6 +9,7 @@ from ..storage import _default_progress_state, get_memory_paths
 from ...stages.architecture.state import default_architecture_state
 from ...stages.concept.state import default_concept_state
 from ...stages.design.state import default_design_state
+from ...stages.deploy.state import default_deploy_state
 from ...stages.feature_init.state import default_feature_init_state
 from ...stages.plan.state import default_plan_state
 from ...stages.tech.state import default_tech_state
@@ -33,6 +34,7 @@ _SNAPSHOT_SPECS: tuple[tuple[str, str], ...] = (
     ("mvp.concept", "concept_state"),
     ("mvp.design", "design_state"),
     ("mvp.tech", "tech_state"),
+    ("deploy", "deploy_state"),
     ("mvp.architecture", "architecture_state"),
     ("mvp.plan", "plan_state"),
     ("feature.init", "feature_init_state"),
@@ -44,6 +46,7 @@ _SNAPSHOT_DEFAULTS = {
     "mvp.concept": default_concept_state,
     "mvp.design": default_design_state,
     "mvp.tech": default_tech_state,
+    "deploy": default_deploy_state,
     "mvp.architecture": default_architecture_state,
     "mvp.plan": default_plan_state,
     "feature.init": default_feature_init_state,
@@ -153,6 +156,7 @@ def build_runtime_snapshot_specs(project_path: Path, branch_name: str, snapshots
         "mvp.concept": paths.concept_state,
         "mvp.design": paths.design_state,
         "mvp.tech": paths.tech_state,
+        "deploy": paths.deploy_state,
         "mvp.architecture": paths.architecture_state,
         "mvp.plan": paths.plan_state,
         "feature.init": paths.feature_init_state,

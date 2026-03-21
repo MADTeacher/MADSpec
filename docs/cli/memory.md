@@ -168,7 +168,7 @@ madspec memory work-items create --task-id <task> --subagent-id developer --depe
 
 Для разных фаз MADSpec использует разные наборы команд:
 
-- неитеративные стадии вроде `mvp.concept`, `mvp.design`, `mvp.tech`, `mvp.architecture`, `mvp.plan`, `feature.init`, `feature.plan`, `review` и `security` используют `retrieve`, `capture` и `checkpoint`
+- неитеративные стадии вроде `mvp.concept`, `mvp.design`, `mvp.tech`, `deploy`, `mvp.architecture`, `mvp.plan`, `feature.init`, `feature.plan`, `review` и `security` используют `retrieve`, `capture` и `checkpoint`
 - Процесс планирования использует `next-step` и `register-step` для поддержки каталога шагов и состояния покрытия
 - Процесс реализации использует `start-step`, `checkpoint-step` и `complete-step` для управления текущим состоянием шага и TDD-доказательствами
 - `consolidate` и `validate` поддерживают синхронность производных файлов и основных записей
@@ -523,7 +523,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 Из этого следуют два правила чтения:
 
-- Для `mvp.concept`, `mvp.design`, `mvp.tech`, `mvp.architecture`, `mvp.plan`, `feature.init` и `feature.plan` история по умолчанию не подмешивается в `retrieve`; используйте `--include-history`, если нужен `episodes` и `decision_log`.
+- Для `mvp.concept`, `mvp.design`, `mvp.tech`, `deploy`, `mvp.architecture`, `mvp.plan`, `feature.init` и `feature.plan` история по умолчанию не подмешивается в `retrieve`; используйте `--include-history`, если нужен `episodes` и `decision_log`.
 - Для стадий реализации, `review` и `security` история обычно важна для продолжения работы, поэтому `retrieve` включает ее автоматически.
 - `retrieve` всегда может дополнительно собрать найденный контекст: точный и полнотекстовый поиск из `SQLite` и семантический поиск из векторного индекса, если сработали триггеры или передан `--query`
 

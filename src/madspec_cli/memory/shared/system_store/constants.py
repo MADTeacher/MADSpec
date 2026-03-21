@@ -10,6 +10,7 @@ ARTIFACT_STAGE_HINTS = {
     "concept.md": "mvp.concept",
     "ui-design.md": "mvp.design",
     "tech-stack.md": "mvp.tech",
+    "deployment.md": "deploy",
     "architecture.md": "mvp.architecture",
     "data-model.md": "mvp.architecture",
     "openapi.yaml": "mvp.architecture",

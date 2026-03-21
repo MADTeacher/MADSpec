@@ -30,6 +30,11 @@ from ..stages.design.state import (
     parse_screen_value,
     parse_zone_value,
 )
+from ..stages.deploy.state import (
+    DEPLOY_STAGE,
+    parse_deployment_unit_value,
+    parse_environment_value,
+)
 from ..stages.feature_init.state import (
     FEATURE_INIT_STAGE,
     parse_dependency_value,
@@ -76,6 +81,13 @@ class TechCaptureParse:
     library_updates: list[dict[str, str]]
     alternative_updates: list[dict[str, str]]
     code_organization: dict[str, str] | None
+    errors: list[str]
+
+
+@dataclass(frozen=True)
+class DeployCaptureParse:
+    environment_updates: list[dict[str, str]]
+    deployment_unit_updates: list[dict[str, str]]
     errors: list[str]
 
 
@@ -338,6 +350,39 @@ def parse_tech_capture(
     )
 
 
+def parse_deploy_capture(
+    *,
+    environments: list[str] | None,
+    deployment_units: list[str] | None,
+) -> DeployCaptureParse:
+    environment_updates: list[dict[str, str]] = []
+    deployment_unit_updates: list[dict[str, str]] = []
+    errors: list[str] = []
+
+    for value in normalize_text_list(environments):
+        parsed = parse_environment_value(value)
+        if parsed is None:
+            errors.append(f"environment must use '<name>::<purpose>::<notes>' format: {value}")
+            continue
+        environment_updates.append(parsed)
+
+    for value in normalize_text_list(deployment_units):
+        parsed = parse_deployment_unit_value(value)
+        if parsed is None:
+            errors.append(
+                "deployment-unit must use '<name>::<kind>::<runtime>::<notes>' format: "
+                f"{value}"
+            )
+            continue
+        deployment_unit_updates.append(parsed)
+
+    return DeployCaptureParse(
+        environment_updates=environment_updates,
+        deployment_unit_updates=deployment_unit_updates,
+        errors=errors,
+    )
+
+
 def parse_architecture_capture(
     *,
     project_structure: str | None,
@@ -528,6 +573,22 @@ def validate_capture_scope(
     normalized_performance_notes: list[str],
     normalized_plan_overview: str,
     normalized_planning_principles: list[str],
+    normalized_deploy_overview: str,
+    normalized_deploy_goals: list[str],
+    deploy_environment_updates: list[dict[str, str]],
+    deploy_unit_updates: list[dict[str, str]],
+    normalized_config_notes: list[str],
+    normalized_secret_notes: list[str],
+    normalized_cicd_triggers: list[str],
+    normalized_cicd_steps: list[str],
+    normalized_release_artifacts: list[str],
+    normalized_migration_notes: list[str],
+    normalized_backup_notes: list[str],
+    normalized_recovery_checks: list[str],
+    normalized_observability_notes: list[str],
+    normalized_security_controls: list[str],
+    normalized_release_strategy: str,
+    normalized_rollback_strategy: str,
     normalized_next_actions: list[str],
     normalized_feature_goal: str,
     normalized_problem: str,
@@ -607,6 +668,26 @@ def validate_capture_scope(
         ]
     )
     used_plan_fields = any([normalized_plan_overview, normalized_planning_principles])
+    used_deploy_fields = any(
+        [
+            normalized_deploy_overview,
+            normalized_deploy_goals,
+            deploy_environment_updates,
+            deploy_unit_updates,
+            normalized_config_notes,
+            normalized_secret_notes,
+            normalized_cicd_triggers,
+            normalized_cicd_steps,
+            normalized_release_artifacts,
+            normalized_migration_notes,
+            normalized_backup_notes,
+            normalized_recovery_checks,
+            normalized_observability_notes,
+            normalized_security_controls,
+            normalized_release_strategy,
+            normalized_rollback_strategy,
+        ]
+    )
     used_shared_project_type = bool(normalized_project_type)
     used_feature_init_fields = any(
         [
@@ -641,6 +722,8 @@ def validate_capture_scope(
         return ["feature-init-specific capture options are only supported for stage feature.init"]
     if used_plan_fields and normalized_stage not in {PLAN_STAGE, FEATURE_PLAN_STAGE}:
         return ["plan-specific capture options are only supported for stages mvp.plan and feature.plan"]
-    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE, ARCHITECTURE_STAGE, PLAN_STAGE, FEATURE_INIT_STAGE, FEATURE_PLAN_STAGE}:
-        return ["--next-action is only supported for stages mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, and feature.plan"]
+    if used_deploy_fields and normalized_stage != DEPLOY_STAGE:
+        return ["deploy-specific capture options are only supported for stage deploy"]
+    if normalized_next_actions and normalized_stage not in {CONCEPT_STAGE, DESIGN_STAGE, TECH_STAGE, DEPLOY_STAGE, ARCHITECTURE_STAGE, PLAN_STAGE, FEATURE_INIT_STAGE, FEATURE_PLAN_STAGE}:
+        return ["--next-action is only supported for stages mvp.concept, mvp.design, mvp.tech, deploy, mvp.architecture, mvp.plan, feature.init, and feature.plan"]
     return []

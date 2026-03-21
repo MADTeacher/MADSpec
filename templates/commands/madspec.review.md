@@ -91,7 +91,7 @@ $ARGUMENTS
      - `.madspec/<BRANCH>/ui-design.md`
      - `.madspec/<BRANCH>/tech-stack.md`
      - `.madspec/<BRANCH>/architecture.md`
-     - `.madspec/<BRANCH>/deployment.md`
+     - `.madspec/<BRANCH>/deployment.md` как официальный производный артефакт этапа `deploy`
      - `.madspec/<BRANCH>/review.md`
      - `.madspec/<BRANCH>/improvements.md`
    - Если часть файлов отсутствует, не останавливай review. Зафиксируй это как limitation.
@@ -114,7 +114,7 @@ $ARGUMENTS
 
    **C. Архитектурные и интеграционные последствия**
    - Проверь, соответствует ли реализация ожидаемой архитектуре и структуре модулей
-   - Оцени влияние изменений на контракты, данные, зависимости, deployment context и observability
+   - Оцени влияние изменений на контракты, данные, зависимости, зафиксированный план развертывания и наблюдаемость
    - Если интерфейс или пользовательский поток изменились, проверь, не устарели ли связанные design/generated artifacts
 
    **D. Improvement backlog**

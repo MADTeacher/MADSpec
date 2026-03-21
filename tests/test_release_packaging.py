@@ -200,6 +200,18 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert ".madspec/<BRANCH>/memory/stages/feature.plan.json" in feature_plan_body
         assert "generated views" in feature_plan_body
 
+        deploy_command = next(
+            name
+            for name in names
+            if name.endswith("madspec.deploy.md") or name.endswith("madspec.deploy.agent.md")
+        )
+        deploy_body = zf.read(deploy_command).decode("utf-8")
+        assert "madspec memory retrieve --stage deploy --toon-output" in deploy_body
+        assert "madspec memory capture --stage deploy" in deploy_body
+        assert "madspec memory checkpoint --stage deploy" in deploy_body
+        assert "madspec-cli-operator" in deploy_body
+        assert "План развертывания" in deploy_body or "развертывания" in deploy_body
+
         feature_implement_command = next(
             name
             for name in names

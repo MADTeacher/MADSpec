@@ -41,7 +41,7 @@ CHECKPOINT_FROM_FILE_ALLOWED_KEYS = {
 
 def memory_checkpoint(
     from_file: str = typer.Option(None, "--from-file", help="Path to JSON file with all arguments (bypasses command-line length limits)"),
-    stage: str = typer.Option(None, "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
+    stage: str = typer.Option(None, "--stage", help="Checkpoint stage: mvp.concept, mvp.design, mvp.tech, deploy, mvp.architecture, mvp.plan, feature.init, feature.plan, review, or security"),
     session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     expected_revision: int | None = typer.Option(None, "--expected-revision", help="Expected branch runtime revision for optimistic concurrency"),
     summary: str = typer.Option(None, "--summary", help="Stage checkpoint summary"),

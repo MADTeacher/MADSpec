@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..stages.deploy.state import DEPLOY_STAGE
 from ..stages.feature_init.state import FEATURE_INIT_STAGE
 from .capture_models import CaptureInputs, ParsedStageBundle, PreparedCapture
 from .parsers import validate_capture_scope
@@ -16,6 +17,7 @@ def prepare_capture(
     parsed: ParsedStageBundle,
 ) -> PreparedCapture | dict[str, Any]:
     _enrich_feature_init(inputs, parsed)
+    _enrich_deploy(inputs, parsed)
 
     scope_errors = validate_capture_scope(
         normalized_stage=inputs.stage,
@@ -65,6 +67,22 @@ def prepare_capture(
         normalized_performance_notes=inputs.performance_notes,
         normalized_plan_overview=inputs.plan_overview,
         normalized_planning_principles=inputs.planning_principles,
+        normalized_deploy_overview=inputs.deploy_overview,
+        normalized_deploy_goals=inputs.deploy_goals,
+        deploy_environment_updates=parsed.deploy_environment_updates,
+        deploy_unit_updates=parsed.deploy_unit_updates,
+        normalized_config_notes=inputs.config_notes,
+        normalized_secret_notes=inputs.secret_notes,
+        normalized_cicd_triggers=inputs.cicd_triggers,
+        normalized_cicd_steps=inputs.cicd_steps,
+        normalized_release_artifacts=inputs.release_artifacts,
+        normalized_migration_notes=inputs.migration_notes,
+        normalized_backup_notes=inputs.backup_notes,
+        normalized_recovery_checks=inputs.recovery_checks,
+        normalized_observability_notes=inputs.observability_notes,
+        normalized_security_controls=inputs.security_controls,
+        normalized_release_strategy=inputs.release_strategy,
+        normalized_rollback_strategy=inputs.rollback_strategy,
         normalized_next_actions=inputs.next_actions,
         normalized_feature_goal=inputs.feature_goal,
         normalized_problem=inputs.problem,
@@ -90,6 +108,7 @@ def prepare_capture(
         parsed.feature_init_errors,
         parsed.design_errors,
         parsed.tech_errors,
+        parsed.deploy_errors,
         parsed.architecture_errors,
     ):
         if errors:
@@ -188,6 +207,39 @@ def _enrich_feature_init(inputs: CaptureInputs, parsed: ParsedStageBundle) -> No
         inputs.contracts,
         inputs.interface_contracts
         + [f"{item['scope']} {item['name']}: {item['description']}" for item in parsed.feature_dependencies],
+    )
+
+
+def _enrich_deploy(inputs: CaptureInputs, parsed: ParsedStageBundle) -> None:
+    if inputs.stage != DEPLOY_STAGE:
+        return
+    inputs.facts = append_unique(
+        inputs.facts,
+        ([f"Обзор развертывания: {inputs.deploy_overview}"] if inputs.deploy_overview else [])
+        + [f"Цель развертывания: {item}" for item in inputs.deploy_goals]
+        + [
+            f"Окружение {item['name']}: {item['purpose']} — {item['notes']}"
+            for item in parsed.deploy_environment_updates
+        ]
+        + [f"Конфигурация: {item}" for item in inputs.config_notes]
+        + [f"Секреты: {item}" for item in inputs.secret_notes]
+        + [f"Миграции: {item}" for item in inputs.migration_notes]
+        + [f"Резервное копирование: {item}" for item in inputs.backup_notes]
+        + [f"Проверка восстановления: {item}" for item in inputs.recovery_checks]
+        + [f"Наблюдаемость: {item}" for item in inputs.observability_notes]
+        + [f"Контроль безопасности: {item}" for item in inputs.security_controls],
+    )
+    inputs.decisions = append_unique(
+        inputs.decisions,
+        [
+            f"Единица развертывания {item['name']}: {item['kind']} / {item['runtime']} — {item['notes']}"
+            for item in parsed.deploy_unit_updates
+        ]
+        + [f"Триггер CI/CD: {item}" for item in inputs.cicd_triggers]
+        + [f"Шаг CI/CD: {item}" for item in inputs.cicd_steps]
+        + [f"Артефакт релиза: {item}" for item in inputs.release_artifacts]
+        + ([f"Стратегия релиза: {inputs.release_strategy}"] if inputs.release_strategy else [])
+        + ([f"Стратегия отката: {inputs.rollback_strategy}"] if inputs.rollback_strategy else []),
     )
 
 

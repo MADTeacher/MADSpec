@@ -47,6 +47,7 @@
 - `madspec memory next-step --stage feature.plan --candidate-step ...`
 - `madspec memory register-step --stage feature.plan ...`
 - `madspec memory checkpoint --stage feature.plan --summary ...`
+- `.madspec/<BRANCH>/deployment.md`, если этот файл существует
 
 Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`, чтобы feature-план не расходился с действующими общепроектными правилами.
 
@@ -55,12 +56,13 @@
 1. Агент читает `feature.init_status` и `feature_plan_status`.
    Первый вход в стадию лениво материализует `feature.plan.json`, `implementation-plan.md`, `planning-context-cache.md` и `project-context.md`, если их еще нет.
 2. Агент читает `policy_context` и учитывает действующие правила при выборе `stepKind`, `tddPolicy` и зависимостей.
-3. Определяет максимально крупный безопасный шаг для текущей feature-итерации.
-4. Фиксирует стратегию планирования для feature.
-5. Проверяет candidate step через `next-step`.
-6. Регистрирует шаг через `register-step`, связывая `covers` с feature IDs.
-7. Система обновляет `feature.plan.json`, `progress.json` и производные представления плана.
-8. `checkpoint` ратифицирует feature-план.
+3. Если существует `deployment.md`, агент учитывает требования к окружениям, конфигурации, секретам, миграциям, наблюдаемости и откату.
+4. Определяет максимально крупный безопасный шаг для текущей feature-итерации.
+5. Фиксирует стратегию планирования для feature.
+6. Проверяет candidate step через `next-step`.
+7. Регистрирует шаг через `register-step`, связывая `covers` с feature IDs.
+8. Система обновляет `feature.plan.json`, `progress.json` и производные представления плана.
+9. `checkpoint` ратифицирует feature-план.
 
 ## Правила гранулярности шага
 
@@ -165,6 +167,7 @@ flowchart LR
 ## Соседние команды и передача дальше
 
 - предыдущая команда: [`madspec.feature.init`](./madspec.feature.init.md)
+- связанная дополнительная команда: [`madspec.deploy`](../other/madspec.deploy.md)
 - следующая команда: [`madspec.feature.implement`](./madspec.feature.implement.md)
 
 ## Что не является источником истины

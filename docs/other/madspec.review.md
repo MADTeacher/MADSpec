@@ -34,6 +34,7 @@
 - `.madspec/<BRANCH>/review.md`
 - `.madspec/<BRANCH>/improvements.md`
 - `.madspec/<BRANCH>/project-context.md`
+- `.madspec/<BRANCH>/deployment.md` как официальный производный артефакт этапа `deploy`, если он существует
 
 ## Входы команды
 

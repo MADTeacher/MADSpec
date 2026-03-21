@@ -15,7 +15,7 @@ $ARGUMENTS
 ## Обязательный skill `madspec-cli-operator`
 
 - Перед началом работы обязательно найди и прочитай skill `madspec-cli-operator`.
-- Дальше работай, опираясь на `madspec-cli-operator` как на базовый operational layer для workflow `madspec.*`, branch-aware артефактов `.madspec/` и команд MADSpec CLI.
+- Дальше работай, опираясь на `madspec-cli-operator` как на базовый операционный навык для команд `madspec.*`, артефактов `.madspec/`, привязанных к ветке, и MADSpec CLI.
 
 ## Structured Memory First
 
@@ -64,6 +64,7 @@ $ARGUMENTS
    - `.madspec/<BRANCH>/feature-context.md`
    - `.madspec/<BRANCH>/tech-stack.md`
    - `.madspec/<BRANCH>/architecture.md`
+   - Если существует `.madspec/<BRANCH>/deployment.md` — обязательно прочитай его и учти ограничения развертывания для шагов, тестов и проверки результата
 4. Если стратегия ещё не зафиксирована, добавь её через `madspec memory capture --stage feature.plan --plan-overview ... --planning-principle ... --next-action ...`.
 5. Выбери следующий шаг:
    - покрывает хотя бы одну функцию из `feature.init` catalog;
@@ -89,6 +90,7 @@ $ARGUMENTS
 - Не редактируй `implementation-plan.md`, `planning-context-cache.md`, `planning-context.md` и `project-context.md` вручную как primary source.
 - Для `code` шага TDD policy всегда `required`.
 - Для feature coverage используй IDs из `feature.init.json`, а не свободные текстовые labels.
+- Если существует `deployment.md`, учитывай требования к конфигурации, секретам, миграциям, наблюдаемости и откату при составлении шага и его проверки.
 
 ## Что считается результатом
 

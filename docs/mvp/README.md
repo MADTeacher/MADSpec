@@ -10,8 +10,9 @@
 2. [`mvp.design`](madspec.mvp.design.md)
 3. [`mvp.tech`](madspec.mvp.tech.md)
 4. [`mvp.architecture`](madspec.mvp.architecture.md)
-5. [`mvp.plan`](madspec.mvp.plan.md)
-6. [`mvp.implement`](madspec.mvp.implement.md)
+5. [`deploy`](../other/madspec.deploy.md) — рекомендуемый этап, если ограничения развертывания важны до планирования
+6. [`mvp.plan`](madspec.mvp.plan.md)
+7. [`mvp.implement`](madspec.mvp.implement.md)
 
 ## Общие состояния стадий и артефакты
 
@@ -19,6 +20,7 @@
 - `mvp.design` — `.madspec/<BRANCH>/memory/stages/mvp.design.json`, производные `ui-design.md`, `ui-prototype/*`, где `index.html` — точка входа приложения
 - `mvp.tech` — `.madspec/<BRANCH>/memory/stages/mvp.tech.json`, производный `tech-stack.md`
 - `mvp.architecture` — `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`, производные `architecture.md`, `data-model.md`, `contracts/openapi.yaml`
+- `deploy` — `.madspec/<BRANCH>/memory/stages/deploy.json`, производный `deployment.md`
 - `mvp.plan` — `.madspec/<BRANCH>/memory/stages/mvp.plan.json` + `.madspec/<BRANCH>/memory/progress.json`, производные `implementation-plan.md`, `planning-context-cache.md`, `steps/*/planning-context.md`
 - `mvp.implement` — текущее состояние выполнения в `progress.json` и `working/active-session.json`, производные `implementation-context.md`, `project-context.md`
 
@@ -26,5 +28,6 @@
 
 - `design` зависит от покрываемых функций из `concept`
 - `architecture` зависит от экранов и покрытия данных из `design`
+- `deploy` при необходимости уточняет ограничения развертывания до начала детального планирования
 - `plan` зависит от состояния архитектуры и синхронизации `progress`
 - `implement` зависит от каталога шагов и графа зависимостей из `plan`

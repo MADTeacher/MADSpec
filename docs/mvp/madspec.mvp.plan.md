@@ -9,6 +9,7 @@
 ## Когда запускать
 
 - после `mvp.architecture`
+- после `madspec.deploy`, если для ветки уже зафиксирован план развертывания
 - каждый раз, когда нужно добавить или уточнить шаги реализации
 - до начала `mvp.implement`
 
@@ -48,12 +49,13 @@
 - `madspec memory next-step --stage mvp.plan --candidate-step ...`
 - `madspec memory register-step --stage mvp.plan ...`
 - `madspec memory checkpoint --stage mvp.plan --summary ...`
+- `.madspec/<BRANCH>/deployment.md`, если этот файл существует
 
 Из `retrieve` агент обязан прочитать `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`, потому что решения по планированию теперь проходят через общий проектный слой правил.
 
 ## Пошаговый процесс выполнения
 
-1. Агент читает `mvp.architecture` и затем `plan_status`.
+1. Агент читает `mvp.architecture`, при наличии `deployment.md`, а затем `plan_status`.
 2. Агент читает `policy_context` и сверяет новый шаг с действующими правилами текущей стадии.
 3. Определяет максимально крупный безопасный шаг для текущей итерации.
 4. Фиксирует стратегию планирования через `capture`.
@@ -62,6 +64,7 @@
 7. Система обновляет `mvp.plan.json`, `progress.json`, метаданные шагов, граф зависимостей и метрики прогресса.
 8. После серии изменений агент ратифицирует стадию через `checkpoint`.
 9. Для UI-шагов агент явно фиксирует в step artifacts конкретные screen-прототипы, flow и входной экран, которые задают acceptance contract.
+10. Если существует `deployment.md`, агент учитывает требования к конфигурации, секретам, миграциям, наблюдаемости и откату в шагах, тестах и проверке результата.
 
 ## Правила гранулярности шага
 
@@ -181,6 +184,7 @@ flowchart LR
 ## Соседние команды и передача дальше
 
 - предыдущая команда: [`madspec.mvp.architecture`](./madspec.mvp.architecture.md)
+- связанная дополнительная команда: [`madspec.deploy`](../other/madspec.deploy.md)
 - следующая команда: [`madspec.mvp.implement`](./madspec.mvp.implement.md)
 
 ## Что не является источником истины

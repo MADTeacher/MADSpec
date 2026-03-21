@@ -70,6 +70,22 @@ class CaptureInputs:
     performance_notes: list[str]
     plan_overview: str
     planning_principles: list[str]
+    deploy_overview: str
+    deploy_goals: list[str]
+    environments: list[str]
+    deployment_units: list[str]
+    config_notes: list[str]
+    secret_notes: list[str]
+    cicd_triggers: list[str]
+    cicd_steps: list[str]
+    release_artifacts: list[str]
+    migration_notes: list[str]
+    backup_notes: list[str]
+    recovery_checks: list[str]
+    observability_notes: list[str]
+    security_controls: list[str]
+    release_strategy: str
+    rollback_strategy: str
     feature_goal: str
     problem: str
     expected_outcome: str
@@ -108,6 +124,9 @@ class ParsedStageBundle:
     tech_alternative_updates: list[dict[str, str]]
     tech_code_organization: dict[str, str] | None
     tech_errors: list[str]
+    deploy_environment_updates: list[dict[str, str]]
+    deploy_unit_updates: list[dict[str, str]]
+    deploy_errors: list[str]
     architecture_project_structure: dict[str, str] | None
     architecture_directory_updates: list[dict[str, str]]
     architecture_entity_updates: list[dict[str, str]]

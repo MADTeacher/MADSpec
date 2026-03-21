@@ -97,3 +97,52 @@ def test_retrieve_review_context_keeps_policy_context_and_history(memory_project
     assert "required" in payload["policy_context"]
     assert payload["decision_log"]
     assert payload["artifact_state"]["policy"] is not None
+
+
+def test_deploy_stage_materializes_deployment_artifact(memory_project) -> None:
+    captured = capture_stage_memory(
+        memory_project.project_path,
+        "main",
+        "deploy",
+        deploy_overview="Развертывание через контейнеры с отдельными окружениями stage и prod.",
+        deploy_goals=["Воспроизводимая выкладка", "Безопасная работа с секретами"],
+        environments=[
+            "stage::Предрелизная проверка::Проверка миграций и smoke-тестов",
+            "prod::Боевой контур::Обслуживание пользовательского трафика",
+        ],
+        deployment_units=[
+            "api::service::Docker::Обслуживает HTTP API",
+            "worker::worker::Docker::Выполняет фоновые задачи",
+        ],
+        config_notes=["Конфигурация хранится в переменных окружения"],
+        secret_notes=["Секреты берутся из внешнего хранилища"],
+        cicd_triggers=["Публикация тега релиза"],
+        cicd_steps=["Сборка образа", "Запуск миграций", "Выкладка в prod"],
+        release_artifacts=["Docker image"],
+        migration_notes=["Миграции запускаются перед переключением трафика"],
+        backup_notes=["Ежедневный снимок базы данных"],
+        recovery_checks=["Раз в месяц проверять восстановление на резервном стенде"],
+        observability_notes=["Логи и метрики собираются в централизованную систему"],
+        security_controls=["Доступ к окружению prod только через выделенные роли"],
+        release_strategy="Постепенное переключение трафика",
+        rollback_strategy="Возврат на предыдущий образ и откат миграций при необходимости",
+        status="validated",
+    )
+
+    assert captured["accepted"] is True
+
+    checkpointed = checkpoint_stage_memory(
+        memory_project.project_path,
+        "main",
+        "deploy",
+        "План развертывания подтвержден для релизной подготовки",
+    )
+    assert checkpointed["accepted"] is True
+
+    deployment_doc = (memory_project.branch_dir / "deployment.md").read_text(encoding="utf-8")
+    project_context = (memory_project.branch_dir / "project-context.md").read_text(encoding="utf-8")
+
+    assert "План развертывания" in deployment_doc
+    assert "Воспроизводимая выкладка" in deployment_doc
+    assert "prod" in deployment_doc
+    assert "Deploy checkpoint summary" in project_context

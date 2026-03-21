@@ -34,8 +34,11 @@ def test_init_creates_structured_memory_layout(tmp_path, monkeypatch, invoke_cli
         "phase1Enabled": True,
         "phase2Enabled": False,
     }
+    assert paths["deploy_state"].exists()
+    assert (project_path / ".madspec" / "main" / "deployment.md").exists()
     assert (project_path / ".madspec" / "system" / "agents" / "state.json").exists()
     assert "/madspec.gate" in result.stdout
+    assert "/madspec.deploy" in result.stdout
 
 
 def test_init_accepts_qwen_agent(tmp_path, monkeypatch, invoke_cli, fake_template_download) -> None:

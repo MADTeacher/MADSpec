@@ -14,6 +14,7 @@ CAPTURE_STAGES = {
     "mvp.concept",
     "mvp.design",
     "mvp.tech",
+    "deploy",
     "mvp.architecture",
     "mvp.plan",
     "feature.init",

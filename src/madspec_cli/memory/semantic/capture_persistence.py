@@ -26,6 +26,11 @@ from ..stages.architecture.state import (
 )
 from ..stages.concept.state import CONCEPT_STAGE, load_concept_state
 from ..stages.design.state import DESIGN_STAGE, load_design_state
+from ..stages.deploy.state import (
+    DEPLOY_STAGE,
+    load_deploy_state,
+    update_deploy_state,
+)
 from ..stages.feature_init.state import FEATURE_INIT_STAGE, load_feature_init_state, update_feature_init_state
 from ..stages.feature_plan.state import FEATURE_PLAN_STAGE, load_feature_plan_state
 from ..stages.plan.state import PLAN_STAGE, load_plan_state, update_plan_state
@@ -187,6 +192,7 @@ def _build_capture_plan(
     concept_state = canonical.snapshots.get(CONCEPT_STAGE) or load_concept_state(paths.concept_state)
     design_state = canonical.snapshots.get(DESIGN_STAGE) or load_design_state(paths.design_state)
     tech_state = canonical.snapshots.get(TECH_STAGE) or load_tech_state(paths.tech_state)
+    deploy_state = canonical.snapshots.get(DEPLOY_STAGE) or load_deploy_state(paths.deploy_state)
     architecture_state = canonical.snapshots.get(ARCHITECTURE_STAGE) or load_architecture_state(paths.architecture_state)
     plan_state = canonical.snapshots.get(PLAN_STAGE) or load_plan_state(paths.plan_state)
     feature_init_state = canonical.snapshots.get(FEATURE_INIT_STAGE) or load_feature_init_state(paths.feature_init_state)
@@ -265,6 +271,28 @@ def _build_capture_plan(
             tech_notes=inputs.tech_notes,
             architecture_notes=inputs.architecture_notes,
             features=parsed.feature_init_feature_updates,
+            next_actions=inputs.next_actions,
+        )
+    elif inputs.stage == DEPLOY_STAGE:
+        deploy_state = update_deploy_state(
+            deploy_state,
+            deploy_overview=inputs.deploy_overview or None,
+            goals=inputs.deploy_goals,
+            environments=parsed.deploy_environment_updates,
+            deployment_units=parsed.deploy_unit_updates,
+            config_notes=inputs.config_notes,
+            secret_notes=inputs.secret_notes,
+            cicd_triggers=inputs.cicd_triggers,
+            cicd_steps=inputs.cicd_steps,
+            release_artifacts=inputs.release_artifacts,
+            migration_notes=inputs.migration_notes,
+            backup_notes=inputs.backup_notes,
+            recovery_checks=inputs.recovery_checks,
+            observability_notes=inputs.observability_notes,
+            security_controls=inputs.security_controls,
+            constraints=inputs.contracts,
+            release_strategy=inputs.release_strategy or None,
+            rollback_strategy=inputs.rollback_strategy or None,
             next_actions=inputs.next_actions,
         )
     elif inputs.stage == FEATURE_PLAN_STAGE:
@@ -353,6 +381,8 @@ def _build_capture_plan(
         snapshot_payloads[DESIGN_STAGE] = design_state
     elif inputs.stage == TECH_STAGE:
         snapshot_payloads[TECH_STAGE] = tech_state
+    elif inputs.stage == DEPLOY_STAGE:
+        snapshot_payloads[DEPLOY_STAGE] = deploy_state
     elif inputs.stage == ARCHITECTURE_STAGE:
         snapshot_payloads[ARCHITECTURE_STAGE] = architecture_state
     elif inputs.stage == PLAN_STAGE:
@@ -421,6 +451,7 @@ def _detect_capture_conflict(
         CONCEPT_STAGE,
         DESIGN_STAGE,
         TECH_STAGE,
+        DEPLOY_STAGE,
         ARCHITECTURE_STAGE,
         PLAN_STAGE,
         FEATURE_INIT_STAGE,

@@ -21,6 +21,12 @@ from ..stages.design.state import (
     load_design_state,
     update_design_state,
 )
+from ..stages.deploy.state import (
+    DEPLOY_STAGE,
+    deploy_completeness_errors,
+    load_deploy_state,
+    update_deploy_state,
+)
 from ..stages.feature_init.state import (
     FEATURE_INIT_STAGE,
     feature_init_completeness_errors,
@@ -66,6 +72,7 @@ CHECKPOINT_STAGES = {
     "mvp.concept",
     "mvp.design",
     "mvp.tech",
+    "deploy",
     "mvp.architecture",
     "mvp.plan",
     "feature.init",
@@ -140,6 +147,7 @@ def _build_stage_checkpoint_plan(
     concept_state = canonical.snapshots.get(CONCEPT_STAGE) or load_concept_state(paths.concept_state)
     design_state = canonical.snapshots.get(DESIGN_STAGE) or load_design_state(paths.design_state)
     tech_state = canonical.snapshots.get(TECH_STAGE) or load_tech_state(paths.tech_state)
+    deploy_state = canonical.snapshots.get(DEPLOY_STAGE) or load_deploy_state(paths.deploy_state)
     architecture_state = canonical.snapshots.get(ARCHITECTURE_STAGE) or load_architecture_state(paths.architecture_state)
     plan_state = canonical.snapshots.get(PLAN_STAGE) or load_plan_state(paths.plan_state)
     feature_init_state = canonical.snapshots.get(FEATURE_INIT_STAGE) or load_feature_init_state(paths.feature_init_state)
@@ -162,6 +170,14 @@ def _build_stage_checkpoint_plan(
     elif normalized_stage == TECH_STAGE:
         tech_state = update_tech_state(
             tech_state,
+            constraints=normalized_contracts,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+    elif normalized_stage == DEPLOY_STAGE:
+        deploy_state = update_deploy_state(
+            deploy_state,
             constraints=normalized_contracts,
             next_actions=normalized_pending_actions,
             checkpoint_summary=normalized_summary,
@@ -249,6 +265,8 @@ def _build_stage_checkpoint_plan(
         snapshot_payloads[DESIGN_STAGE] = design_state
     elif normalized_stage == TECH_STAGE:
         snapshot_payloads[TECH_STAGE] = tech_state
+    elif normalized_stage == DEPLOY_STAGE:
+        snapshot_payloads[DEPLOY_STAGE] = deploy_state
     elif normalized_stage == ARCHITECTURE_STAGE:
         snapshot_payloads[ARCHITECTURE_STAGE] = architecture_state
     elif normalized_stage == PLAN_STAGE:
@@ -316,6 +334,7 @@ def _detect_stage_checkpoint_conflict(
         CONCEPT_STAGE,
         DESIGN_STAGE,
         TECH_STAGE,
+        DEPLOY_STAGE,
         ARCHITECTURE_STAGE,
         PLAN_STAGE,
         FEATURE_INIT_STAGE,
@@ -403,6 +422,7 @@ def checkpoint_stage_memory(
     concept_state = canonical.snapshots.get(CONCEPT_STAGE) or load_concept_state(paths.concept_state)
     design_state = canonical.snapshots.get(DESIGN_STAGE) or load_design_state(paths.design_state)
     tech_state = canonical.snapshots.get(TECH_STAGE) or load_tech_state(paths.tech_state)
+    deploy_state = canonical.snapshots.get(DEPLOY_STAGE) or load_deploy_state(paths.deploy_state)
     architecture_state = canonical.snapshots.get(ARCHITECTURE_STAGE) or load_architecture_state(paths.architecture_state)
     plan_state = canonical.snapshots.get(PLAN_STAGE) or load_plan_state(paths.plan_state)
     feature_init_state = canonical.snapshots.get(FEATURE_INIT_STAGE) or load_feature_init_state(paths.feature_init_state)
@@ -444,6 +464,17 @@ def checkpoint_stage_memory(
             ratify=True,
         )
         errors.extend(tech_completeness_errors(tech_state))
+        if errors:
+            return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
+    elif normalized_stage == DEPLOY_STAGE:
+        deploy_state = update_deploy_state(
+            deploy_state,
+            constraints=normalized_contracts,
+            next_actions=normalized_pending_actions,
+            checkpoint_summary=normalized_summary,
+            ratify=True,
+        )
+        errors.extend(deploy_completeness_errors(deploy_state))
         if errors:
             return {"accepted": False, "branch": branch_name, "stage": normalized_stage, "errors": errors}
     elif normalized_stage == ARCHITECTURE_STAGE:

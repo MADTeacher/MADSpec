@@ -523,6 +523,136 @@ def test_memory_retrieve_returns_tech_status_and_full_artifact(make_madspec_proj
     assert "FastAPI" in tech_stack
 
 
+def test_memory_retrieve_returns_deploy_status_and_full_artifact(make_madspec_project, invoke_cli) -> None:
+    project_path = make_madspec_project()
+
+    capture_result = invoke_cli(
+        [
+            "memory",
+            "capture",
+            "--branch",
+            "main",
+            "--stage",
+            "deploy",
+            "--summary",
+            "Зафиксировали схему развертывания",
+            "--deploy-overview",
+            "Контейнерное развертывание с отдельными окружениями stage и prod.",
+            "--deploy-goal",
+            "Воспроизводимая выкладка",
+            "--deploy-goal",
+            "Контролируемый откат",
+            "--environment",
+            "stage::Предрелизная проверка::Проверка миграций и smoke-тестов",
+            "--environment",
+            "prod::Боевой контур::Обслуживание внешних пользователей",
+            "--deployment-unit",
+            "api::service::Docker::Обслуживает HTTP API",
+            "--deployment-unit",
+            "worker::worker::Docker::Выполняет фоновые задачи",
+            "--config-note",
+            "Конфигурация хранится в переменных окружения",
+            "--secret-note",
+            "Секреты берутся из внешнего хранилища",
+            "--cicd-trigger",
+            "Публикация тега релиза",
+            "--cicd-step",
+            "Сборка образа",
+            "--cicd-step",
+            "Запуск миграций",
+            "--release-artifact",
+            "Docker image",
+            "--migration-note",
+            "Миграции выполняются до переключения трафика",
+            "--backup-note",
+            "Ежедневный снимок базы данных",
+            "--recovery-check",
+            "Раз в месяц проверять восстановление на резервном стенде",
+            "--observability-note",
+            "Логи и метрики собираются централизованно",
+            "--security-control",
+            "Доступ к prod только через выделенные роли",
+            "--release-strategy",
+            "Постепенное переключение трафика",
+            "--rollback-strategy",
+            "Возврат на предыдущий образ и откат миграций при необходимости",
+            "--next-action",
+            "Уточнить процедуру аварийного восстановления",
+            "--json-output",
+        ]
+    )
+    assert capture_result.exit_code == 0, capture_result.stdout
+
+    retrieve_result = invoke_cli(
+        ["memory", "retrieve", "--branch", "main", "--stage", "deploy", "--json-output"]
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["deploy_status"]["is_complete"] is True
+    assert retrieve_payload["deploy_status"]["missing_required_fields"] == []
+    assert retrieve_payload["deploy_status"]["counts"] == {
+        "goals": 2,
+        "environments": 2,
+        "deployment_units": 2,
+        "config_notes": 1,
+        "secret_notes": 1,
+        "cicd_triggers": 1,
+        "cicd_steps": 2,
+        "release_artifacts": 1,
+        "migration_notes": 1,
+        "backup_notes": 1,
+        "recovery_checks": 1,
+        "observability_notes": 1,
+        "security_controls": 1,
+        "constraints": 0,
+        "next_actions": 1,
+    }
+    assert retrieve_payload["artifact_state"]["deploy"] is None
+
+    checkpoint_result = invoke_cli(
+        [
+            "memory",
+            "checkpoint",
+            "--branch",
+            "main",
+            "--stage",
+            "deploy",
+            "--summary",
+            "План развертывания подтвержден для релизной подготовки",
+            "--evidence",
+            ".madspec/main/deployment.md",
+            "--json-output",
+        ]
+    )
+    assert checkpoint_result.exit_code == 0, checkpoint_result.stdout
+
+    retrieve_full_result = invoke_cli(
+        [
+            "memory",
+            "retrieve",
+            "--branch",
+            "main",
+            "--stage",
+            "deploy",
+            "--full-artifact",
+            "--include-history",
+            "--json-output",
+        ]
+    )
+    assert retrieve_full_result.exit_code == 0, retrieve_full_result.stdout
+    retrieve_full_payload = json.loads(retrieve_full_result.stdout)
+    assert (
+        retrieve_full_payload["artifact_state"]["deploy"]["checkpointSummary"]
+        == "План развертывания подтвержден для релизной подготовки"
+    )
+    assert retrieve_full_payload["artifact_state"]["deploy"]["revision"] == 1
+    assert retrieve_full_payload["decision_log"] != []
+
+    deployment_doc = (project_path / ".madspec" / "main" / "deployment.md").read_text(encoding="utf-8")
+    assert "План развертывания" in deployment_doc
+    assert "Постепенное переключение трафика" in deployment_doc
+
+
 def test_memory_capture_supports_architecture_stage_state_and_retrieve(
     make_madspec_project,
     invoke_cli,
