@@ -1,10 +1,10 @@
 # `madspec memory`
 
-Группа `madspec memory` - это рабочий интерфейс структурированной памяти в MADSpec. Через нее создается проектное хранилище памяти, читается контекст стадий, фиксируются решения, продвигается состояние планирования и реализации и проверяются производные представления.
+Группа `madspec memory` — это рабочий интерфейс структурированной памяти в MADSpec. Через нее создается проектное хранилище памяти, читается контекст стадий, фиксируются решения, продвигается состояние планирования и реализации и проверяются производные представления.
 
-Для изменяющих состояние переходов этот интерфейс теперь опирается на общий слой контрольных проверок: preflight-проверки planning и implementation, а также `checkpoint` для `review` и `security`, выполняются через `madspec gate`.
+Для изменяющих состояние переходов этот интерфейс теперь опирается на общий слой контрольных проверок: предварительные проверки планирования и реализации, а также `checkpoint` для `review` и `security`, выполняются через `madspec gate`.
 
-Команды, привязанные к стадии (`retrieve`, `capture`, `checkpoint`, planning и implementation operations), материализуют только минимально необходимый набор артефактов ветки для текущей стадии. Полная пересборка всех производных файлов ветки остается задачей `madspec memory init`, `madspec memory consolidate` и `madspec memory validate`.
+Команды, привязанные к стадии (`retrieve`, `capture`, `checkpoint`, операции планирования и реализации), материализуют только минимально необходимый набор артефактов ветки для текущей стадии. Полная пересборка всех производных файлов ветки остается задачей `madspec memory init`, `madspec memory consolidate` и `madspec memory validate`.
 
 Начиная с `Memory v2`, MADSpec использует смешанную модель хранения:
 
@@ -14,39 +14,39 @@
 
 Важно для текущего состояния реализации:
 
-- все mutating runtime-команды теперь сначала коммитят изменения в `SQLite`, а уже потом пересобирают файловые projections ветки;
-- `SQLite` считается каноническим источником для `progress`, stage snapshots, session-local state и runtime record streams;
-- для runtime состояния ветки ведется единая top-level ревизия `runtime_revision`, которая увеличивается после каждого успешного mutating commit;
-- для самых горячих write paths runtime дополнительно использует scoped writer leases и может вернуть `kind="scope_busy"`, если другой writer уже держит тот же hot scope;
+- все изменяющие команды состояния теперь сначала фиксируют изменения в `SQLite`, а уже потом пересобирают файловые проекции ветки;
+- `SQLite` считается каноническим источником для `progress`, снимков стадий, состояния конкретной сессии и потоков записей состояния;
+- для состояния выполнения ветки ведется единая верхнеуровневая ревизия `runtime_revision`, которая увеличивается после каждой успешной изменяющей записи;
+- для самых горячих путей записи система дополнительно использует ограниченные аренды записи и может вернуть `kind="scope_busy"`, если другой процесс уже держит ту же горячую область;
 - файл `.madspec/<branch>/memory/working/active-session.json` больше не считается источником истины и поддерживается только как производная проекция для session `active`;
 - для `retrieve`, `search`, `explain`, `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step`, `complete-step` и связанных вызовов субагентного контекста доступен `--session-key`, по умолчанию используется `active`;
-- mutating runtime-команды `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` и `complete-step` принимают optional `--expected-revision`; если флаг не передан, команда использует ревизию, которую увидела в начале собственного выполнения;
-- branch `memory/*.json`, `memory/*.jsonl` и generated markdown остаются rebuildable projections и могут быть пересобраны через `madspec memory consolidate`;
-- успешный mutating ответ теперь возвращает `runtime_revision_before` и `runtime_revision_after`, а при конфликте возвращается structured payload с `kind="conflict"` и полем `conflict.retry_guidance`;
-- hot write paths `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` используют scoped lease вместо глобальной блокировки всей ветки;
-- если post-commit projection refresh падает, canonical commit не откатывается: команда возвращает `projection_status="stale"` и `projection_refresh_required=true`, а последующий `madspec memory consolidate` восстанавливает projections из `SQLite`.
+- изменяющие команды `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` и `complete-step` принимают необязательный `--expected-revision`; если флаг не передан, команда использует ревизию, которую увидела в начале собственного выполнения;
+- веточные `memory/*.json`, `memory/*.jsonl` и производные Markdown-представления остаются пересобираемыми проекциями и могут быть восстановлены через `madspec memory consolidate`;
+- успешный изменяющий ответ теперь возвращает `runtime_revision_before` и `runtime_revision_after`, а при конфликте возвращается структурированный `payload` с `kind="conflict"` и полем `conflict.retry_guidance`;
+- самые горячие пути записи `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` используют ограниченную аренду записи вместо глобальной блокировки всей ветки;
+- если обновление проекций после записи падает, каноническая запись не откатывается: команда возвращает `projection_status="stale"` и `projection_refresh_required=true`, а последующий `madspec memory consolidate` восстанавливает проекции из `SQLite`.
 - Phase 1 теперь официально поддерживает сценарий: реализация текущего шага и параллельное планирование следующего, если операции попадают в совместимую матрицу `register-step(step-02)` + `start/checkpoint/complete-step(step-01)`.
-- rollout для многосубагентного протокола теперь разделен: Phase 1 считается стабильным default, а полный Phase 2 включается только как opt-in режим через `parallelRuntime.phase2Enabled` в `.madspec/config.json`;
-- Для базового многосубагентного сценария появился отдельный слой координации: `task` как контейнер работы и `work-item` как каноническая единица владения поверх session-local runtime.
+- включение многосубагентного протокола теперь разделено: `Phase 1` считается стабильным режимом по умолчанию, а полный `Phase 2` включается только явно через `parallelRuntime.phase2Enabled` в `.madspec/config.json`;
+- для базового многосубагентного сценария появился отдельный слой координации: `task` как контейнер работы и `work-item` как каноническая единица владения поверх локального состояния сеанса.
 - Каноническое состояние координации тоже хранится в `SQLite`: таблицы `tasks`, `work_items`, `work_item_claims`, а их lifecycle events попадают в `records` со scope `work-item`.
-- Для coordinator runtime также используется явный dependency graph: `work_item_dependencies` хранит жесткие зависимости между work items внутри одного task.
+- Для координационного состояния также используется явный граф зависимостей: `work_item_dependencies` хранит жесткие зависимости между `work items` внутри одного `task`.
 - `claim` привязывает `session_key` к `work_item_id`, записывает канонический owner вида `work-item:<subagent-id>:<session-key>` и расширяет session payload полями `task_id`, `work_item_id`, `subagent_id`.
 - Каждый work item теперь хранит snapshot scheduling hints в каноническом состоянии: `default_stage`, `execution_mode_hint`, `subagent_dependencies`.
 - Если runtime-сеанс привязан к work item, `start-step`, `checkpoint-step` и `complete-step` валидируют совпадение `step_id` с ownership binding и продвигают статус work item в `claimed`, `in_progress`, `completed`.
 - Для claimed `work-item` direct mutating runtime-команды больше не считаются допустимым write path: вместо `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` и `complete-step` такой session должен публиковать proposal и затем применять его через отдельный apply flow.
-- Proposal lifecycle теперь канонически хранится в `SQLite`: `runtime_proposals` и `runtime_proposal_events`, а related summary попадает в `retrieve`, `explain`, `agents subagents context`, `timeline` и `doctor`.
-- Coordinator readiness не хранится как отдельный persisted status: он вычисляется детерминированно при чтении на основе explicit dependencies, claim state, ownership и proposal context.
-- Для explainability и operator UX поверх canonical runtime теперь строится единый read-model `observability`: он объединяет shared branch state, session-local state, leases, proposals, ownership, conflicts и health rebuildable projections.
-- `retrieve`, `search`, `explain`, `timeline`, `doctor` и `conflicts` теперь возвращают additive observability payloads, чтобы session, task и work-item state можно было инспектировать без прямого SQL-доступа.
+- Жизненный цикл `proposal` теперь канонически хранится в `SQLite`: `runtime_proposals` и `runtime_proposal_events`, а связанная сводка попадает в `retrieve`, `explain`, `agents subagents context`, `timeline` и `doctor`.
+- Готовность `coordinator` не хранится как отдельный постоянный статус: она вычисляется детерминированно при чтении на основе явных зависимостей, состояния `claim`, владения и контекста `proposal`.
+- Для объяснимости и удобства оператора поверх канонического состояния теперь строится единая модель чтения `observability`: она объединяет общее состояние ветки, локальное состояние сеанса, аренды записи, `proposals`, владение, конфликты и здоровье пересобираемых проекций.
+- `retrieve`, `search`, `explain`, `timeline`, `doctor` и `conflicts` теперь возвращают дополнительные данные `observability`, чтобы состояние `session`, `task` и `work-item` можно было инспектировать без прямого SQL-доступа.
 - `doctor` теперь отдельно диагностирует `stale_projections`, `orphan_sessions`, `stuck_leases`, `unresolved_proposal_conflicts` и `revision_drift`, а также сообщает `probable_cause` и `repair_hint`.
-- `timeline` теперь нормализует runtime lifecycle в typed events с полями `event_type`, `category`, `reason`, `owner_id`, `session_key`, `task_id`, `work_item_id`, `proposal_id` и `scope`.
+- `timeline` теперь нормализует жизненный цикл выполнения в типизированные события с полями `event_type`, `category`, `reason`, `owner_id`, `session_key`, `task_id`, `work_item_id`, `proposal_id` и `scope`.
 
-Политика rollout для текущей версии:
+Политика включения для текущей версии:
 
-- новые проекты получают в `.madspec/config.json` блок `parallelRuntime` с default-значениями `phase1Enabled=true` и `phase2Enabled=false`;
-- если блок `parallelRuntime` отсутствует в старом проекте, MADSpec трактует это как legacy-safe default: `phase1Enabled=true`, `phase2Enabled=false`;
-- Phase 2 CLI-команды остаются видимыми в help, но при выключенном `parallelRuntime.phase2Enabled` завершаются structured payload с `reason="phase2_disabled"`;
-- `madspec migrate` не включает Phase 2 автоматически и остается только layout-migration командой.
+- новые проекты получают в `.madspec/config.json` блок `parallelRuntime` со значениями по умолчанию `phase1Enabled=true` и `phase2Enabled=false`;
+- если блок `parallelRuntime` отсутствует в старом проекте, MADSpec трактует это как совместимое поведение по умолчанию: `phase1Enabled=true`, `phase2Enabled=false`;
+- команды CLI для `Phase 2` остаются видимыми в `help`, но при выключенном `parallelRuntime.phase2Enabled` завершаются структурированным `payload` с `reason="phase2_disabled"`;
+- `madspec migrate` не включает `Phase 2` автоматически и остается только командой миграции структуры.
 
 ## Когда Использовать
 
@@ -119,7 +119,7 @@
 | `madspec memory checkpoint-step --stage ...` | Зафиксировать промежуточное состояние шага, включая контрольные точки TDD |
 | `madspec memory complete-step --stage ... --summary ...` | Завершить текущий шаг и продвинуть текущее состояние выполнения |
 
-### Команды Координации Task / Work-Item
+### Команды Координации `Task` / `Work-Item`
 
 Эта группа относится к Phase 2 и работает только при `parallelRuntime.phase2Enabled=true`. Если флаг не включен, команда вернет отказ с `reason="phase2_disabled"` и guidance включить Phase 2 в `.madspec/config.json`.
 
@@ -133,18 +133,18 @@
 | `madspec memory work-items claim --work-item-id ... --session-key ...` | Привязать session к work item и назначить канонический owner |
 | `madspec memory work-items release --work-item-id ... --session-key ...` | Снять активный claim и очистить привязку сеанса |
 
-### Команды Proposal Flow
+### Команды Потока `Proposal`
 
-Эта группа тоже относится к Phase 2 и требует `parallelRuntime.phase2Enabled=true`. В default-режиме Phase 1 команды остаются зарегистрированными в CLI, но не считаются доступным write path.
+Эта группа тоже относится к `Phase 2` и требует `parallelRuntime.phase2Enabled=true`. В стандартном режиме `Phase 1` команды остаются зарегистрированными в CLI, но не считаются доступным путем записи.
 
 | Команда | Назначение |
 | --- | --- |
-| `madspec memory proposals publish --type ... --payload-json ...` | Опубликовать typed proposal вместо direct write для claimed work item |
-| `madspec memory proposals list` | Показать proposals ветки, task, work item или session |
-| `madspec memory proposals preview --proposal-id ...` | Показать proposal, ownership state, base revision и события lifecycle |
-| `madspec memory proposals apply --proposal-id ...` | Применить proposal к каноническому runtime или перевести его в `conflict` / `rejected` |
+| `madspec memory proposals publish --type ... --payload-json ...` | Опубликовать типизированное `proposal` вместо прямой записи для занятого `work item` |
+| `madspec memory proposals list` | Показать `proposals` ветки, `task`, `work item` или сеанса |
+| `madspec memory proposals preview --proposal-id ...` | Показать `proposal`, состояние владения, базовую ревизию и события жизненного цикла |
+| `madspec memory proposals apply --proposal-id ...` | Применить `proposal` к каноническому состоянию выполнения или перевести его в `conflict` / `rejected` |
 
-Базовые точки входа proposal flow: `madspec memory proposals publish` и `madspec memory proposals apply`.
+Базовые точки входа потока `proposal`: `madspec memory proposals publish` и `madspec memory proposals apply`.
 
 Минимальный синтаксис:
 
@@ -171,19 +171,19 @@ madspec memory work-items create --task-id <task> --subagent-id developer --depe
 - `consolidate` и `validate` поддерживают синхронность производных файлов и основных записей
 - stage-scoped операции не обязаны заранее создавать несвязанные артефакты других стадий
 
-Для rollout Phase 2:
+Для включения `Phase 2`:
 
-- если нужен только planning/implementation parallel runtime на одной ветке, оставляй default-конфиг и работай в Phase 1;
-- если нужен `task/work-item/proposals/coordinator` protocol, явно включи `parallelRuntime.phase2Enabled=true` в `.madspec/config.json`;
-- если вы просто мигрируете старый проект, не требуется пересоздавать `.madspec/`, переносить branch memory layout заново или отказываться от session `active`.
+- если нужны только параллельные планирование и реализация на одной ветке, оставляй конфигурацию по умолчанию и работай в `Phase 1`;
+- если нужен протокол `task/work-item/proposals/coordinator`, явно включи `parallelRuntime.phase2Enabled=true` в `.madspec/config.json`;
+- если вы просто мигрируете старый проект, не требуется пересоздавать `.madspec/`, заново переносить структуру памяти ветки или отказываться от сеанса `active`.
 
 ## Общие Опции
 
 У многих команд группы `memory` есть:
 
 - `--branch <name>`: явно выбрать ветку для операции
-- `--session-key <key>`: выбрать session-local runtime-контекст; по умолчанию используется `active`
-- `--expected-revision <n>`: для mutating runtime-команд проверить, что запись делается поверх ожидаемой ревизии ветки
+- `--session-key <key>`: выбрать локальный контекст выполнения для сеанса; по умолчанию используется `active`
+- `--expected-revision <n>`: для изменяющих команд состояния проверить, что запись делается поверх ожидаемой ревизии ветки
 - `--json-output`: вывести JSON в удобном для автоматической обработки виде
 - `--from-file <path>`: прочитать все аргументы из JSON-файла вместо командной строки
 
@@ -278,9 +278,9 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 У `explain` теперь также есть:
 
-- `--session-key` — выбрать session-local runtime-контекст для объяснения
+- `--session-key` — выбрать локальный контекст выполнения для сеанса при объяснении
 
-Ответ `madspec memory explain` по-прежнему возвращает top-level `runtime_revision`, а в `summary` теперь явно показывает:
+Ответ `madspec memory explain` по-прежнему возвращает верхнеуровневый `runtime_revision`, а в `summary` теперь явно показывает:
 
 - `session_key`
 - `session_current_step`
@@ -390,18 +390,18 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - `--recall-limit` — сколько кандидатов брать из каждого канала поиска
 - `--disable-semantic` — отключить семантический поиск по векторному индексу и оставить только `SQLite` с точным и полнотекстовым поиском
 
-Ответ `search` также содержит top-level `runtime_revision`, чтобы вызывающая сторона могла понять, на каком canonical runtime state был собран результат.
+Ответ `search` также содержит верхнеуровневый `runtime_revision`, чтобы вызывающая сторона могла понять, на каком каноническом состоянии выполнения был собран результат.
 
 ## Ревизии И Конфликты Runtime
 
 Для runtime-операций MADSpec использует optimistic concurrency на уровне ветки. Это значит:
 
-- `retrieve`, `search` и `explain` возвращают top-level `runtime_revision`;
-- mutating команды могут принять `--expected-revision`, чтобы явно зафиксировать, поверх какой ревизии должна выполняться запись;
-- если флаг не указан, CLI по-прежнему остается совместимым с legacy single-agent сценарием и использует ревизию, прочитанную в начале команды;
+- `retrieve`, `search` и `explain` возвращают верхнеуровневый `runtime_revision`;
+- изменяющие команды могут принять `--expected-revision`, чтобы явно зафиксировать, поверх какой ревизии должна выполняться запись;
+- если флаг не указан, CLI по-прежнему остается совместимым со старым сценарием одного агента и использует ревизию, прочитанную в начале команды;
 - после успешного коммита ответ включает `runtime_revision_before` и `runtime_revision_after`.
 
-Если между чтением и записью произошли конкурентные изменения, runtime пытается безопасно переиграть intent на свежем canonical state только для совместимых случаев. Для несовместимых случаев команда возвращает конфликт и завершает выполнение с кодом `1`.
+Если между чтением и записью произошли конкурентные изменения, система пытается безопасно переиграть намерение на свежем каноническом состоянии только для совместимых случаев. Для несовместимых случаев команда возвращает конфликт и завершает выполнение с кодом `1`.
 
 Для hot scopes, защищенных lease-механизмом, команда может завершиться раньше с `kind="scope_busy"`. Это не конфликт ревизий, а признак того, что другой writer сейчас держит lease на тот же scope.
 
@@ -495,7 +495,7 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 Практически это означает:
 
 - `SQLite` отвечает на вопросы "какое состояние сейчас каноническое", "что индексировать дальше" и "что подходит под точный и полнотекстовый поиск"
-- `SQLite` также хранит session-local runtime state для всех `session_key`, а файловая проекция поддерживается только для `active`
+- `SQLite` также хранит локальное состояние выполнения для всех `session_key`, а файловая проекция поддерживается только для `active`
 - `lancedb/` отвечает на вопрос "что еще семантически похоже и стоит подтянуть в рабочий контекст"
 - `episodes` отвечает на вопрос "что происходило по ходу работы"
 - `decision_log` отвечает на вопрос "что еще нужно осмыслить, утвердить или продвинуть"
@@ -547,7 +547,7 @@ madspec memory register-step \
   --json-output
 ```
 
-Если за время между чтением и записью другая команда уже изменила runtime state ветки, ответ вернет `kind="conflict"` и подскажет повторить операцию после чтения свежего `runtime_revision`.
+Если за время между чтением и записью другая команда уже изменила состояние выполнения ветки, ответ вернет `kind="conflict"` и подскажет повторить операцию после чтения свежего `runtime_revision`.
 
 ### Посмотреть результаты поиска по явному запросу
 

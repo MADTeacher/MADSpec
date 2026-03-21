@@ -2,34 +2,34 @@
 
 ## Назначение команды
 
-`madspec.mvp.concept` фиксирует product intent нового проекта: что создается, для кого, какую боль решает и какие функции входят в MVP по приоритетам `P1/P2/P3`.
+`madspec.mvp.concept` фиксирует продуктовый замысел нового проекта: что создается, для кого, какую боль решает и какие функции входят в MVP по приоритетам `P1/P2/P3`.
 
 ## Когда запускать
 
 - в начале MVP-ветки
 - когда продуктовая гипотеза еще не ратифицирована
-- когда нужно обновить концепцию после существенного изменения scope
+- когда нужно обновить концепцию после существенного изменения рамок проекта
 
-## Preconditions / required context
+## Предварительные условия и обязательный контекст
 
-- доступна текущая branch context через `madspec git current-branch`
+- доступен контекст текущей ветки через `madspec git current-branch`
 - доступен `.madspec/<BRANCH>/memory/`
 - ручное редактирование `concept.md` не используется как источник истины
-- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
+- перед началом работы агент обязан прочитать и использовать навык `madspec-cli-operator`
 
 ## Источник истины
 
-### Canonical state
+### Каноническое состояние
 
 - `.madspec/<BRANCH>/memory/stages/mvp.concept.json`
 
-### Runtime / working state
+### Рабочее состояние
 
 - `.madspec/<BRANCH>/memory/working/active-session.json`
 - `.madspec/<BRANCH>/memory/working/decision-log.jsonl`
 - `.madspec/<BRANCH>/memory/semantic/*.jsonl`
 
-### Generated views
+### Производные представления
 
 - `.madspec/<BRANCH>/concept.md`
 - `.madspec/<BRANCH>/project-context.md`
@@ -42,7 +42,7 @@
 - `madspec memory capture --stage mvp.concept ...`
 - `madspec memory checkpoint --stage mvp.concept --summary ...`
 
-Stage-specific поля capture:
+Поля `capture`, относящиеся к этой стадии:
 
 - `--project-name`
 - `--system-overview`
@@ -54,16 +54,16 @@ Stage-specific поля capture:
 - `--assumption`
 - `--next-action`
 
-## Пошаговый runtime workflow
+## Пошаговый процесс выполнения
 
 1. Агент определяет ветку через `madspec git current-branch`.
 2. Загружает `concept_status` через `retrieve`.
 3. Задает вопросы по одному и после каждого подтвержденного блока пишет `capture`.
-4. На каждом capture runtime обновляет `mvp.concept.json`, semantic records и generated views.
+4. На каждом `capture` система обновляет `mvp.concept.json`, семантические записи и производные представления.
 5. Перед финалом агент запрашивает `--full-artifact`.
 6. `checkpoint` ратифицирует стадию, обновляет `checkpointSummary`, `ratifiedAt`, `updatedAt`, `revision`.
 
-## Canonical data model
+## Каноническая модель данных
 
 Ключевые поля `mvp.concept.json`:
 
@@ -87,11 +87,11 @@ Stage-specific поля capture:
 - минимум один `painPoint`
 - минимум одна функция в `features.p1`
 
-## Generated artifacts
+## Производные артефакты
 
-- `concept.md` — human-readable концепция
-- `project-context.md` — branch summary и ссылки на артефакты
-- `planning-context-cache.md` — condensed memory cache для следующих стадий
+- `concept.md` — человекочитаемое описание концепции
+- `project-context.md` — сводка по ветке и ссылки на артефакты
+- `planning-context-cache.md` — сжатый кэш памяти для следующих стадий
 
 ## Диаграммы
 
@@ -105,7 +105,7 @@ flowchart TD
     R --> S["mvp.concept.json"]
     C --> S
     K --> S
-    K --> G["generated views"]
+    K --> G["производные представления"]
     K --> V["memory validate"]
 ```
 
@@ -115,7 +115,7 @@ sequenceDiagram
     participant A as Агент
     participant M as Memory API
     participant S as mvp.concept.json
-    participant G as Generated views
+    participant G as Производные представления
 
     U->>A: Идея проекта
     A->>M: retrieve(stage=mvp.concept)
@@ -154,16 +154,16 @@ flowchart LR
     F --> X
 ```
 
-## Типовые ошибки / drift / ограничения
+## Типовые ошибки, расхождения и ограничения
 
 - `concept.md` отредактирован вручную и больше не совпадает с `mvp.concept.json`
 - агент пытается синтезировать отсутствующее поле без `retrieve`
 - checkpoint выполняется до появления `systemOverview` или `P1` feature
-- пользовательский чат используется как источник истины вместо stage-state
+- пользовательский чат используется как источник истины вместо состояния стадии
 
-## Соседние команды и handoff
+## Соседние команды и передача дальше
 
-- предыдущая команда: обычно начало workflow
+- предыдущая команда: обычно начало процесса
 - следующая команда: [`madspec.mvp.design`](./madspec.mvp.design.md)
 
 ## Что не является источником истины

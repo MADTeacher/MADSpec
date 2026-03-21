@@ -2,36 +2,36 @@
 
 ## Назначение команды
 
-`madspec.feature.implement` выполняет шаги feature-ветки через тот же step runtime API, что и MVP, но с feature-specific branch intent и опорой на `feature.init` context.
+`madspec.feature.implement` выполняет шаги feature-ветки через тот же пошаговый API состояния выполнения, что и MVP, но с намерением ветки, специфичным для feature, и опорой на контекст `feature.init`.
 
 ## Когда запускать
 
 - после `feature.plan`
-- для выполнения следующего executable step
-- при возобновлении work-in-progress по feature
+- для выполнения следующего исполнимого шага
+- при возобновлении незавершенной работы по feature
 
-## Preconditions / required context
+## Предварительные условия и обязательный контекст
 
 - шаги уже запланированы
 - существует `progress.json`
-- `project-analysis.md` используется только как reference, не как primary source
-- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
+- `project-analysis.md` используется только как справочный материал, а не как основной источник
+- перед началом работы агент обязан прочитать и использовать навык `madspec-cli-operator`
 
 ## Источник истины
 
-### Canonical runtime state
+### Каноническое состояние выполнения
 
 - `.madspec/<BRANCH>/memory/progress.json`
 - `.madspec/<BRANCH>/memory/working/active-session.json`
 
-### Step-level knowledge
+### Знания уровня шага
 
 - `events.jsonl`
 - `facts.jsonl`
 - `decisions.jsonl`
 - `contracts.jsonl`
 
-### Generated views
+### Производные представления
 
 - `.madspec/<BRANCH>/implementation-plan.md`
 - `.madspec/<BRANCH>/steps/<step-id>/implementation-context.md`
@@ -45,20 +45,20 @@
 - `madspec memory complete-step --stage feature.implement`
 - `madspec git commit --message ...`
 
-Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и policy validations. При спорном состоянии можно дополнительно выполнить `madspec policy validate --stage feature.implement --step-id <step-id> --toon-output`, если этот вывод читает агент.
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и результаты проверки правил. При спорном состоянии можно дополнительно выполнить `madspec policy validate --stage feature.implement --step-id <step-id> --toon-output`, если этот вывод читает агент.
 
-## Пошаговый runtime workflow
+## Пошаговый процесс выполнения
 
-1. Агент читает implement context и current feature step.
-2. Агент сверяет шаг с active policies из `policy_context`.
+1. Агент читает контекст реализации и текущий шаг feature.
+2. Агент сверяет шаг с действующими правилами из `policy_context`.
 3. Запускает шаг через `start-step`.
 4. Фиксирует TDD cycle через `checkpoint-step`.
-5. Завершает шаг через `complete-step`, записывая устойчивые facts/decisions/contracts.
-6. Повторно читает `retrieve` и двигается к следующему executable step.
+5. Завершает шаг через `complete-step`, записывая устойчивые `facts/decisions/contracts`.
+6. Повторно читает `retrieve` и двигается к следующему исполнимому шагу.
 
-## Canonical data model
+## Каноническая модель данных
 
-Runtime-форма совпадает с MVP implementation:
+Форма состояния совпадает с MVP-реализацией:
 
 - `plannedSteps[]`
 - `completedSteps[]`
@@ -68,9 +68,9 @@ Runtime-форма совпадает с MVP implementation:
 
 Ключевое отличие:
 
-- branch intent, coverage и messages должны интерпретироваться через feature context из `feature.init` / `feature.plan`
+- намерение ветки, покрытие и сообщения должны интерпретироваться через контекст feature из `feature.init` / `feature.plan`
 
-## Generated artifacts
+## Производные артефакты
 
 - `implementation-plan.md`
 - `steps/<step-id>/implementation-context.md`
@@ -86,7 +86,7 @@ flowchart TD
     A --> C["checkpoint-step"]
     A --> X["complete-step"]
     X --> P["progress.json"]
-    X --> G["generated views"]
+    X --> G["производные представления"]
 ```
 
 ```mermaid
@@ -123,13 +123,13 @@ flowchart LR
     V --> C["complete-step output"]
 ```
 
-## Типовые ошибки / drift / ограничения
+## Типовые ошибки, расхождения и ограничения
 
-- runtime-state редактируется вручную
-- `project-analysis.md` воспринимается как canonical source
+- состояние выполнения редактируется вручную
+- `project-analysis.md` воспринимается как канонический источник
 - step completion не записывает knowledge records
 
-## Соседние команды и handoff
+## Соседние команды и передача дальше
 
 - предыдущая команда: [`madspec.feature.plan`](./madspec.feature.plan.md)
 - соседние quality-команды: [`madspec.review`](../other/madspec.review.md), [`madspec.security`](../other/madspec.security.md)
@@ -138,4 +138,4 @@ flowchart LR
 
 - `.madspec/<BRANCH>/implementation-plan.md`
 - `.madspec/<BRANCH>/project-analysis.md`
-- любые шаговые заметки вне memory workflow
+- любые шаговые заметки вне процесса `memory`

@@ -2,34 +2,34 @@
 
 ## Назначение команды
 
-`madspec.mvp.architecture` переводит согласованный продуктовый, UI и tech context в структуру проекта, модель данных, API-контракты, интеграции и code principles.
+`madspec.mvp.architecture` переводит согласованный продуктовый, UI- и технический контекст в структуру проекта, модель данных, API-контракты, интеграции и принципы организации кода.
 
 ## Когда запускать
 
 - после `mvp.tech`
-- когда нужно закрепить data model и contract layer перед планированием шагов
-- когда UI уже стабилизирован настолько, чтобы связать screens с endpoints
+- когда нужно закрепить модель данных и слой контрактов перед планированием шагов
+- когда UI уже стабилизирован настолько, чтобы связать `screens` с `endpoints`
 
-## Preconditions / required context
+## Предварительные условия и обязательный контекст
 
 - завершены `mvp.concept`, `mvp.design`, `mvp.tech`
-- screens и data coverage из design уже известны
-- agent не редактирует `architecture.md` или `openapi.yaml` вручную
-- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
+- `screens` и покрытие данных из `design` уже известны
+- агент не редактирует `architecture.md` или `openapi.yaml` вручную
+- перед началом работы агент обязан прочитать и использовать навык `madspec-cli-operator`
 
 ## Источник истины
 
-### Canonical state
+### Каноническое состояние
 
 - `.madspec/<BRANCH>/memory/stages/mvp.architecture.json`
 
-### Runtime / working state
+### Рабочее состояние
 
 - `active-session.json`
-- semantic stage records
-- `mvp.design.json` используется как reference state для coverage checks
+- семантические записи стадии
+- `mvp.design.json` используется как опорное состояние для проверок покрытия
 
-### Generated views
+### Производные представления
 
 - `.madspec/<BRANCH>/architecture.md`
 - `.madspec/<BRANCH>/data-model.md`
@@ -44,7 +44,7 @@
 
 Связанное правило из `mvp.design`: `--screen-data` хранит только логический field id в формате `<screen-id>::<displayed|input>::<name>`. Не записывай туда описания и дополнительные `::` сегменты.
 
-Ключевые flags:
+Ключевые флаги:
 
 - `--architecture-overview`
 - `--project-structure`
@@ -64,15 +64,15 @@
 - `--performance-note`
 - `--next-action`
 
-## Пошаговый runtime workflow
+## Пошаговый процесс выполнения
 
 1. Агент получает `architecture_status`.
 2. Инкрементально фиксирует структуру проекта, сущности, связи и endpoints через `capture`.
-3. Runtime связывает endpoints с design screens и проверяет поля request/response против `screen.data`.
-4. `architecture_completeness_errors()` валидирует overview, directories, entities, endpoints, response fields и наличие code principles/patterns.
-5. `checkpoint` пересобирает markdown и OpenAPI artifacts.
+3. Система связывает `endpoints` с экранами из `design` и проверяет поля `request/response` против `screen.data`.
+4. `architecture_completeness_errors()` проверяет обзор, директории, сущности, `endpoints`, поля ответа и наличие принципов или шаблонов кода.
+5. `checkpoint` пересобирает Markdown-представления и артефакты OpenAPI.
 
-## Canonical data model
+## Каноническая модель данных
 
 Ключевые группы полей:
 
@@ -91,14 +91,14 @@
 
 - есть `architectureOverview`
 - заполнены `projectStructure.strategy` и `rationale`
-- есть хотя бы одна directory
-- есть хотя бы одна entity с fields
-- есть хотя бы один endpoint
-- хотя бы один endpoint связан со screen
-- есть хотя бы один response field
+- есть хотя бы одна директория
+- есть хотя бы одна сущность с полями
+- есть хотя бы один `endpoint`
+- хотя бы один `endpoint` связан с `screen`
+- есть хотя бы одно поле ответа
 - есть минимум один `codePrinciple` или `pattern`
 
-## Generated artifacts
+## Производные артефакты
 
 - `architecture.md`
 - `data-model.md`
@@ -156,17 +156,17 @@ flowchart LR
     A --> R["architecture.md / data-model.md / openapi.yaml"]
 ```
 
-## Типовые ошибки / drift / ограничения
+## Типовые ошибки, расхождения и ограничения
 
 - endpoint ссылается на неизвестный `screenId`
-- design screen не связан ни с одним endpoint
-- `screen.data.displayed` не отражен в response fields
+- экран из `design` не связан ни с одним `endpoint`
+- `screen.data.displayed` не отражен в полях ответа
 - `--project-structure` передан без разделителя `::`; используй формат `<strategy>::<rationale>`, например `feature-first::Keep bot-connection, workspace, and publish-log isolated by capability`
 - Для `--endpoint-field` секция `response` допустима как shorthand для `response:200`; для явных кодов ответа используй `response:<status>`
 - Не редактируй `.madspec/<BRANCH>/memory/stages/mvp.architecture.json` вручную, даже если validation кажется ложным: исправляй state только через memory CLI
 - `architecture.md` и `openapi.yaml` редактируются вручную
 
-## Соседние команды и handoff
+## Соседние команды и передача дальше
 
 - предыдущая команда: [`madspec.mvp.tech`](./madspec.mvp.tech.md)
 - следующая команда: [`madspec.mvp.plan`](./madspec.mvp.plan.md)

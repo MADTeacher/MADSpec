@@ -2,33 +2,33 @@
 
 ## Назначение команды
 
-`madspec.security` выполняет pragmatic security/privacy audit по текущему change set, codebase и branch context с учетом рисков authn/authz, secrets, input validation, dependencies, data handling и privacy gaps.
+`madspec.security` выполняет практический аудит безопасности и приватности по текущему набору изменений, кодовой базе и контексту ветки с учетом рисков `authn/authz`, `secrets`, `input validation`, `dependencies`, `data handling` и пробелов в приватности.
 
 ## Когда запускать
 
 - после появления рабочего кода
-- перед релизом или hardening
+- перед релизом или усилением защиты
 - после крупных интеграционных или архитектурных изменений
 
-## Preconditions / required context
+## Предварительные условия и обязательный контекст
 
-- есть код или заметный change set
-- branch context доступен
-- отсутствие части артефактов фиксируется как limitation, а не как hard blocker
-- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
+- есть код или заметный набор изменений
+- контекст ветки доступен
+- отсутствие части артефактов фиксируется как ограничение, а не как жесткая блокировка
+- перед началом работы агент обязан прочитать и использовать навык `madspec-cli-operator`
 
 ## Источник истины
 
-### Canonical state
+### Каноническое состояние
 
-- validated security records в `.madspec/<BRANCH>/memory/`
+- проверенные записи безопасности в `.madspec/<BRANCH>/memory/`
 
-### Runtime / working state
+### Рабочее состояние
 
-- implementation progress
-- stage memory из `mvp.implement` или `feature.implement`
+- прогресс реализации
+- память стадии из `mvp.implement` или `feature.implement`
 
-### Generated views
+### Производные представления
 
 - `.madspec/<BRANCH>/security-audit.md`
 - `.madspec/<BRANCH>/project-context.md`
@@ -37,51 +37,51 @@
 
 - `madspec memory retrieve --stage security --toon-output`, если этот контекст читает агент
 - `madspec security status --toon-output`, если этот вывод читает агент
-- при наличии implementation workflow: `madspec memory retrieve --stage mvp.implement|feature.implement --toon-output`, если этот контекст читает агент
-- код, manifests, tests, architecture artifacts
+- при наличии процесса реализации: `madspec memory retrieve --stage mvp.implement|feature.implement --toon-output`, если этот контекст читает агент
+- код, манифесты, тесты, архитектурные артефакты
 - `madspec memory capture --stage security ...`
 - `madspec memory checkpoint --stage security --summary ...`
 
-Поддерживаемые scope режимы из шаблона команды:
+Поддерживаемые режимы охвата из шаблона команды:
 
 - `default`
 - `release`
 - `privacy`
 - `deep`
 
-## Пошаговый runtime workflow
+## Пошаговый процесс выполнения
 
-1. Агент читает security context и implementation state.
+1. Агент читает контекст `security` и состояние реализации.
 2. Агент запускает `madspec security status --toon-output` и фиксирует блокирующие, ожидающие и предупреждающие проверки, активные исключения и статус ратификации.
-3. Определяет ограничения анализа: код, manifests, deployment context, tests.
-4. Выполняет audit по категориям: authn/authz, secrets, injection, dependencies, storage/transport/logging, external integrations.
-5. Отдельно проверяет privacy/data handling gaps.
-6. Сохраняет findings, remediation decisions, constraints и pending actions через `capture`.
+3. Определяет ограничения анализа: код, манифесты, контекст развертывания, тесты.
+4. Выполняет аудит по категориям: `authn/authz`, `secrets`, `injection`, `dependencies`, `storage/transport/logging`, `external integrations`.
+5. Отдельно проверяет пробелы в `privacy/data handling`.
+6. Сохраняет замечания, решения по исправлению, ограничения и отложенные действия через `capture`.
 7. `checkpoint` пересобирает `security-audit.md`.
 
-## Canonical data model
+## Каноническая модель данных
 
 Отдельного `security.json` нет. Источник истины — stage records:
 
-- `facts` для risks и limitations
-- `decisions` для remediation directions и compensating controls
-- `contracts` для security/privacy constraints
-- `questions` для unresolved unknowns
-- `pendingActions` для remediation backlog
+- `facts` для рисков и ограничений
+- `decisions` для направлений исправления и компенсирующих мер
+- `contracts` для ограничений по безопасности и приватности
+- `questions` для неразрешенных вопросов
+- `pendingActions` для списка исправлений
 
-Risk classification в output:
+Классификация риска в выводе:
 
 - `critical`
 - `high`
 - `medium`
 - `low`
 
-## Generated artifacts
+## Производные артефакты
 
 - `security-audit.md`
 - `project-context.md`
 
-Generated view `security-audit.md` также показывает производную секцию `gate summary` и список активных исключений.
+Представление `security-audit.md` также показывает производную секцию `gate summary` и список активных исключений.
 
 ## Диаграммы
 
@@ -131,13 +131,13 @@ flowchart LR
     X --> T["Severity buckets + remediation actions"]
 ```
 
-## Типовые ошибки / drift / ограничения
+## Типовые ошибки, расхождения и ограничения
 
-- отсутствующий deployment context трактуется как доказанный security failure, а не как limitation
-- results сканирования зависимостей выдумываются без фактического запуска tools
+- отсутствие контекста развертывания трактуется как доказанный сбой безопасности, а не как ограничение
+- результаты сканирования зависимостей выдумываются без фактического запуска инструментов
 - `security-audit.md` редактируется вручную
 
-## Соседние команды и handoff
+## Соседние команды и передача дальше
 
 - источники изменений: [`mvp.implement`](../mvp/madspec.mvp.implement.md) или [`feature.implement`](../feature/madspec.feature.implement.md)
 - соседняя quality-команда: [`madspec.review`](./madspec.review.md)
@@ -145,5 +145,5 @@ flowchart LR
 ## Что не является источником истины
 
 - `.madspec/<BRANCH>/security-audit.md`
-- числовой security score, если он не поддержан отдельной моделью
-- устные выводы без validated records
+- числовая оценка безопасности, если она не поддержана отдельной моделью
+- устные выводы без проверенных записей

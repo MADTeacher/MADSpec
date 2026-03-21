@@ -2,34 +2,34 @@
 
 ## Назначение команды
 
-`madspec.feature.init` анализирует существующий проект и формализует цель новой функциональности, ее problem statement, expected outcome и точки интеграции в текущем codebase.
+`madspec.feature.init` анализирует существующий проект и формализует цель новой функциональности, ее постановку проблемы, ожидаемый результат и точки интеграции в текущей кодовой базе.
 
 ## Когда запускать
 
 - при начале работы над новой функциональностью в существующей ветке
-- до любого feature planning
+- до любого планирования feature
 - когда нужно понять, какие файлы, модули и контракты будут затронуты
 
-## Preconditions / required context
+## Предварительные условия и обязательный контекст
 
-- существует codebase для анализа
-- доступен branch context
-- агент готов фиксировать findings в `feature.init.json`, а не только в markdown notes
-- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
+- существует кодовая база для анализа
+- доступен контекст ветки
+- агент готов фиксировать выводы в `feature.init.json`, а не только в заметках Markdown
+- перед началом работы агент обязан прочитать и использовать навык `madspec-cli-operator`
 
 ## Источник истины
 
-### Canonical state
+### Каноническое состояние
 
 - `.madspec/<BRANCH>/memory/stages/feature.init.json`
 
-### Runtime / working state
+### Рабочее состояние
 
 - `active-session.json`
-- semantic stage records
-- минимальный runtime-набор ветки: `progress.json`, `decision-log.jsonl`, `events.jsonl`, `semantic/*.jsonl`
+- семантические записи стадии
+- минимальный рабочий набор ветки: `progress.json`, `decision-log.jsonl`, `events.jsonl`, `semantic/*.jsonl`
 
-### Generated views
+### Производные представления
 
 - `.madspec/<BRANCH>/project-analysis.md`
 - `.madspec/<BRANCH>/feature-context.md`
@@ -44,15 +44,15 @@
 - `madspec memory capture --stage feature.init ...`
 - `madspec memory checkpoint --stage feature.init --summary ...`
 
-## Пошаговый runtime workflow
+## Пошаговый процесс выполнения
 
 1. Агент получает `feature_init_status`.
-2. Анализирует текущий проект, модифицируемые файлы, новые файлы, зависимости и risks.
+2. Анализирует текущий проект, изменяемые файлы, новые файлы, зависимости и риски.
 3. Сохраняет результат через `capture`.
-4. Повторно читает short status и, при необходимости, `--full-artifact`.
+4. Повторно читает краткий статус и, при необходимости, `--full-artifact`.
 5. `checkpoint` ратифицирует `feature.init.json` и пересобирает только производные артефакты `feature.init` и сводку ветки.
 
-## Canonical data model
+## Каноническая модель данных
 
 Ключевые поля:
 
@@ -82,7 +82,7 @@
 - хотя бы одна feature
 - есть `modifiedFiles` или `newFiles`
 
-## Generated artifacts
+## Производные артефакты
 
 - `project-analysis.md`
 - `feature-context.md`
@@ -90,9 +90,9 @@
 - `architecture.md`, собранный из `feature.init`
 - `project-context.md`
 
-## Stage-aware materialization
+## Материализация с учетом стадии
 
-- `feature.init` создает только минимальный runtime-набор ветки, `feature.init.json` и свои производные представления.
+- `feature.init` создает только минимальный рабочий набор ветки, `feature.init.json` и свои производные представления.
 - `concept.md`, `ui-design.md`, `data-model.md`, `contracts/openapi.yaml`, `implementation-plan.md`, `planning-context-cache.md`, `review.md` и `security-audit.md` не должны появляться только из-за `feature.init`.
 - Артефакты других стадий материализуются лениво при первом входе в соответствующую стадию или через команды полной пересборки `madspec memory init`, `madspec memory consolidate`, `madspec memory validate`.
 
@@ -115,7 +115,7 @@ sequenceDiagram
     participant A as Агент
     participant M as Memory API
     participant S as feature.init.json
-    participant G as Generated views
+    participant G as Производные представления
 
     A->>M: retrieve(stage=feature.init)
     M-->>A: feature_init_status
@@ -144,15 +144,15 @@ flowchart LR
     S --> R["architecture.md"]
 ```
 
-## Типовые ошибки / drift / ограничения
+## Типовые ошибки, расхождения и ограничения
 
-- feature IDs не используются дальше в planning
+- идентификаторы feature не используются дальше в планировании
 - изменяемые файлы обсуждены, но не записаны в `modifiedFiles/newFiles`
 - `tech-stack.md` принимается за основной источник истины
 
-## Соседние команды и handoff
+## Соседние команды и передача дальше
 
-- предыдущая команда: начало feature workflow
+- предыдущая команда: начало feature-процесса
 - следующая команда: [`madspec.feature.plan`](./madspec.feature.plan.md)
 
 ## Что не является источником истины

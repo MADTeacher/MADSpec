@@ -2,7 +2,7 @@
 
 ## Назначение команды
 
-`madspec.feature.plan` строит step catalog для feature-ветки и синхронизирует его с `progress.json`, используя feature IDs и integration analysis из `feature.init`.
+`madspec.feature.plan` строит каталог шагов для feature-ветки и синхронизирует его с `progress.json`, используя идентификаторы feature и анализ интеграции из `feature.init`.
 
 Команда должна стремиться к минимально достаточному числу шагов: для небольшой feature или легкого изменения агент выбирает один полный шаг, а не серию микро-шагов без реальной необходимости.
 
@@ -12,28 +12,28 @@
 - при добавлении новых шагов реализации feature
 - до начала `feature.implement`
 
-## Preconditions / required context
+## Предварительные условия и обязательный контекст
 
-- существует ratified `feature.init.json`
-- planning coverage использует feature IDs из `feature.init`
-- generated planning files не редактируются вручную
-- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
+- существует ратифицированный `feature.init.json`
+- покрытие плана использует идентификаторы feature из `feature.init`
+- производные файлы планирования не редактируются вручную
+- перед началом работы агент обязан прочитать и использовать навык `madspec-cli-operator`
 
 ## Источник истины
 
-### Canonical state
+### Каноническое состояние
 
 - `.madspec/<BRANCH>/memory/stages/feature.plan.json`
 - `.madspec/<BRANCH>/memory/progress.json`
 
-### Runtime / working state
+### Рабочее состояние
 
 - `stepMetadata`
 - `stepStatus`
 - `planningMetadata.stepDependencies`
 - `coversFunctions`
 
-### Generated views
+### Производные представления
 
 - `.madspec/<BRANCH>/implementation-plan.md`
 - `.madspec/<BRANCH>/planning-context-cache.md`
@@ -48,19 +48,19 @@
 - `madspec memory register-step --stage feature.plan ...`
 - `madspec memory checkpoint --stage feature.plan --summary ...`
 
-Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`, чтобы feature plan не расходился с project-global active policies.
+Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`, чтобы feature-план не расходился с действующими общепроектными правилами.
 
-## Пошаговый runtime workflow
+## Пошаговый процесс выполнения
 
 1. Агент читает `feature.init_status` и `feature_plan_status`.
    Первый вход в стадию лениво материализует `feature.plan.json`, `implementation-plan.md`, `planning-context-cache.md` и `project-context.md`, если их еще нет.
-2. Агент читает `policy_context` и учитывает active policies при выборе `stepKind`, `tddPolicy` и зависимостей.
+2. Агент читает `policy_context` и учитывает действующие правила при выборе `stepKind`, `tddPolicy` и зависимостей.
 3. Определяет максимально крупный безопасный шаг для текущей feature-итерации.
-4. Фиксирует planning strategy для feature.
+4. Фиксирует стратегию планирования для feature.
 5. Проверяет candidate step через `next-step`.
 6. Регистрирует шаг через `register-step`, связывая `covers` с feature IDs.
-7. Runtime обновляет `feature.plan.json`, `progress.json` и generated planning views.
-8. `checkpoint` ратифицирует feature plan.
+7. Система обновляет `feature.plan.json`, `progress.json` и производные представления плана.
+8. `checkpoint` ратифицирует feature-план.
 
 ## Правила гранулярности шага
 
@@ -70,7 +70,7 @@
 - Делить feature на несколько шагов нужно только при реальных зависимостях, отдельных пользовательских проверках, заметно разных рисках или явной просьбе пользователя получить подробный план.
 - Если нет убедительной причины дробить, выбирай меньшее число шагов.
 
-## Canonical data model
+## Каноническая модель данных
 
 `feature.plan.json` использует ту же форму, что и `mvp.plan.json`:
 
@@ -86,23 +86,23 @@
 - есть хотя бы один step
 - step catalog валиден по `stepKind`, `tddPolicy`, `size`, `complexity`
 
-Reference rules:
+Правила согласованности:
 
-- каждый planned step из `progress.json` присутствует в `feature.plan.json`
+- каждый запланированный шаг из `progress.json` присутствует в `feature.plan.json`
 - у каждого шага есть обязательные step files
 - `covers` синхронизирован с feature IDs из `feature.init`
 
-## Generated artifacts
+## Производные артефакты
 
 - `implementation-plan.md`
 - `planning-context-cache.md`
 - `steps/<step-id>/planning-context.md`
 - `project-context.md`
 
-## Stage-aware materialization
+## Материализация с учетом стадии
 
 - До первого реального входа в `feature.plan` файлы `feature.plan.json`, `implementation-plan.md` и `planning-context-cache.md` могут отсутствовать.
-- Их отсутствие после `feature.init` не считается drift.
+- Их отсутствие после `feature.init` не считается расхождением.
 - `madspec memory init`, `madspec memory consolidate` и `madspec memory validate` по-прежнему могут собрать полный набор артефактов ветки.
 
 ## Диаграммы
@@ -156,13 +156,13 @@ flowchart LR
     R --> I
 ```
 
-## Типовые ошибки / drift / ограничения
+## Типовые ошибки, расхождения и ограничения
 
 - `covers` использует свободный текст вместо feature IDs
 - шаги есть в `progress.json`, но отсутствуют в `feature.plan.json`
-- агент использует generated plan view как primary source
+- агент использует производное представление плана как основной источник
 
-## Соседние команды и handoff
+## Соседние команды и передача дальше
 
 - предыдущая команда: [`madspec.feature.init`](./madspec.feature.init.md)
 - следующая команда: [`madspec.feature.implement`](./madspec.feature.implement.md)

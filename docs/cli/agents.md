@@ -157,15 +157,15 @@ JSON-файл должен содержать:
 - `--branch <name>`
 - `--stage <stage>`
 - `--step-id <id>`
-- `--session-key <key>` — выбрать session-local runtime-контекст; по умолчанию используется `active`
-- `--task-id <id>` — явно выбрать task coordination вместо автодетекта по session
-- `--work-item-id <id>` — явно выбрать work item вместо автодетекта по session
+- `--session-key <key>` — выбрать локальный контекст выполнения для сеанса; по умолчанию используется `active`
+- `--task-id <id>` — явно выбрать координацию через `task` вместо автоопределения по сеансу
+- `--work-item-id <id>` — явно выбрать `work item` вместо автоопределения по сеансу
 - `--json-output`
 - `--toon-output` — отдать тот же контекст в TOON-представлении для прямого чтения агентом
 
-Для rollout важно различать два режима:
+Для режима включения важно различать два варианта:
 
-- при default-конфиге с `parallelRuntime.phase2Enabled=false` команда остается session-aware, но не подгружает coordinator payload автоматически и не обещает Phase 2 semantics;
+- при конфигурации по умолчанию с `parallelRuntime.phase2Enabled=false` команда остается чувствительной к сеансу, но не подгружает автоматически `coordinator`-данные и не обещает семантику `Phase 2`;
 - при `parallelRuntime.phase2Enabled=true` команда может читать `task/work-item` binding, related proposals и coordinator readiness.
 
 Контекст собирается на основе:
@@ -175,11 +175,11 @@ JSON-файл должен содержать:
 - статуса gate-проверок
 - краткой сводки активного пакета изменений
 
-Для сценария “реализация текущего шага и параллельное планирование следующего” ориентируйся на session-aware пару команд: `madspec memory retrieve --session-key ...` для минимального контекста и `madspec memory explain --session-key ...` для объяснения локального session focus и общего workflow state.
+Для сценария "реализация текущего шага и параллельное планирование следующего" ориентируйся на пару команд, учитывающих сеанс: `madspec memory retrieve --session-key ...` для минимального контекста и `madspec memory explain --session-key ...` для объяснения локального фокуса сеанса и общего состояния процесса.
 
-Флаг `--session-key` нужен только для выбора session-local runtime-контекста. Он не превращает команду в диспетчер задач и не добавляет отдельный протокол координации.
+Флаг `--session-key` нужен только для выбора локального контекста выполнения для сеанса. Он не превращает команду в диспетчер задач и не добавляет отдельный протокол координации.
 
-В top-level payload команда также возвращает `session_key`, а поле `active_session` пока остается совместимым псевдонимом для уже разрешенной session payload.
+В корневом `payload` команда также возвращает `session_key`, а поле `active_session` пока остается совместимым псевдонимом для уже разрешенного содержимого сеанса.
 
 Если `parallelRuntime.phase2Enabled=true` и у сеанса уже есть активный claim на work item, команда автоматически добавляет в payload блок `coordination`:
 
@@ -195,23 +195,23 @@ JSON-файл должен содержать:
 - `scheduler_hints`
 - `dependency_state`
 
-При необходимости этот же координационный контекст можно жестко зафиксировать через `--task-id` и `--work-item-id`, но только в opt-in режиме Phase 2.
+При необходимости этот же координационный контекст можно жестко зафиксировать через `--task-id` и `--work-item-id`, но только в режиме `Phase 2` с явным включением.
 
-Если claimed session уже работает внутри task coordination, summary proposals помогает понять, есть ли pending apply, последний статус и какие `proposal_id` сейчас связаны с work item. Coordinator block дополнительно объясняет readiness, ownership и hard dependencies. Это read-only explain/export слой поверх coordinator runtime, а не process runner.
+Если занятый сеанс уже работает внутри координации по `task`, сводка по `proposals` помогает понять, есть ли ожидающее применение, каков последний статус и какие `proposal_id` сейчас связаны с `work item`. Блок `coordinator` дополнительно объясняет готовность, владение и жесткие зависимости. Это слой чтения и объяснения поверх координационного состояния, а не исполнитель процесса.
 
-Так как `madspec memory retrieve` теперь возвращает также `runtime_revision`, субагент может использовать этот номер как основу для последующих mutating memory-команд. Если после чтения контекста роль должна вызвать `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` или `complete-step`, в automation- и multi-agent сценариях стоит передавать `--expected-revision`, чтобы запись не затерла более свежее состояние ветки.
+Так как `madspec memory retrieve` теперь возвращает также `runtime_revision`, субагент может использовать этот номер как основу для последующих изменяющих команд `memory`. Если после чтения контекста роль должна вызвать `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` или `complete-step`, в сценариях автоматизации и работы нескольких агентов стоит передавать `--expected-revision`, чтобы запись не затерла более свежее состояние ветки.
 
-Если роли нужно не только прочитать контекст, но и понять расхождение между своим session-local focus и общим execution cursor ветки, используй `madspec memory explain --session-key <key>`. В том числе полезен буквальный вызов `madspec memory explain --session-key` с нужным значением сеанса. Эта команда показывает session-local `current_step`, общий `currentImplementStep`, следующий исполнимый шаг и planning-derived поля в одном payload.
+Если роли нужно не только прочитать контекст, но и понять расхождение между собственным локальным фокусом сеанса и общим указателем выполнения ветки, используй `madspec memory explain --session-key <key>`. Эта команда показывает локальный `current_step`, общий `currentImplementStep`, следующий исполнимый шаг и производные поля планирования в одном `payload`.
 
-Для hot write paths одного `--expected-revision` теперь недостаточно: `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` могут вернуть `kind="scope_busy"`, если другой writer уже удерживает scoped lease на тот же runtime scope. Это временная занятость scope, а не ревизионный конфликт, и именно поэтому в контракте фигурирует payload kind `` `scope_busy` ``.
+Для самых горячих путей записи одного `--expected-revision` теперь недостаточно: `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` могут вернуть `kind="scope_busy"`, если другой процесс уже удерживает ограниченную аренду записи на ту же область состояния. Это временная занятость области, а не конфликт ревизий.
 
-В текущей реализации это по-прежнему граница экспорта контекста для конкретной роли и текущего runtime state ветки. Команда умеет читать уже существующую привязку `task` / `work-item` и coordinator readiness только в opt-in режиме `parallelRuntime.phase2Enabled=true`, а жизненный цикл состояния координации создается и изменяется не здесь, а через `madspec memory tasks ...`, `madspec memory work-items ...`, `madspec memory proposals ...` и `madspec memory coordinator explain`.
+В текущей реализации это по-прежнему граница экспорта контекста для конкретной роли и текущего состояния выполнения ветки. Команда умеет читать уже существующую привязку `task` / `work-item` и готовность `coordinator` только в режиме с явным включением `parallelRuntime.phase2Enabled=true`, а жизненный цикл координационного состояния создается и изменяется не здесь, а через `madspec memory tasks ...`, `madspec memory work-items ...`, `madspec memory proposals ...` и `madspec memory coordinator explain`.
 
 ## Встроенные И Запасные Адаптеры
 
 В v1 MADSpec не реализует собственный диспетчер субагентов. Он управляет только каноническим состоянием и адаптерами среды.
 
-Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`, и теперь он расширен до coordinator runtime с explicit dependencies, readiness explain и proposal-based commit flow. Сейчас этот слой считается Phase 2 и остается opt-in через `parallelRuntime.phase2Enabled`, не запускает субагентов сам и остается каноническим orchestration protocol для внешней среды.
+Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`, и теперь он расширен до координационного состояния с явными зависимостями, объяснением готовности и потоком применения через `proposal`. Сейчас этот слой считается `Phase 2`, включается явно через `parallelRuntime.phase2Enabled`, не запускает субагентов сам и остается каноническим протоколом оркестрации для внешней среды.
 
 - Встроенные адаптеры: Cursor, GitHub Copilot, OpenCode, Qwen Code
 - Запасные адаптеры: Kilo Code, Roo Code, SourceCraft

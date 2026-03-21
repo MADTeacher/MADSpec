@@ -2,34 +2,34 @@
 
 ## Назначение команды
 
-`madspec.review` выполняет branch-aware review качества: сверяет реализацию, progress state и generated views с intent ветки и формирует findings и improvement backlog.
+`madspec.review` выполняет проверку качества с учетом ветки: сверяет реализацию, состояние `progress` и производные представления с замыслом ветки и формирует замечания и список улучшений.
 
 ## Когда запускать
 
-- после заметного change set
-- после завершения одного или нескольких implementation steps
+- после заметного набора изменений
+- после завершения одного или нескольких шагов реализации
 - перед рефакторингом или подготовкой к релизу
 
-## Preconditions / required context
+## Предварительные условия и обязательный контекст
 
-- есть codebase или существенные изменения для анализа
+- есть кодовая база или существенные изменения для анализа
 - доступна текущая ветка
-- отсутствие части generated artifacts не должно автоматически блокировать review
-- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
+- отсутствие части производных артефактов не должно автоматически блокировать review
+- перед началом работы агент обязан прочитать и использовать навык `madspec-cli-operator`
 
 ## Источник истины
 
-### Canonical state
+### Каноническое состояние
 
-- validated review records в `.madspec/<BRANCH>/memory/`
+- проверенные записи review в `.madspec/<BRANCH>/memory/`
 
-### Runtime / working state
+### Рабочее состояние
 
 - `progress.json`
 - `working/active-session.json`
-- implementation stage records
+- записи стадии реализации
 
-### Generated views
+### Производные представления
 
 - `.madspec/<BRANCH>/review.md`
 - `.madspec/<BRANCH>/improvements.md`
@@ -46,38 +46,38 @@
 
 Из `retrieve` агент обязан читать `policy_context.required`, `policy_context.advisory`, `policy_context.violations` и `policy_context.confirmations`, а `madspec review status` использовать как сводку блокирующих, ожидающих и предупреждающих проверок, а также активных исключений. Если этот вывод читает агент, используй `--toon-output`.
 
-## Пошаговый runtime workflow
+## Пошаговый процесс выполнения
 
-1. Агент читает `review` memory context.
+1. Агент читает контекст `review` из памяти.
 2. Агент запускает `madspec review status --toon-output` и фиксирует блокирующие, ожидающие и предупреждающие проверки, активные исключения и статус ратификации.
 3. Агент запускает `madspec policy validate --stage review --toon-output` и подмешивает violations, advisories и confirmations в review evidence.
-4. Определяет актуальный implementation workflow: `mvp.implement` или `feature.implement`.
-5. Загружает progress, implementation plan, step contexts и branch artifacts.
-6. Проводит fit-gap review, code/test review, architecture/integration review и improvement triage.
+4. Определяет актуальный процесс реализации: `mvp.implement` или `feature.implement`.
+5. Загружает `progress`, план реализации, контексты шагов и артефакты ветки.
+6. Проводит анализ расхождений, проверку кода и тестов, проверку архитектуры и интеграций, а также разбор списка улучшений.
 7. Сохраняет findings, decisions, questions и pending actions через `capture`, включая наблюдения по контрольным проверкам и правилам проекта.
 8. `checkpoint` пересобирает `review.md` и `improvements.md`.
 
-## Canonical data model
+## Каноническая модель данных
 
-Review не использует отдельный stage JSON. Источник истины — validated records:
+Review не использует отдельный JSON стадии. Источник истины — проверенные записи:
 
-- `facts` для findings и limitations
-- `decisions` для accepted remediation directions
-- `questions` для open issues
-- `pendingActions` для improvement backlog
+- `facts` для замечаний и ограничений
+- `decisions` для принятых направлений исправления
+- `questions` для открытых вопросов
+- `pendingActions` для списка улучшений
 
 Checkpoint требует:
 
 - `summary`
-- либо новые validated records, либо уже накопленный stage memory
+- либо новые проверенные записи, либо уже накопленная память стадии
 
-## Generated artifacts
+## Производные артефакты
 
 - `review.md`
 - `improvements.md`
 - `project-context.md`
 
-Generated view `review.md` также показывает производную секцию `gate summary` и список активных исключений.
+Представление `review.md` также показывает производную секцию `gate summary` и список активных исключений.
 
 ## Диаграммы
 
@@ -97,7 +97,7 @@ sequenceDiagram
     participant M as Memory API
     participant P as progress/artifacts
     participant R as review records
-    participant G as generated review views
+    participant G as производные представления review
 
     A->>M: retrieve(stage=review)
     A->>P: read code, tests, progress, artifacts
@@ -125,13 +125,13 @@ flowchart LR
     F --> R["Review findings"]
 ```
 
-## Типовые ошибки / drift / ограничения
+## Типовые ошибки, расхождения и ограничения
 
-- review блокируется только потому, что отсутствует часть generated artifacts
-- findings остаются в чате и не фиксируются в memory
+- review блокируется только потому, что отсутствует часть производных артефактов
+- замечания остаются в чате и не фиксируются в памяти
 - backlog улучшений не разделен по приоритету
 
-## Соседние команды и handoff
+## Соседние команды и передача дальше
 
 - источник изменений: [`mvp.implement`](../mvp/madspec.mvp.implement.md) или [`feature.implement`](../feature/madspec.feature.implement.md)
 - соседняя quality-команда: [`madspec.security`](./madspec.security.md)
@@ -140,4 +140,4 @@ flowchart LR
 
 - `.madspec/<BRANCH>/review.md`
 - `.madspec/<BRANCH>/improvements.md`
-- устный review-отчет без validated records
+- устный review-отчет без проверенных записей

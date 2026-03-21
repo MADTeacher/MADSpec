@@ -2,7 +2,7 @@
 
 ## Назначение команды
 
-`madspec.mvp.plan` строит step catalog реализации и синхронизирует planning state с `progress.json`, step directories и generated planning views.
+`madspec.mvp.plan` строит каталог шагов реализации и синхронизирует состояние планирования с `progress.json`, директориями шагов и производными представлениями плана.
 
 Команда должна стремиться к минимально достаточному числу шагов: для простой задачи агент выбирает один полный шаг, а не несколько искусственно раздробленных.
 
@@ -12,21 +12,21 @@
 - каждый раз, когда нужно добавить или уточнить шаги реализации
 - до начала `mvp.implement`
 
-## Preconditions / required context
+## Предварительные условия и обязательный контекст
 
 - завершены предыдущие MVP стадии
 - существует или может быть создан `.madspec/<BRANCH>/memory/progress.json`
 - `currentImplementStep` нельзя менять вручную
-- перед началом работы агент обязан прочитать и использовать skill `madspec-cli-operator`
+- перед началом работы агент обязан прочитать и использовать навык `madspec-cli-operator`
 
 ## Источник истины
 
-### Canonical state
+### Каноническое состояние
 
 - `.madspec/<BRANCH>/memory/stages/mvp.plan.json`
 - `.madspec/<BRANCH>/memory/progress.json`
 
-### Runtime / working state
+### Рабочее состояние
 
 - `planningMetadata.stepDependencies`
 - `stepMetadata`
@@ -34,7 +34,7 @@
 - `coversFunctions`
 - `plannedSteps`
 
-### Generated views
+### Производные представления
 
 - `.madspec/<BRANCH>/implementation-plan.md`
 - `.madspec/<BRANCH>/planning-context-cache.md`
@@ -49,18 +49,18 @@
 - `madspec memory register-step --stage mvp.plan ...`
 - `madspec memory checkpoint --stage mvp.plan --summary ...`
 
-Из `retrieve` агент обязан прочитать `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`, потому что planning decisions теперь проходят через project-global policy layer.
+Из `retrieve` агент обязан прочитать `policy_context.required`, `policy_context.advisory` и `policy_context.pending_proposals_count`, потому что решения по планированию теперь проходят через общий проектный слой правил.
 
-## Пошаговый runtime workflow
+## Пошаговый процесс выполнения
 
 1. Агент читает `mvp.architecture` и затем `plan_status`.
-2. Агент читает `policy_context` и сверяет новый шаг с active policies текущей стадии.
+2. Агент читает `policy_context` и сверяет новый шаг с действующими правилами текущей стадии.
 3. Определяет максимально крупный безопасный шаг для текущей итерации.
-4. Фиксирует planning strategy через `capture`.
+4. Фиксирует стратегию планирования через `capture`.
 5. Для каждого нового шага проверяет ID и зависимости через `next-step`.
 6. Регистрирует шаг через `register-step`, а не через ручное редактирование JSON.
-7. Runtime обновляет `mvp.plan.json`, `progress.json`, step metadata, dependency graph и progress metrics.
-8. После серии изменений агент ратифицирует stage через `checkpoint`.
+7. Система обновляет `mvp.plan.json`, `progress.json`, метаданные шагов, граф зависимостей и метрики прогресса.
+8. После серии изменений агент ратифицирует стадию через `checkpoint`.
 
 ## Правила гранулярности шага
 
@@ -70,7 +70,7 @@
 - Делить работу на несколько шагов нужно только при реальных зависимостях, разных точках пользовательской проверки, заметно разных рисках или явной просьбе пользователя о более детальном плане.
 - Если есть сомнение между двумя и тремя шагами без явной причины, выбирай меньшее число шагов.
 
-## Canonical data model
+## Каноническая модель данных
 
 `mvp.plan.json`:
 
@@ -98,14 +98,14 @@
 - `stepCatalog` не пуст
 - каждый step имеет валидные `title`, `stepKind`, `tddPolicy`, `size`, `complexity`
 
-Reference checks:
+Проверки согласованности:
 
-- каждый planned step присутствует в `stepCatalog`
+- каждый запланированный шаг присутствует в `stepCatalog`
 - существует `steps/<step-id>/`
 - существуют `description.md`, `tasks.md`, `tests.md`, `validation.md`
 - `dependsOn`, `covers`, `stepKind`, `tddPolicy` синхронизированы с `progress.json`
 
-## Generated artifacts
+## Производные артефакты
 
 - `implementation-plan.md`
 - `planning-context-cache.md`
@@ -143,7 +143,7 @@ sequenceDiagram
         M-->>A: accepted/rejected
         A->>M: register-step(...)
         M->>P: update stepCatalog
-        M->>R: update planning runtime
+        M->>R: обновление состояния планирования
         M->>S: ensure step artifacts
     end
     A->>M: checkpoint(summary)
@@ -169,14 +169,14 @@ flowchart LR
     P --> I["implementation-plan.md"]
 ```
 
-## Типовые ошибки / drift / ограничения
+## Типовые ошибки, расхождения и ограничения
 
 - ручное изменение `currentImplementStep`
 - шаг добавлен в `progress.json`, но не зарегистрирован через `register-step`
 - отсутствуют обязательные step files
-- dependency graph в `planningMetadata` не совпадает с `stepCatalog`
+- граф зависимостей в `planningMetadata` не совпадает с `stepCatalog`
 
-## Соседние команды и handoff
+## Соседние команды и передача дальше
 
 - предыдущая команда: [`madspec.mvp.architecture`](./madspec.mvp.architecture.md)
 - следующая команда: [`madspec.mvp.implement`](./madspec.mvp.implement.md)
