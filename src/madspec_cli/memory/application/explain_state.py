@@ -91,14 +91,25 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
         for key in STATUS_VIEW_KEYS
         if context.get(key) is not None
     }
+    workflow = context["workflow"]
+    active_session = context["active_session"]
     summary = {
         "stage": request.stage,
         "step_id": context.get("step_id"),
         "selected_step": (next_step_analysis or {}).get("selected_step"),
         "next_step_reason": (next_step_analysis or {}).get("reason"),
-        "active_goal": context["active_session"].get("active_goal"),
-        "open_questions_count": len(context["active_session"].get("open_questions", [])),
+        "session_key": request.session_key,
+        "session_current_step": active_session.get("current_step"),
+        "shared_current_implement_step": workflow.get("currentImplementStep"),
+        "next_executable_step": workflow.get("nextExecutableStep"),
+        "last_planned_step": workflow.get("lastPlannedStep"),
+        "planning_phase": workflow.get("planningPhase"),
+        "progress_metrics": workflow.get("progressMetrics", {}),
+        "active_goal": active_session.get("active_goal"),
+        "open_questions_count": len(active_session.get("open_questions", [])),
         "recall_match_count": len(context["recall"].get("merged", [])),
+        "task_id": (context.get("coordination") or {}).get("session_binding", {}).get("task_id"),
+        "work_item_id": (context.get("coordination") or {}).get("session_binding", {}).get("work_item_id"),
     }
 
     return ExplainStateResult(
@@ -114,6 +125,7 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
                 "step": context["step"],
                 "stage_memory": context["stage_memory"],
                 "semantic": context["semantic"],
+                "coordination": context.get("coordination"),
                 "change_context": context.get("change_context"),
                 "status_views": status_views,
                 "gate_summary": gate_summary,

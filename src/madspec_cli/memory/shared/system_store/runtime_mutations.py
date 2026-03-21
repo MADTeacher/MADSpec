@@ -17,6 +17,7 @@ class RuntimeMutationPlan:
     stage_snapshots: list[dict[str, Any]]
     sessions: list[dict[str, Any]]
     records: list[dict[str, Any]]
+    work_items: list[dict[str, Any]] = field(default_factory=list)
     response_payload: dict[str, Any] = field(default_factory=dict)
 
 
@@ -88,6 +89,7 @@ def commit_runtime_mutation(
                 stage_snapshots=normalized_plan.stage_snapshots,
                 sessions=normalized_plan.sessions,
                 records=normalized_plan.records,
+                work_items=normalized_plan.work_items,
                 branch_revision_after=branch_revision_after,
                 conn=conn,
             )
@@ -170,6 +172,7 @@ def _normalize_runtime_mutation_plan(
         stage_snapshots=snapshots,
         sessions=sessions,
         records=[dict(record) for record in plan.records],
+        work_items=[dict(work_item) for work_item in plan.work_items],
         response_payload=dict(plan.response_payload),
     )
 

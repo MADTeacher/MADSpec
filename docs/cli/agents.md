@@ -158,6 +158,8 @@ JSON-файл должен содержать:
 - `--stage <stage>`
 - `--step-id <id>`
 - `--session-key <key>` — выбрать session-local runtime-контекст; по умолчанию используется `active`
+- `--task-id <id>` — явно выбрать task coordination вместо автодетекта по session
+- `--work-item-id <id>` — явно выбрать work item вместо автодетекта по session
 - `--json-output`
 - `--toon-output` — отдать тот же контекст в TOON-представлении для прямого чтения агентом
 
@@ -168,21 +170,34 @@ JSON-файл должен содержать:
 - статуса gate-проверок
 - краткой сводки активного пакета изменений
 
+Для сценария “реализация текущего шага и параллельное планирование следующего” ориентируйся на session-aware пару команд: `madspec memory retrieve --session-key ...` для минимального контекста и `madspec memory explain --session-key ...` для объяснения локального session focus и общего workflow state.
+
 Флаг `--session-key` нужен только для выбора session-local runtime-контекста. Он не превращает команду в диспетчер задач и не добавляет отдельный протокол координации.
 
 В top-level payload команда также возвращает `session_key`, а поле `active_session` пока остается совместимым псевдонимом для уже разрешенной session payload.
 
+Если у сеанса уже есть активный claim на work item, команда автоматически добавляет в payload блок `coordination`:
+
+- `task`
+- `work_item`
+- `claim`
+- `session_binding`
+
+При необходимости этот же координационный контекст можно жестко зафиксировать через `--task-id` и `--work-item-id`.
+
 Так как `madspec memory retrieve` теперь возвращает также `runtime_revision`, субагент может использовать этот номер как основу для последующих mutating memory-команд. Если после чтения контекста роль должна вызвать `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` или `complete-step`, в automation- и multi-agent сценариях стоит передавать `--expected-revision`, чтобы запись не затерла более свежее состояние ветки.
+
+Если роли нужно не только прочитать контекст, но и понять расхождение между своим session-local focus и общим execution cursor ветки, используй `madspec memory explain --session-key <key>`. В том числе полезен буквальный вызов `madspec memory explain --session-key` с нужным значением сеанса. Эта команда показывает session-local `current_step`, общий `currentImplementStep`, следующий исполнимый шаг и planning-derived поля в одном payload.
 
 Для hot write paths одного `--expected-revision` теперь недостаточно: `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` могут вернуть `kind="scope_busy"`, если другой writer уже удерживает scoped lease на тот же runtime scope. Это временная занятость scope, а не ревизионный конфликт, и именно поэтому в контракте фигурирует payload kind `` `scope_busy` ``.
 
-В текущей реализации это экспорт контекста, ограниченный конкретной ролью и текущим состоянием проекта и ветки. Команда не является встроенным координатором выполнения, не управляет жизненным циклом `task` и `work-item` и не вводит отдельный протокол оркестрации по сессиям.
+В текущей реализации это по-прежнему граница экспорта контекста для конкретной роли и текущего runtime state ветки. Команда умеет читать уже существующую привязку `task` / `work-item`, но жизненный цикл состояния координации создается и изменяется не здесь, а через `madspec memory tasks ...` и `madspec memory work-items ...`.
 
 ## Встроенные И Запасные Адаптеры
 
 В v1 MADSpec не реализует собственный диспетчер субагентов. Он управляет только каноническим состоянием и адаптерами среды.
 
-Оркестрация с `task`, `work-item` и `proposal`, а также расширенный multi-agent runtime описаны в `dev/parallel-memory-roadmap.md` и пока не считаются реализованной частью `madspec agents`.
+Базовый слой координации с `task` и `work-item` уже реализован в `madspec memory`. Следующие фазы roadmap по-прежнему остаются впереди: proposal-based commits, coordinator runtime и расширенная multi-agent диагностика.
 
 - Встроенные адаптеры: Cursor, GitHub Copilot, OpenCode, Qwen Code
 - Запасные адаптеры: Kilo Code, Roo Code, SourceCraft

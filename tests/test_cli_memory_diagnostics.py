@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 
 from madspec_cli.memory import append_jsonl, get_memory_paths, make_record, write_json
+from madspec_cli.memory.shared.system_store.canonical_state import load_canonical_branch_state
+from madspec_cli.memory.shared.system_store.sessions import save_runtime_session
 from madspec_cli.memory.shared.system_store.store import MemoryStore
 
 from tests.support import step_metadata, step_status
@@ -122,6 +124,102 @@ def test_memory_why_next_step_and_explain_show_step_reasoning(init_memory_branch
     assert why_text_result.exit_code == 0, why_text_result.stdout
     assert "Selected step:" in why_text_result.stdout
     assert "gates=" in why_text_result.stdout
+
+
+def test_memory_explain_supports_session_local_focus(init_memory_branch, invoke_cli) -> None:
+    project_path = init_memory_branch(branch="main")
+    paths = get_memory_paths(project_path, "main")
+    _write_progress(
+        paths,
+        planned_steps=["step-01-bootstrap", "step-02-auth-flow", "step-03-billing"],
+        completed_steps=[],
+    )
+    payload = json.loads(paths.progress.read_text(encoding="utf-8"))
+    payload["currentImplementStep"] = "step-01-bootstrap"
+    payload["stepStatus"]["step-01-bootstrap"] = step_status(status="in_progress", tdd_phase="green")
+    payload["planningMetadata"]["lastPlannedStep"] = "step-02-auth-flow"
+    write_json(paths.progress, payload)
+
+    load_canonical_branch_state(project_path, "main")
+    save_runtime_session(
+        project_path,
+        branch_name="main",
+        session_key="planner",
+        payload={
+            "branch": "main",
+            "session_key": "planner",
+            "stage": "mvp.plan",
+            "current_step": "step-02-auth-flow",
+            "active_goal": "Plan the next step",
+            "open_questions": [],
+            "pending_actions": [],
+            "current_hypotheses": [],
+            "last_checkpoint_at": "2026-03-10T10:00:00+00:00",
+            "updated_at": "2026-03-10T10:00:00+00:00",
+        },
+    )
+    save_runtime_session(
+        project_path,
+        branch_name="main",
+        session_key="impl",
+        payload={
+            "branch": "main",
+            "session_key": "impl",
+            "stage": "mvp.implement",
+            "current_step": "step-01-bootstrap",
+            "active_goal": "Implement the current step",
+            "open_questions": [],
+            "pending_actions": [],
+            "current_hypotheses": [],
+            "last_checkpoint_at": "2026-03-10T10:05:00+00:00",
+            "updated_at": "2026-03-10T10:05:00+00:00",
+        },
+    )
+
+    planner_result = invoke_cli(
+        [
+            "memory",
+            "explain",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--session-key",
+            "planner",
+            "--json-output",
+        ]
+    )
+    impl_result = invoke_cli(
+        [
+            "memory",
+            "explain",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.implement",
+            "--session-key",
+            "impl",
+            "--json-output",
+        ]
+    )
+
+    assert planner_result.exit_code == 0, planner_result.stdout
+    assert impl_result.exit_code == 0, impl_result.stdout
+
+    planner_payload = json.loads(planner_result.stdout)
+    impl_payload = json.loads(impl_result.stdout)
+
+    assert planner_payload["summary"]["session_key"] == "planner"
+    assert planner_payload["summary"]["session_current_step"] == "step-02-auth-flow"
+    assert impl_payload["summary"]["session_key"] == "impl"
+    assert impl_payload["summary"]["session_current_step"] == "step-01-bootstrap"
+    assert planner_payload["summary"]["shared_current_implement_step"] == "step-01-bootstrap"
+    assert impl_payload["summary"]["shared_current_implement_step"] == "step-01-bootstrap"
+    assert planner_payload["summary"]["next_executable_step"] == "step-01-bootstrap"
+    assert impl_payload["summary"]["next_executable_step"] == "step-01-bootstrap"
+    assert planner_payload["summary"]["last_planned_step"] == "step-03-billing"
+    assert planner_payload["summary"]["planning_phase"] == "incremental"
+    assert planner_payload["summary"]["progress_metrics"]["p1Coverage"]["covered"] == 2
 
 
 def test_memory_timeline_includes_progress_snapshot_and_retrieval_runs(init_memory_branch, invoke_cli) -> None:

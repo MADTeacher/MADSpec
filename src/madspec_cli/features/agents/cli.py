@@ -295,6 +295,8 @@ def context_command(
     stage: str = typer.Option(None, "--stage", help="Необязательная замена стадии"),
     session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Ключ runtime-сеанса; по умолчанию legacy active"),
     step_id: str = typer.Option(None, "--step-id", help="Необязательный идентификатор шага"),
+    task_id: str = typer.Option(None, "--task-id", help="Необязательный идентификатор task coordination"),
+    work_item_id: str = typer.Option(None, "--work-item-id", help="Необязательный идентификатор work item"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
     toon_output: bool = typer.Option(False, "--toon-output", help="Вывести TOON для агентского контекста"),
 ) -> None:
@@ -308,6 +310,8 @@ def context_command(
                 stage=stage,
                 session_key=session_key,
                 step_id=step_id,
+                task_id=task_id,
+                work_item_id=work_item_id,
             )
         ).to_payload()
     except Exception as exc:

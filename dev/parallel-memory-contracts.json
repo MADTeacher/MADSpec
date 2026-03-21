@@ -1,5 +1,5 @@
 {
-  "epic": "epic-4-scoped-leases-and-ownership",
+  "epic": "epic-6-task-work-item-model",
   "roadmap_document": "dev/parallel-memory-roadmap.md",
   "default_session_key": "active",
   "scope": "docs+contracts+behavior",
@@ -15,6 +15,7 @@
   "session_scoped_commands": [
     "madspec memory retrieve",
     "madspec memory search",
+    "madspec memory explain",
     "madspec memory capture",
     "madspec memory checkpoint",
     "madspec memory register-step",
@@ -31,9 +32,21 @@
     "madspec memory checkpoint-step",
     "madspec memory complete-step"
   ],
+  "coordination_commands": [
+    "madspec memory tasks create",
+    "madspec memory tasks list",
+    "madspec memory work-items create",
+    "madspec memory work-items list",
+    "madspec memory work-items claim",
+    "madspec memory work-items release"
+  ],
   "reserved_cli_flags": [
     "--session-key",
     "--expected-revision"
+  ],
+  "coordination_context_flags": [
+    "--task-id",
+    "--work-item-id"
   ],
   "reserved_payload_kinds": [
     "conflict",
@@ -46,6 +59,10 @@
       "madspec_cli.memory.application.checkpoint_stage.CheckpointStageRequest",
       "madspec_cli.memory.application.register_step.RegisterStepRequest",
       "madspec_cli.memory.application.implementation_steps.ImplementationStepRequest",
+      "madspec_cli.memory.application.orchestration.CreateTaskRequest",
+      "madspec_cli.memory.application.orchestration.CreateWorkItemRequest",
+      "madspec_cli.memory.application.orchestration.ClaimWorkItemRequest",
+      "madspec_cli.memory.application.orchestration.ReleaseWorkItemRequest",
       "madspec_cli.features.agents.application.subagent_context.SubagentContextRequest"
     ],
     "future_canonical_boundary": "madspec_cli.memory.shared.system_store",

@@ -4,6 +4,7 @@ from madspec_cli.memory.shared.storage import get_memory_paths
 from madspec_cli.memory.shared.system_store import build_runtime_snapshot_specs, load_canonical_branch_state
 from madspec_cli.memory.shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
 from madspec_cli.memory.shared.system_store.store import MemoryStore
+from madspec_cli.memory.implementation import checkpoint_implementation_step, complete_implementation_step, start_implementation_step
 from madspec_cli.memory.workflow.planning import (
     _build_register_step_plan,
     _detect_register_step_conflict,
@@ -330,3 +331,178 @@ def test_scope_busy_does_not_replace_stale_revision_conflict(memory_project) -> 
     )
     assert stale["accepted"] is False
     assert stale["kind"] == "conflict"
+
+
+def test_parallel_register_after_started_implementation_preserves_shared_execution_focus(memory_project) -> None:
+    memory_project.write_mvp_concept(variant="auth_sessions")
+    memory_project.create_step_artifacts("step-01-authentication")
+    memory_project.create_step_artifacts("step-02-session-persistence")
+
+    first = register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        session_key="planner",
+        step_id="step-01-authentication",
+        covers=["Authentication"],
+        step_kind="code",
+    )
+    started = start_implementation_step(
+        memory_project.project_path,
+        "main",
+        "mvp.implement",
+        session_key="impl",
+        step_id="step-01-authentication",
+    )
+    second = register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        session_key="planner",
+        step_id="step-02-session-persistence",
+        covers=["Sessions"],
+        step_kind="code",
+        depends_on=["step-01-authentication"],
+        expected_revision=first["runtime_revision_after"],
+    )
+
+    assert first["accepted"] is True
+    assert started["accepted"] is True
+    assert second["accepted"] is True
+
+    refreshed = load_canonical_branch_state(memory_project.project_path, "main")
+    impl_session = MemoryStore(memory_project.project_path).fetch_session(branch="main", session_key="impl")
+    planner_session = MemoryStore(memory_project.project_path).fetch_session(branch="main", session_key="planner")
+
+    assert refreshed.progress["currentImplementStep"] == "step-01-authentication"
+    assert refreshed.progress["stepStatus"]["step-01-authentication"]["status"] == "in_progress"
+    assert refreshed.progress["plannedSteps"] == ["step-01-authentication", "step-02-session-persistence"]
+    assert planner_session is not None and planner_session["current_step"] == "step-02-session-persistence"
+    assert impl_session is not None and impl_session["current_step"] == "step-01-authentication"
+
+
+def test_parallel_register_after_checkpoint_preserves_step_runtime_and_planning_derivatives(memory_project) -> None:
+    memory_project.write_mvp_concept(variant="auth_sessions")
+    memory_project.create_step_artifacts("step-01-authentication")
+    memory_project.create_step_artifacts("step-02-session-persistence")
+
+    register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        step_id="step-01-authentication",
+        covers=["Authentication"],
+        step_kind="code",
+    )
+    started = start_implementation_step(
+        memory_project.project_path,
+        "main",
+        "mvp.implement",
+        session_key="impl",
+        step_id="step-01-authentication",
+    )
+    checkpointed = checkpoint_implementation_step(
+        memory_project.project_path,
+        "main",
+        "mvp.implement",
+        session_key="impl",
+        step_id="step-01-authentication",
+        summary="Auth tests red",
+        tdd_phase="red",
+        red_evidence=["uv run pytest tests/test_auth.py -q"],
+    )
+    second = register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        session_key="planner",
+        step_id="step-02-session-persistence",
+        covers=["Sessions"],
+        step_kind="code",
+        depends_on=["step-01-authentication"],
+        expected_revision=started["runtime_revision_after"],
+    )
+
+    assert checkpointed["accepted"] is True
+    assert second["accepted"] is True
+
+    refreshed = load_canonical_branch_state(memory_project.project_path, "main")
+    status = refreshed.progress["stepStatus"]["step-01-authentication"]
+    planning = refreshed.progress["planningMetadata"]
+
+    assert status["status"] == "in_progress"
+    assert status["tddPhase"] == "red"
+    assert status["redEvidence"] == ["uv run pytest tests/test_auth.py -q"]
+    assert planning["lastPlannedStep"] == "step-02-session-persistence"
+    assert planning["planningPhase"] == "incremental"
+    assert planning["stepDependencies"]["step-02-session-persistence"] == ["step-01-authentication"]
+    assert planning["progressMetrics"]["p1Coverage"]["covered"] == 2
+
+
+def test_parallel_register_after_complete_preserves_completion_and_recomputed_next_step(memory_project) -> None:
+    memory_project.write_mvp_concept(variant="auth_sessions")
+    memory_project.create_step_artifacts("step-01-authentication")
+    memory_project.create_step_artifacts("step-02-session-persistence")
+
+    register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        step_id="step-01-authentication",
+        covers=["Authentication"],
+        step_kind="code",
+    )
+    started = start_implementation_step(
+        memory_project.project_path,
+        "main",
+        "mvp.implement",
+        session_key="impl",
+        step_id="step-01-authentication",
+    )
+    checkpointed = checkpoint_implementation_step(
+        memory_project.project_path,
+        "main",
+        "mvp.implement",
+        session_key="impl",
+        step_id="step-01-authentication",
+        summary="Authentication tests green",
+        tdd_phase="green",
+        red_evidence=["uv run pytest tests/test_auth.py -q"],
+        green_evidence=["uv run pytest tests/test_auth.py -q"],
+        refactor_note="No refactor needed.",
+    )
+    completed = complete_implementation_step(
+        memory_project.project_path,
+        "main",
+        "mvp.implement",
+        session_key="impl",
+        step_id="step-01-authentication",
+        summary="Authentication complete",
+        facts=["Authentication persists sessions"],
+        evidence=["tests/test_auth.py"],
+    )
+    second = register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        session_key="planner",
+        step_id="step-02-session-persistence",
+        covers=["Sessions"],
+        step_kind="code",
+        depends_on=["step-01-authentication"],
+        expected_revision=started["runtime_revision_after"],
+    )
+
+    assert checkpointed["accepted"] is True
+    assert completed["accepted"] is True
+    assert second["accepted"] is True
+
+    refreshed = load_canonical_branch_state(memory_project.project_path, "main")
+    planner_session = MemoryStore(memory_project.project_path).fetch_session(branch="main", session_key="planner")
+
+    assert refreshed.progress["completedSteps"] == ["step-01-authentication"]
+    assert refreshed.progress["stepStatus"]["step-01-authentication"]["status"] == "completed"
+    assert refreshed.progress["currentImplementStep"] is None
+    assert second["progressMetrics"]["p1Coverage"]["covered"] == 2
+    assert refreshed.progress["planningMetadata"]["lastPlannedStep"] == "step-02-session-persistence"
+    assert planner_session is not None and planner_session["current_step"] == "step-02-session-persistence"

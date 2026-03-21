@@ -56,6 +56,7 @@ def retrieve_memory_context(
     from ..shared.system_store import search_memory_store
     from ..shared.system_store.store import MemoryStore
 
+    store = MemoryStore(project_path)
     stage_lower = stage.lower()
     is_stage_artifact = stage_lower in {
         "mvp.concept",
@@ -121,7 +122,7 @@ def retrieve_memory_context(
         },
     }
     if scope == "project":
-        project_records = MemoryStore(project_path).list_records(
+        project_records = store.list_records(
             branch=PROJECT_MEMORY_BRANCH,
             statuses=["validated"],
             limit=500,
@@ -235,6 +236,10 @@ def retrieve_memory_context(
         step_id=resolved_step_id,
         limit=resolved_limit,
     )
+    coordination = store.fetch_session_coordination(
+        branch=branch_name,
+        session_key=session_key,
+    )
 
     return {
         "branch": branch_name,
@@ -252,10 +257,13 @@ def retrieve_memory_context(
         },
         "workflow": {
             "currentImplementStep": state.progress.get("currentImplementStep"),
-            "plannedSteps": state.progress.get("plannedSteps", [])[:resolved_limit],
-            "completedSteps": state.progress.get("completedSteps", [])[:resolved_limit],
+            "plannedSteps": list(state.progress.get("plannedSteps", [])),
+            "completedSteps": list(state.progress.get("completedSteps", [])),
             "stepDependencies": state.progress.get("planningMetadata", {}).get("stepDependencies", {}),
-            "nextExecutableStep": select_next_executable_step(state.progress) if "implement" in stage_lower else None,
+            "nextExecutableStep": select_next_executable_step(state.progress),
+            "planningPhase": state.progress.get("planningMetadata", {}).get("planningPhase"),
+            "lastPlannedStep": state.progress.get("planningMetadata", {}).get("lastPlannedStep"),
+            "progressMetrics": state.progress.get("planningMetadata", {}).get("progressMetrics", {}),
         },
         "step": {
             "step_id": resolved_step_id,
@@ -278,6 +286,12 @@ def retrieve_memory_context(
             "contracts": _trim(relevant_contracts, resolved_limit),
         },
         "policy_context": policy_context,
+        "coordination": {
+            "task": coordination.get("task"),
+            "work_item": coordination.get("work_item"),
+            "claim": coordination.get("claim"),
+            "session_binding": coordination.get("session_binding"),
+        },
         "change_context": change_context,
         "concept_status": build_concept_status(state.concept_state) if stage_lower == "mvp.concept" else None,
         "design_status": (

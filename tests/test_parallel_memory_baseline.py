@@ -21,7 +21,7 @@ def _invoke_help(invoke_cli, command: str):
 def test_parallel_memory_contract_manifest_matches_runtime_baseline(repo_root, invoke_cli) -> None:
     manifest = _load_manifest(repo_root)
 
-    assert manifest["epic"] == "epic-4-scoped-leases-and-ownership"
+    assert manifest["epic"] == "epic-6-task-work-item-model"
     assert manifest["roadmap_document"] == "dev/parallel-memory-roadmap.md"
     assert manifest["scope"] == "docs+contracts+behavior"
     assert manifest["behavior_change"] is True
@@ -39,6 +39,19 @@ def test_parallel_memory_contract_manifest_matches_runtime_baseline(repo_root, i
             assert "--expected-revision" in result.stdout
         else:
             assert "--expected-revision" not in result.stdout
+    explain_help = _invoke_help(invoke_cli, "madspec memory explain")
+    assert explain_help.exit_code == 0, explain_help.stdout
+    assert "--session-key" in explain_help.stdout
+    context_help = _invoke_help(invoke_cli, "madspec agents subagents context")
+    assert context_help.exit_code == 0, context_help.stdout
+    assert "--task-id" in context_help.stdout
+    assert "--work-item-id" in context_help.stdout
+    claim_help = _invoke_help(invoke_cli, "madspec memory work-items claim")
+    assert claim_help.exit_code == 0, claim_help.stdout
+    assert "--session-key" in claim_help.stdout
+    release_help = _invoke_help(invoke_cli, "madspec memory work-items release")
+    assert release_help.exit_code == 0, release_help.stdout
+    assert "--session-key" in release_help.stdout
 
 
 def test_parallel_memory_contract_manifest_imports_request_models(repo_root) -> None:
@@ -52,6 +65,9 @@ def test_parallel_memory_contract_manifest_imports_request_models(repo_root) -> 
         assert hasattr(obj, "__dataclass_fields__")
         if attr_name in {"CaptureStageRequest", "CheckpointStageRequest", "RegisterStepRequest", "ImplementationStepRequest"}:
             assert "expected_revision" in obj.__dataclass_fields__
+
+    for dotted_path in manifest["coordination_commands"]:
+        assert dotted_path.startswith("madspec memory ")
 
 
 def test_parallel_memory_roadmap_and_manifest_stay_in_sync(repo_root) -> None:
@@ -77,6 +93,8 @@ def test_parallel_memory_roadmap_and_manifest_stay_in_sync(repo_root) -> None:
         assert command in roadmap
     for command in manifest["revision_aware_mutating_commands"]:
         assert command in roadmap
+    for command in manifest["coordination_commands"]:
+        assert command in roadmap
     for scope_name in manifest["ownership_scopes"]:
         assert f"`{scope_name}`" in roadmap
     for lease_name in manifest["lease_scope_patterns"]:
@@ -99,8 +117,14 @@ def test_parallel_memory_docs_describe_current_runtime_truth(repo_root) -> None:
     assert "`scope_busy`" in memory_docs
     assert "writer lease" in memory_docs
     assert "session `active`" in memory_docs
-    assert "не является встроенным координатором выполнения" in agents_docs
-    assert "Оркестрация с `task`, `work-item` и `proposal`" in agents_docs
+    assert "реализация текущего шага и параллельное планирование следующего" in memory_docs
+    assert "`madspec memory explain`" in memory_docs
+    assert "`madspec memory tasks create`" in memory_docs
+    assert "`madspec memory work-items claim`" in memory_docs
+    assert "`coordination`" in memory_docs
+    assert "Базовый слой координации с `task` и `work-item` уже реализован" in agents_docs
     assert "`--session-key`" in agents_docs
-    assert "`--expected-revision`" in agents_docs
+    assert "`--task-id`" in agents_docs
+    assert "`--work-item-id`" in agents_docs
     assert "`scope_busy`" in agents_docs
+    assert "`madspec memory explain --session-key`" in agents_docs

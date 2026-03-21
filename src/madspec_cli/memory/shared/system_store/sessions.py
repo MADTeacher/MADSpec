@@ -137,6 +137,14 @@ def normalize_session_payload(
         current_step = None
     normalized["current_step"] = current_step
 
+    for key in ("task_id", "work_item_id", "subagent_id"):
+        value = normalized.get(key)
+        if isinstance(value, str):
+            value = value.strip() or None
+        else:
+            value = None
+        normalized[key] = value
+
     for key in ("pending_actions", "open_questions", "current_hypotheses"):
         values = normalized.get(key)
         if isinstance(values, list):

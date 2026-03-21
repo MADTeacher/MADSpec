@@ -322,6 +322,7 @@ Ownership задается по scope и используется для writer-
 - Session-scoped commands, planned for future `--session-key` support:
   - `madspec memory retrieve`
   - `madspec memory search`
+  - `madspec memory explain`
   - `madspec memory capture`
   - `madspec memory checkpoint`
   - `madspec memory register-step`
@@ -741,6 +742,14 @@ Ownership задается по scope и используется для writer-
 - storage model для tasks и work items;
 - CLI/API operations для create/list/claim/release;
 - связь между session и work item.
+- public CLI surface:
+  - `madspec memory tasks create`
+  - `madspec memory tasks list`
+  - `madspec memory work-items create`
+  - `madspec memory work-items list`
+  - `madspec memory work-items claim`
+  - `madspec memory work-items release`
+  - `madspec agents subagents context --task-id --work-item-id`
 
 **Acceptance criteria**
 

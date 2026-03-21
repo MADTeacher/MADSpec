@@ -131,3 +131,67 @@ def test_planner_and_impl_sessions_keep_independent_current_steps(memory_project
     assert impl_context["step_id"] == "step-01-authentication"
     assert impl_context["active_session"]["current_step"] == "step-01-authentication"
     assert impl_context["workflow"]["currentImplementStep"] == "step-01-authentication"
+
+
+def test_retrieve_exposes_shared_workflow_and_session_local_focus(memory_project) -> None:
+    memory_project.write_mvp_concept(variant="auth_sessions")
+    memory_project.create_step_artifacts("step-01-authentication")
+    memory_project.create_step_artifacts("step-02-session-persistence")
+
+    first = register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        session_key="planner",
+        step_id="step-01-authentication",
+        covers=["Authentication"],
+        step_kind="code",
+    )
+    second = register_planned_step(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        session_key="planner",
+        step_id="step-02-session-persistence",
+        covers=["Sessions"],
+        step_kind="code",
+        depends_on=["step-01-authentication"],
+    )
+    started = start_implementation_step(
+        memory_project.project_path,
+        "main",
+        "mvp.implement",
+        session_key="impl",
+        step_id="step-01-authentication",
+    )
+
+    assert first["accepted"] is True
+    assert second["accepted"] is True
+    assert started["accepted"] is True
+
+    planner_context = retrieve_memory_context(
+        memory_project.project_path,
+        "main",
+        "mvp.plan",
+        session_key="planner",
+    )
+    impl_context = retrieve_memory_context(
+        memory_project.project_path,
+        "main",
+        "mvp.implement",
+        session_key="impl",
+    )
+
+    assert planner_context["active_session"]["current_step"] == "step-02-session-persistence"
+    assert impl_context["active_session"]["current_step"] == "step-01-authentication"
+    assert planner_context["workflow"]["currentImplementStep"] == "step-01-authentication"
+    assert impl_context["workflow"]["currentImplementStep"] == "step-01-authentication"
+    assert planner_context["workflow"]["nextExecutableStep"] == "step-01-authentication"
+    assert impl_context["workflow"]["nextExecutableStep"] == "step-01-authentication"
+    assert planner_context["workflow"]["lastPlannedStep"] == "step-02-session-persistence"
+    assert planner_context["workflow"]["planningPhase"] == "incremental"
+    assert planner_context["workflow"]["progressMetrics"]["p1Coverage"]["covered"] == 2
+    assert planner_context["workflow"]["plannedSteps"] == [
+        "step-01-authentication",
+        "step-02-session-persistence",
+    ]

@@ -6,6 +6,7 @@ from pathlib import Path
 from madspec_cli.features.change.application.summary_change import SummaryChangeRequest, execute as summary_change
 from madspec_cli.features.gates.application.status_gate import GateStatusRequest, execute as gate_status
 from madspec_cli.features.policy.application.show_policy import ShowPolicyRequest, execute as show_policy
+from madspec_cli.memory.application.orchestration import CoordinationContextRequest, resolve_coordination_context
 from madspec_cli.memory import retrieve_memory_context
 from madspec_cli.memory.domain.branch_layout import resolve_target_branch
 from madspec_cli.shared.kernel.result import PayloadResult
@@ -21,6 +22,8 @@ class SubagentContextRequest:
     stage: str | None
     session_key: str
     step_id: str | None
+    task_id: str | None = None
+    work_item_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -64,6 +67,15 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
         ).to_payload()
     except Exception:
         change = {"bundle": None, "highlights": None}
+    coordination = resolve_coordination_context(
+        CoordinationContextRequest(
+            project_path=request.project_path,
+            branch_name=branch_name,
+            session_key=request.session_key,
+            task_id=request.task_id,
+            work_item_id=request.work_item_id,
+        )
+    ).to_payload()
     return SubagentContextResult(
         payload={
             "subagent": subagent,
@@ -73,6 +85,7 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
             "stage": stage,
             "session_key": request.session_key,
             "memory": memory_context,
+            "coordination": coordination,
             "policy": policy,
             "gates": gates,
             "change": change,

@@ -15,6 +15,7 @@ from ..application.inspect_record import InspectRecordRequest, execute as inspec
 from ..application.timeline import TimelineRequest, execute as memory_timeline
 from ..application.why_next_step import WhyNextStepRequest, execute as explain_next_step
 from ..domain.branch_layout import resolve_target_branch
+from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
 def doctor(
@@ -48,6 +49,7 @@ def doctor(
 def explain(
     stage: str = typer.Option(..., "--stage", help="Target stage, e.g. mvp.plan or mvp.implement"),
     branch_name: str = typer.Option(None, "--branch", help="Branch name to inspect"),
+    session_key: str = typer.Option(SYSTEM_SESSION_KEY, "--session-key", help="Runtime session key; defaults to legacy active"),
     step_id: str = typer.Option(None, "--step-id", help="Optional step identifier"),
     limit: int = typer.Option(5, "--limit", help="Max records per section"),
     query: str | None = typer.Option(None, "--query", help="Optional recall query"),
@@ -69,6 +71,7 @@ def explain(
             project_path=project_path,
             branch_name=target_branch,
             stage=stage,
+            session_key=session_key,
             step_id=step_id,
             limit=limit,
             query=query,
@@ -90,7 +93,10 @@ def explain(
     show_banner()
     console.print(f"[cyan]Branch:[/cyan] {target_branch}")
     console.print(f"[cyan]Stage:[/cyan] {stage}")
+    console.print(f"[cyan]Session:[/cyan] {payload['summary'].get('session_key') or SYSTEM_SESSION_KEY}")
     console.print(f"[cyan]Step:[/cyan] {payload['step_id'] or 'N/A'}")
+    console.print(f"[cyan]Session focus:[/cyan] {payload['summary'].get('session_current_step') or 'N/A'}")
+    console.print(f"[cyan]Shared implementation focus:[/cyan] {payload['summary'].get('shared_current_implement_step') or 'N/A'}")
     console.print(f"[cyan]Selected step:[/cyan] {payload['summary'].get('selected_step') or 'N/A'}")
     console.print(f"[cyan]Reason:[/cyan] {payload['summary'].get('next_step_reason') or 'N/A'}")
     console.print(f"[cyan]Gate status:[/cyan] {payload['gate_summary']['overall_status']}")

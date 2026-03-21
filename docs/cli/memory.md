@@ -19,12 +19,17 @@
 - для runtime состояния ветки ведется единая top-level ревизия `runtime_revision`, которая увеличивается после каждого успешного mutating commit;
 - для самых горячих write paths runtime дополнительно использует scoped writer leases и может вернуть `kind="scope_busy"`, если другой writer уже держит тот же hot scope;
 - файл `.madspec/<branch>/memory/working/active-session.json` больше не считается источником истины и поддерживается только как производная проекция для session `active`;
-- для `retrieve`, `search`, `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step`, `complete-step` и связанных вызовов субагентного контекста доступен `--session-key`, по умолчанию используется `active`;
+- для `retrieve`, `search`, `explain`, `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step`, `complete-step` и связанных вызовов субагентного контекста доступен `--session-key`, по умолчанию используется `active`;
 - mutating runtime-команды `capture`, `checkpoint`, `register-step`, `start-step`, `checkpoint-step` и `complete-step` принимают optional `--expected-revision`; если флаг не передан, команда использует ревизию, которую увидела в начале собственного выполнения;
 - branch `memory/*.json`, `memory/*.jsonl` и generated markdown остаются rebuildable projections и могут быть пересобраны через `madspec memory consolidate`;
 - успешный mutating ответ теперь возвращает `runtime_revision_before` и `runtime_revision_after`, а при конфликте возвращается structured payload с `kind="conflict"` и полем `conflict.retry_guidance`;
 - hot write paths `register-step`, `start-step`, `checkpoint-step`, `complete-step`, а также `checkpoint --stage review|security` используют scoped lease вместо глобальной блокировки всей ветки;
 - если post-commit projection refresh падает, canonical commit не откатывается: команда возвращает `projection_status="stale"` и `projection_refresh_required=true`, а последующий `madspec memory consolidate` восстанавливает projections из `SQLite`.
+- Phase 1 теперь официально поддерживает сценарий: реализация текущего шага и параллельное планирование следующего, если операции попадают в совместимую матрицу `register-step(step-02)` + `start/checkpoint/complete-step(step-01)`.
+- Для базового многосубагентного сценария появился отдельный слой координации: `task` как контейнер работы и `work-item` как каноническая единица владения поверх session-local runtime.
+- Каноническое состояние координации тоже хранится в `SQLite`: таблицы `tasks`, `work_items`, `work_item_claims`, а их lifecycle events попадают в `records` со scope `work-item`.
+- `claim` привязывает `session_key` к `work_item_id`, записывает канонический owner вида `work-item:<subagent-id>:<session-key>` и расширяет session payload полями `task_id`, `work_item_id`, `subagent_id`.
+- Если runtime-сеанс привязан к work item, `start-step`, `checkpoint-step` и `complete-step` валидируют совпадение `step_id` с ownership binding и продвигают статус work item в `claimed`, `in_progress`, `completed`.
 
 ## Когда Использовать
 
@@ -96,6 +101,26 @@
 | `madspec memory start-step --stage ...` | Запустить шаг реализации |
 | `madspec memory checkpoint-step --stage ...` | Зафиксировать промежуточное состояние шага, включая контрольные точки TDD |
 | `madspec memory complete-step --stage ... --summary ...` | Завершить текущий шаг и продвинуть текущее состояние выполнения |
+
+### Команды Координации Task / Work-Item
+
+| Команда | Назначение |
+| --- | --- |
+| `madspec memory tasks create --title ...` | Создать task как контейнер координации над общей веткой |
+| `madspec memory tasks list` | Показать tasks ветки и их канонический status |
+| `madspec memory work-items create --task-id ... --subagent-id ...` | Создать work item с канонической областью владения для конкретного субагента |
+| `madspec memory work-items list` | Показать work items ветки, task или session |
+| `madspec memory work-items claim --work-item-id ... --session-key ...` | Привязать session к work item и назначить канонический owner |
+| `madspec memory work-items release --work-item-id ... --session-key ...` | Снять активный claim и очистить привязку сеанса |
+
+Минимальный синтаксис:
+
+Базовые точки входа: `madspec memory tasks create` и `madspec memory work-items claim`.
+
+```bash
+madspec memory tasks create --title "Coordinate auth"
+madspec memory work-items claim --work-item-id <id> --session-key <key> --subagent-id <id>
+```
 
 ## Рекомендуемая Схема Использования
 
@@ -178,12 +203,35 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 
 - top-level `runtime_revision`
 - top-level `session_key`
+- `workflow.currentImplementStep`, `workflow.nextExecutableStep`, `workflow.lastPlannedStep`, `workflow.planningPhase`, `workflow.progressMetrics`
 - `policy_context.required[]`
 - `policy_context.advisory[]`
 - `policy_context.pending_proposals_count`
+- `coordination.task`
+- `coordination.work_item`
+- `coordination.claim`
+- `coordination.session_binding`
 - `artifact_state.policy` при `--full-artifact`
 
 Поле `active_session` пока остается в ответе как совместимый псевдоним для уже разрешенной session payload, чтобы не ломать существующих потребителей.
+
+У `explain` теперь также есть:
+
+- `--session-key` — выбрать session-local runtime-контекст для объяснения
+
+Ответ `madspec memory explain` по-прежнему возвращает top-level `runtime_revision`, а в `summary` теперь явно показывает:
+
+- `session_key`
+- `session_current_step`
+- `shared_current_implement_step`
+- `next_executable_step`
+- `last_planned_step`
+- `planning_phase`
+- `progress_metrics`
+- `task_id`
+- `work_item_id`
+
+В `context` команда также возвращает блок `coordination` с активными `task`, `work_item`, `claim` и привязкой сеанса, если текущий `session_key` уже связан с каноническим состоянием координации.
 
 У `search` есть:
 
@@ -253,6 +301,14 @@ madspec memory capture --from-file .madspec/.tmp/capture-args.json --json-output
 - `scope_busy` не равен `conflict`: он говорит о временной занятости hot scope, а не о несовместимости ревизий;
 - после `scope_busy` можно повторить ту же операцию без нового `retrieve`, если контекст еще актуален и нужно только дождаться освобождения scope;
 - `madspec memory doctor` теперь показывает active и expired writer lease для диагностики зависших hot scopes.
+
+Для сценария Phase 1 это означает следующую матрицу:
+
+- `register-step(step-02)` + `start-step(step-01)` => allowed
+- `register-step(step-02)` + `checkpoint-step(step-01)` => allowed
+- `register-step(step-02)` + `complete-step(step-01)` => allowed
+- `register-step(step-02)` + `register-step(step-02)` => `conflict`
+- `checkpoint-step(step-01)` + `checkpoint-step(step-01)` => `scope_busy` при одновременном hot writer и `conflict` для stale replay после чужого коммита
 
 ## Слои Памяти
 

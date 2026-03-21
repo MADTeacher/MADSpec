@@ -36,6 +36,7 @@ from ..shared.system_store.canonical_state import CanonicalBranchState, build_ru
 from ..shared.system_store.leases import build_implementation_step_lease
 from ..shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
 from ..shared.system_store.sessions import read_runtime_session_payload
+from ..shared.system_store.store import MemoryStore
 
 
 def _step_runtime_signature(progress: dict[str, Any], step_id: str) -> str:
@@ -48,6 +49,96 @@ def _step_runtime_signature(progress: dict[str, Any], step_id: str) -> str:
         "dependencies": progress.get("planningMetadata", {}).get("stepDependencies", {}).get(step_id, []),
     }
     return json.dumps(payload, sort_keys=True, ensure_ascii=False)
+
+
+def _resolve_session_work_item(
+    project_path: Path,
+    branch_name: str,
+    *,
+    session_key: str,
+) -> dict[str, Any] | None:
+    coordination = MemoryStore(project_path).fetch_session_coordination(
+        branch=branch_name,
+        session_key=session_key,
+    )
+    work_item = coordination.get("work_item")
+    if not work_item:
+        return None
+    claim = coordination.get("claim")
+    if claim is None:
+        return None
+    return {
+        "task": coordination.get("task"),
+        "work_item": work_item,
+        "claim": claim,
+    }
+
+
+def _validate_work_item_ownership(
+    project_path: Path,
+    branch_name: str,
+    *,
+    session_key: str,
+    selected_step: str,
+) -> dict[str, Any] | None:
+    bound = _resolve_session_work_item(
+        project_path,
+        branch_name,
+        session_key=session_key,
+    )
+    if bound is None:
+        return None
+    work_item = dict(bound["work_item"])
+    scope_descriptor = dict(work_item.get("scope_descriptor") or {})
+    expected_step_id = work_item.get("step_id") or scope_descriptor.get("step_id")
+    if expected_step_id != selected_step:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": "mvp.implement",
+            "step_id": selected_step,
+            "errors": [
+                f"session '{session_key}' is bound to work item '{work_item['work_item_id']}' for step '{expected_step_id}', not '{selected_step}'"
+            ],
+            "coordination": bound,
+        }
+    if not any(scope_descriptor.get(key) for key in ("paths", "artifacts", "concerns")):
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": "mvp.implement",
+            "step_id": selected_step,
+            "errors": [f"work item '{work_item['work_item_id']}' has no executable scope descriptor"],
+            "coordination": bound,
+        }
+    return None
+
+
+def _work_item_runtime_update(
+    project_path: Path,
+    branch_name: str,
+    *,
+    session_key: str,
+    selected_step: str,
+    next_status: str,
+) -> list[dict[str, Any]]:
+    bound = _resolve_session_work_item(
+        project_path,
+        branch_name,
+        session_key=session_key,
+    )
+    if bound is None:
+        return []
+    work_item = dict(bound["work_item"])
+    if work_item.get("step_id") != selected_step:
+        return []
+    if next_status == "in_progress" and work_item.get("status") in {"in_progress", "completed"}:
+        return []
+    if next_status == "completed" and work_item.get("status") == "completed":
+        return []
+    work_item["status"] = next_status
+    work_item["updated_at"] = now_iso()
+    return [work_item]
 
 
 def _build_start_step_plan(
@@ -83,6 +174,13 @@ def _build_start_step_plan(
             {"progress": progress},
         ),
         sessions=[{"session_key": session_key, "payload": active_session}],
+        work_items=_work_item_runtime_update(
+            project_path,
+            branch_name,
+            session_key=session_key,
+            selected_step=selected_step,
+            next_status="in_progress",
+        ),
         records=tag_records_for_stream(
             build_start_event(
                 branch_name=branch_name,
@@ -150,6 +248,13 @@ def _build_checkpoint_step_plan(
             {"progress": progress},
         ),
         sessions=[{"session_key": session_key, "payload": active_session}],
+        work_items=_work_item_runtime_update(
+            project_path,
+            branch_name,
+            session_key=session_key,
+            selected_step=selected_step,
+            next_status="in_progress",
+        ),
         records=tag_records_for_stream(
             build_checkpoint_event(
                 branch_name=branch_name,
@@ -302,6 +407,13 @@ def _build_complete_step_plan(
             {"progress": progress},
         ),
         sessions=[{"session_key": session_key, "payload": active_session}],
+        work_items=_work_item_runtime_update(
+            project_path,
+            branch_name,
+            session_key=session_key,
+            selected_step=selected_step,
+            next_status="completed",
+        ),
         records=records,
         response_payload={
             "step_id": selected_step,
@@ -420,6 +532,16 @@ def start_implementation_step(
             "stage": normalized_stage,
             "errors": ["no executable implementation step found"],
         }
+
+    ownership_error = _validate_work_item_ownership(
+        project_path,
+        branch_name,
+        session_key=session_key,
+        selected_step=selected_step,
+    )
+    if ownership_error is not None:
+        ownership_error["stage"] = normalized_stage
+        return ownership_error
 
     errors = validate_start_step(progress, selected_step)
     if errors:
@@ -601,6 +723,16 @@ def checkpoint_implementation_step(
             "stage": normalized_stage,
             "errors": ["step_id is required when there is no current implementation step"],
         }
+
+    ownership_error = _validate_work_item_ownership(
+        project_path,
+        branch_name,
+        session_key=session_key,
+        selected_step=selected_step,
+    )
+    if ownership_error is not None:
+        ownership_error["stage"] = normalized_stage
+        return ownership_error
 
     planned_steps = progress.get("plannedSteps", [])
     if selected_step not in planned_steps:
@@ -804,6 +936,16 @@ def complete_implementation_step(
             "stage": normalized_stage,
             "errors": ["step_id is required when there is no current implementation step"],
         }
+
+    ownership_error = _validate_work_item_ownership(
+        project_path,
+        branch_name,
+        session_key=session_key,
+        selected_step=selected_step,
+    )
+    if ownership_error is not None:
+        ownership_error["stage"] = normalized_stage
+        return ownership_error
 
     planned_steps = progress.get("plannedSteps", [])
     completed_steps = progress.setdefault("completedSteps", [])
