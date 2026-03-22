@@ -46,6 +46,8 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "get-branch" not in command_body
         assert "--step-kind" in command_body
         assert "red -> green -> refactor" in command_body
+        assert "минимально достаточный план" in command_body
+        assert "Каждый запуск команды создает только **один новый шаг**" not in command_body
 
         command_files = [
             name
@@ -199,6 +201,8 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
         assert "madspec-cli-operator" in feature_plan_body
         assert ".madspec/<BRANCH>/memory/stages/feature.plan.json" in feature_plan_body
         assert "generated views" in feature_plan_body
+        assert "одному полному шагу" in feature_plan_body or "один полный шаг" in feature_plan_body
+        assert "Один запуск команды создает один новый шаг" not in feature_plan_body
 
         deploy_command = next(
             name

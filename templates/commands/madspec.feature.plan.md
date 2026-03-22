@@ -1,5 +1,5 @@
 ---
-description: Feature - Инкрементальное планирование реализации через memory-first workflow
+description: Feature - Построение минимально достаточного плана реализации через memory-first workflow
 handoffs:
   - label: Начать реализацию
     agent: madspec.feature.implement
@@ -32,7 +32,7 @@ $ARGUMENTS
 
 ## Цель этапа
 
-Инкрементально добавлять по одному новому шагу реализации, сохраняя:
+Построить минимально достаточный план реализации, сохраняя:
 
 - step catalog в `feature.plan.json`;
 - покрытие функций по explicit `ID`;
@@ -40,13 +40,16 @@ $ARGUMENTS
 - TDD policy и metadata шага;
 - generated implementation plan без ручного редактирования markdown.
 
+Для небольшой feature по умолчанию стремись завершить планирование за один компактный проход и зарегистрировать один полный шаг, если изменение можно реализовать и проверить как единое целое. Повторные запуски команды нужны, когда действительно остаются следующие шаги, а не как обязательный ритуал процесса.
+
 ## Правила гранулярности шага (обязательно)
 
-- Один запуск команды создает один новый шаг, но сам шаг должен быть максимально крупным и безопасным для одной итерации `madspec.feature.implement`.
+- Для небольшой feature по умолчанию стремись к одному полному шагу, если он покрывает весь текущий результат без лишнего риска.
 - Для небольшой feature или легкой задачи создавай один полный шаг, даже если он включает код, тесты, сопутствующие правки контрактов и документацию.
 - Не выноси отдельно подготовку, тесты, документацию, валидацию и мелкие сопутствующие правки, если они относятся к одному изменению.
 - Делить работу на несколько шагов можно только при реальных зависимостях, отдельных точках пользовательской проверки, заметно разных рисках или явной просьбе пользователя о более детальном плане.
 - Если нет убедительной причины дробить сильнее, выбирай меньшее число шагов.
+- `p1/p2/p3` и feature IDs нужны для покрытия и приоритетов, а не для обязательного правила "по шагу на каждую функцию".
 
 ## Предварительные условия
 
@@ -65,24 +68,24 @@ $ARGUMENTS
    - `.madspec/<BRANCH>/tech-stack.md`
    - `.madspec/<BRANCH>/architecture.md`
    - Если существует `.madspec/<BRANCH>/deployment.md` — обязательно прочитай его и учти ограничения развертывания для шагов, тестов и проверки результата
-4. Если стратегия ещё не зафиксирована, добавь её через `madspec memory capture --stage feature.plan --plan-overview ... --planning-principle ... --next-action ...`.
-5. Выбери следующий шаг:
+4. Если без этого нельзя зафиксировать общий замысел или следующий ход, добавь strategy-level запись через `madspec memory capture --stage feature.plan --plan-overview ... --planning-principle ... --next-action ...`. Если `planOverview` уже достаточен и новый шаг не меняет стратегию, не создавай лишний `capture` только ради ритуала.
+5. Выбери минимально достаточный набор новых шагов для текущего прохода. Для простой feature это обычно один шаг, который:
    - покрывает хотя бы одну функцию из `feature.init` catalog;
    - использует explicit function IDs в `--covers`;
    - имеет явный `step-kind`;
    - имеет корректные `depends-on`.
-6. Создай source artifacts шага в `.madspec/<BRANCH>/steps/<step-id>/`:
+6. Для каждого действительно нового шага создай source artifacts в `.madspec/<BRANCH>/steps/<step-id>/`:
    - `description.md`
    - `tasks.md`
    - `tests.md`
    - `validation.md`
-7. Проверь кандидата:
+7. Для каждого нового шага проверь кандидата:
    - `madspec memory next-step --stage feature.plan --candidate-step <step-id> --depends-on ...`
-8. Зарегистрируй шаг:
+8. Для каждого принятого шага зарегистрируй его:
    - `madspec memory register-step --stage feature.plan --step-id <step-id> --step-kind <code|non-code> --title ... --summary ... --covers <Fxx> ... --depends-on ...`
    - для `non-code` шага обязательно передай `--tdd-policy waived|not-applicable` и `--waiver-reason`, если нужен waiver
-9. Повтори `madspec memory retrieve --stage feature.plan --toon-output` и проверь `feature_plan_status`, если этот вывод читает агент.
-10. Когда стратегия и catalog шагов готовы, зафиксируй этап через `madspec memory checkpoint --stage feature.plan --summary "<validated summary>"`.
+9. Если после регистрации шагов нужен пересмотр контекста или проверка итогового состояния, повтори `madspec memory retrieve --stage feature.plan --toon-output` и проверь `feature_plan_status`.
+10. Когда strategy и catalog шагов для текущего прохода готовы, зафиксируй этап через один финальный `madspec memory checkpoint --stage feature.plan --summary "<validated summary>"`. Не делай отдельный `checkpoint` после каждого мелкого изменения, если один итоговый checkpoint покрывает весь завершенный проход.
 
 ## Важные правила
 
@@ -90,6 +93,7 @@ $ARGUMENTS
 - Не редактируй `implementation-plan.md`, `planning-context-cache.md`, `planning-context.md` и `project-context.md` вручную как primary source.
 - Для `code` шага TDD policy всегда `required`.
 - Для feature coverage используй IDs из `feature.init.json`, а не свободные текстовые labels.
+- Не разбивай простую feature на несколько шагов только потому, что она затрагивает код, тесты, документацию или валидацию одновременно.
 - Если существует `deployment.md`, учитывай требования к конфигурации, секретам, миграциям, наблюдаемости и откату при составлении шага и его проверки.
 
 ## Что считается результатом
