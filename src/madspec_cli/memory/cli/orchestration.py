@@ -28,7 +28,7 @@ from ..application.orchestration import (
     resolve_coordination_context,
 )
 from ..application.resolve_branch import resolve_branch
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared import SYSTEM_SESSION_KEY
 
 
 tasks_app = typer.Typer(help="Task coordination over shared branch runtime")

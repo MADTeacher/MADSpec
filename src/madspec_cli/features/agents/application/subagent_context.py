@@ -3,9 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from madspec_cli.features.change.application.summary_change import SummaryChangeRequest, execute as summary_change
-from madspec_cli.features.gates.application.status_gate import GateStatusRequest, execute as gate_status
-from madspec_cli.features.policy.application.show_policy import ShowPolicyRequest, execute as show_policy
 from madspec_cli.memory.application.parallel_runtime import read_parallel_runtime_policy
 from madspec_cli.memory.application.orchestration import CoordinationContextRequest, resolve_coordination_context
 from madspec_cli.memory import retrieve_memory_context
@@ -33,6 +30,10 @@ class SubagentContextResult(PayloadResult):
 
 
 def execute(request: SubagentContextRequest) -> SubagentContextResult:
+    from madspec_cli.features.change.application.summary_change import SummaryChangeRequest, execute as summary_change
+    from madspec_cli.features.gates.application.status_gate import GateStatusRequest, execute as gate_status
+    from madspec_cli.features.policy.application.show_policy import ShowPolicyRequest, execute as show_policy
+
     subagent = find_subagent(request.project_path, request.subagent_id)
     if subagent is None:
         raise ValueError(f"subagent '{request.subagent_id}' was not found")

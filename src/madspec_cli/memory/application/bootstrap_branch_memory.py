@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from madspec_cli.features.agents.infrastructure.storage import ensure_agents_layout
-from madspec_cli.features.policy.infrastructure.storage import ensure_policy_layout
-from madspec_cli.project_state import create_madspec_config
+from madspec_cli.shared.infra.project_config import create_madspec_config
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import (
+        AgentsLayoutEnsurer,
+        BranchPolicyEvaluator,
+        PolicyLayoutEnsurer,
+    )
 
 from ..projection.materialize import consolidate_branch_memory
 from ..shared.storage import ensure_memory_layout
@@ -39,13 +45,40 @@ class BootstrapBranchMemoryResult:
         }
 
 
-def execute(request: BootstrapBranchMemoryRequest) -> BootstrapBranchMemoryResult:
+def execute(
+    request: BootstrapBranchMemoryRequest,
+    *,
+    _ensure_agents_layout: AgentsLayoutEnsurer | None = None,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
+    _ensure_policy_layout: PolicyLayoutEnsurer | None = None,
+) -> BootstrapBranchMemoryResult:
+    if _ensure_agents_layout is None:
+        from madspec_cli.features.agents.infrastructure.storage import ensure_agents_layout
+        _ensure_agents_layout = ensure_agents_layout
+    if _evaluate_branch_policies is None:
+        from madspec_cli.features.policy.application.common import evaluate_branch_policies
+        _evaluate_branch_policies = evaluate_branch_policies
+    if _ensure_policy_layout is None:
+        from madspec_cli.features.policy.infrastructure.storage import ensure_policy_layout
+        _ensure_policy_layout = ensure_policy_layout
+
     create_madspec_config(request.project_path, request.branch_name)
     created = ensure_memory_layout(request.project_path, request.branch_name, full=True)
-    created.extend(ensure_policy_layout(request.project_path))
-    created.extend(ensure_agents_layout(request.project_path)[1])
+    created.extend(_ensure_policy_layout(request.project_path))
+    created.extend(_ensure_agents_layout(request.project_path)[1])
     generated = consolidate_branch_memory(request.project_path, request.branch_name, full=True)
-    errors = validate_branch_memory(request.project_path, request.branch_name, full=True)
+    policy_payload = _evaluate_branch_policies(
+        request.project_path,
+        request.branch_name,
+        stage=None,
+        operation="validate",
+        include_system_policies=False,
+        create_policy_if_missing=False,
+    )
+    errors = validate_branch_memory(
+        request.project_path, request.branch_name, full=True,
+        policy_violations=policy_payload["violations"],
+    )
     return BootstrapBranchMemoryResult(
         branch=request.branch_name,
         created_count=len(created),

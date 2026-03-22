@@ -6,8 +6,8 @@ from typing import Any
 
 from madspec_cli.config import AGENT_CONFIG
 from madspec_cli.memory.shared.storage import now_iso, read_json, write_json
-from madspec_cli.project_state import (
-    MADSPEC_AGENTS_SCHEMA_VERSION,
+from madspec_cli.config import MADSPEC_AGENTS_SCHEMA_VERSION
+from madspec_cli.shared.infra.project_config import (
     create_madspec_config,
     read_madspec_config,
     update_madspec_config,

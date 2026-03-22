@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
+from madspec_cli.memory.shared import SYSTEM_SESSION_KEY
 from madspec_cli.shared.kernel.result import PayloadResult
 
 from .common import evaluate_gate_context

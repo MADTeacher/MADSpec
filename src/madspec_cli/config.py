@@ -115,5 +115,13 @@ AGENT_CONFIG: dict[str, AgentConfig] = {
 }
 
 
+MADSPEC_CONFIG_VERSION = "1.0.0"
+MADSPEC_AGENTS_SCHEMA_VERSION = 1
+DEFAULT_PARALLEL_RUNTIME_POLICY = {
+    "phase1Enabled": True,
+    "phase2Enabled": False,
+}
+
+
 def allowed_ai_values() -> str:
     return ", ".join(AGENT_CONFIG.keys())

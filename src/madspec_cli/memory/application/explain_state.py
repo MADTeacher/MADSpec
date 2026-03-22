@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from madspec_cli.features.gates.application.common import evaluate_gate_context
 from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
 from madspec_cli.shared.kernel.result import PayloadResult
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import GateEvaluator
 
 from .observability import build_runtime_observability
 from .retrieve_context import RetrieveMemoryContextRequest, execute as retrieve_context
@@ -45,7 +47,15 @@ class ExplainStateResult(PayloadResult):
     pass
 
 
-def execute(request: ExplainStateRequest) -> ExplainStateResult:
+def execute(
+    request: ExplainStateRequest,
+    *,
+    _evaluate_gate_context: GateEvaluator | None = None,
+) -> ExplainStateResult:
+    if _evaluate_gate_context is None:
+        from madspec_cli.features.gates.application.common import evaluate_gate_context
+        _evaluate_gate_context = evaluate_gate_context
+
     context = retrieve_context(
         RetrieveMemoryContextRequest(
             project_path=request.project_path,
@@ -76,7 +86,7 @@ def execute(request: ExplainStateRequest) -> ExplainStateResult:
         ).to_payload()
 
     influences = _build_influences(context, limit=request.limit)
-    gate_summary = evaluate_gate_context(
+    gate_summary = _evaluate_gate_context(
         request.project_path,
         request.branch_name,
         stage=request.stage,

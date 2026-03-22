@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from madspec_cli.memory.domain.step_resolution import resolve_runtime_step_id
-from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
-from madspec_cli.memory.shared.system_store.sessions import load_runtime_session
+from madspec_cli.memory.shared import SYSTEM_SESSION_KEY, load_runtime_session
 from madspec_cli.memory.workflow.implementation_shared import IMPLEMENTATION_STAGES
 
 

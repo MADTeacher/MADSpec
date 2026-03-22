@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from ...features.git.infrastructure.operations import get_current_branch
 from .records import PROCEDURE_FILES
 from .stage_scope import resolve_stage_scope
 
@@ -75,10 +74,6 @@ class MemoryPaths:
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-
-def detect_branch(project_path: Path) -> str:
-    return get_current_branch(project_path)
 
 
 def _default_progress_state() -> dict[str, Any]:

@@ -11,7 +11,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.capture_stage import CaptureStageRequest, execute as capture_stage
 from ..application.resolve_branch import resolve_branch
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared import SYSTEM_SESSION_KEY
 
 
 CAPTURE_FROM_FILE_ALIASES = {

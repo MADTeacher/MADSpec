@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-
-from madspec_cli.features.policy.application.common import evaluate_branch_policies
+from typing import Any
 
 from .storage import get_memory_paths, read_json, read_jsonl
 from .validation_progress import validate_progress as _validate_progress
@@ -18,6 +17,7 @@ def validate_branch_memory(
     *,
     stage: str | None = None,
     full: bool = False,
+    policy_violations: list[dict[str, Any]] | None = None,
 ) -> list[str]:
     paths = get_memory_paths(project_path, branch_name)
     errors: list[str] = []
@@ -68,14 +68,7 @@ def validate_branch_memory(
             record_errors = _validate_record(record)
             errors.extend(f"{path.name}:{index}: {item}" for item in record_errors)
 
-    policy_payload = evaluate_branch_policies(
-        project_path,
-        branch_name,
-        stage=None,
-        operation="validate",
-        include_system_policies=False,
-        create_policy_if_missing=False,
-    )
-    errors.extend(item["message"] for item in policy_payload["violations"])
+    if policy_violations is not None:
+        errors.extend(item["message"] for item in policy_violations)
 
     return errors

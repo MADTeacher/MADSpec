@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from madspec_cli.memory.shared.storage import get_memory_paths
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator
 from madspec_cli.memory.shared.system_store.layout import get_system_memory_paths
 from madspec_cli.memory.shared.system_store.store import MemoryStore
 from madspec_cli.memory.shared.validation import validate_branch_memory
@@ -56,7 +59,15 @@ class MemoryDoctorResult(PayloadResult):
         return self.payload.get("status") == "error"
 
 
-def execute(request: MemoryDoctorRequest) -> MemoryDoctorResult:
+def execute(
+    request: MemoryDoctorRequest,
+    *,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
+) -> MemoryDoctorResult:
+    if _evaluate_branch_policies is None:
+        from madspec_cli.features.policy.application.common import evaluate_branch_policies
+        _evaluate_branch_policies = evaluate_branch_policies
+
     paths = get_memory_paths(request.project_path, request.branch_name)
     system_paths = get_system_memory_paths(request.project_path)
     checks: list[dict[str, Any]] = []
@@ -89,7 +100,18 @@ def execute(request: MemoryDoctorRequest) -> MemoryDoctorResult:
         )
     )
 
-    integrity_errors = validate_branch_memory(request.project_path, request.branch_name)
+    doctor_policy_payload = _evaluate_branch_policies(
+        request.project_path,
+        request.branch_name,
+        stage=None,
+        operation="validate",
+        include_system_policies=False,
+        create_policy_if_missing=False,
+    )
+    integrity_errors = validate_branch_memory(
+        request.project_path, request.branch_name,
+        policy_violations=doctor_policy_payload["violations"],
+    )
     checks.append(
         _make_check(
             "integrity",

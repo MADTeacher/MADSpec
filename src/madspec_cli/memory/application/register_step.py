@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from madspec_cli.features.gates.application.common import evaluate_gate_context, gate_failure_messages
 from madspec_cli.shared.kernel.result import PayloadResult
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import GateEvaluator, GateFailureExtractor
 
 from ..shared.storage import ensure_memory_layout, get_memory_paths
 from .proposal_guard import guard_direct_runtime_write
@@ -38,7 +41,22 @@ class RegisterStepResult(PayloadResult):
         return bool(self.payload.get("accepted"))
 
 
-def execute(request: RegisterStepRequest) -> RegisterStepResult:
+def execute(
+    request: RegisterStepRequest,
+    *,
+    _evaluate_gate_context: GateEvaluator | None = None,
+    _gate_failure_messages: GateFailureExtractor | None = None,
+) -> RegisterStepResult:
+    if _evaluate_gate_context is None or _gate_failure_messages is None:
+        from madspec_cli.features.gates.application.common import (
+            evaluate_gate_context as _egc,
+            gate_failure_messages as _gfm,
+        )
+        if _evaluate_gate_context is None:
+            _evaluate_gate_context = _egc
+        if _gate_failure_messages is None:
+            _gate_failure_messages = _gfm
+
     ensure_memory_layout(request.project_path, request.branch_name, stage=request.stage)
     blocked = guard_direct_runtime_write(
         request.project_path,
@@ -48,7 +66,7 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
     )
     if blocked is not None:
         return RegisterStepResult(payload=blocked)
-    gate_payload = evaluate_gate_context(
+    gate_payload = _evaluate_gate_context(
         request.project_path,
         request.branch_name,
         stage=request.stage,
@@ -70,7 +88,7 @@ def execute(request: RegisterStepRequest) -> RegisterStepResult:
             payload={
                 "accepted": False,
                 "step_id": request.step_id,
-                "errors": gate_failure_messages(gate_payload),
+                "errors": _gate_failure_messages(gate_payload),
                 "gate_summary": gate_payload,
             }
         )

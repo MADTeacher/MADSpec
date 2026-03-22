@@ -17,7 +17,7 @@ from ..application.implementation_steps import (
     start as start_step,
 )
 from ..application.resolve_branch import resolve_branch
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared import SYSTEM_SESSION_KEY
 
 
 START_STEP_FROM_FILE_ALLOWED_KEYS = {

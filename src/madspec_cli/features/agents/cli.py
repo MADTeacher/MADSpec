@@ -9,7 +9,7 @@ from madspec_cli.shared.cli.file_input import ArgsFileLifecycle, read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
 from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
-from madspec_cli.memory.shared.system_store.constants import SYSTEM_SESSION_KEY
+from madspec_cli.memory.shared import SYSTEM_SESSION_KEY
 
 from .application.apply_profile import ApplyProfileRequest, execute as apply_profile
 from .application.create_subagent import CreateSubagentRequest, execute as create_subagent

@@ -11,9 +11,8 @@ from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_outp
 
 from ..application.retrieve_context import RetrieveMemoryContextRequest, execute as retrieve_context
 from ..application.resolve_branch import resolve_branch
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
-from ..shared.system_store.sessions import load_runtime_session
-from ..shared.system_store import search_memory_store
+from ..application.memory_query import load_runtime_session, search_memory_store
+from ..shared import SYSTEM_SESSION_KEY
 
 
 def memory_retrieve(

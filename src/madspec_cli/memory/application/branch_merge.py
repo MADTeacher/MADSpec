@@ -5,7 +5,10 @@ import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator
 
 from madspec_cli.memory.domain.conflicts import (
     PROJECT_MEMORY_BRANCH,
@@ -173,7 +176,14 @@ def resolve_conflict(request: ResolveBranchConflictRequest) -> BranchMergeResult
     return BranchMergeResult(payload=_preview_payload(proposal))
 
 
-def merge_branches(request: MergeBranchesRequest) -> BranchMergeResult:
+def merge_branches(
+    request: MergeBranchesRequest,
+    *,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
+) -> BranchMergeResult:
+    if _evaluate_branch_policies is None:
+        from madspec_cli.features.policy.application.common import evaluate_branch_policies
+        _evaluate_branch_policies = evaluate_branch_policies
     store = MemoryStore(request.project_path)
     proposal = _require_proposal(request.project_path, request.proposal_id)
     unresolved = [item for item in proposal.get("conflicts", []) if item.get("blocking") and not item.get("resolution")]
@@ -202,7 +212,18 @@ def merge_branches(request: MergeBranchesRequest) -> BranchMergeResult:
         consolidate_branch_memory(request.project_path, target_branch)
         raise
 
-    validation_errors = validate_branch_memory(request.project_path, target_branch)
+    merge_policy_payload = _evaluate_branch_policies(
+        request.project_path,
+        target_branch,
+        stage=None,
+        operation="validate",
+        include_system_policies=False,
+        create_policy_if_missing=False,
+    )
+    validation_errors = validate_branch_memory(
+        request.project_path, target_branch,
+        policy_violations=merge_policy_payload["violations"],
+    )
     if validation_errors:
         _restore_target_files(original_files)
         store.purge_branch(target_branch, include_artifacts=True)

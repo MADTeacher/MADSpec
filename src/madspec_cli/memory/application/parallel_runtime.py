@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from madspec_cli.project_state import normalize_parallel_runtime_policy, read_madspec_config
+from madspec_cli.shared.infra.project_config import normalize_parallel_runtime_policy, read_madspec_config
 
 
 PHASE2_OPT_IN_MESSAGE = "Phase 2 coordinator runtime is opt-in"

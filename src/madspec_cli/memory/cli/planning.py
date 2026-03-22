@@ -12,7 +12,7 @@ from ..application.determine_next_step import DetermineNextStepRequest, execute 
 from ..application.register_step import RegisterStepRequest, execute as register_step
 from .runtime_feedback import render_runtime_rejection
 from ..application.resolve_branch import resolve_branch
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared import SYSTEM_SESSION_KEY
 
 
 REGISTER_STEP_FROM_FILE_ALIASES = {

@@ -2,10 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from madspec_cli.features.agents.application.common import find_subagent
 from madspec_cli.shared.kernel.result import PayloadResult
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import SubagentFinder
+
+
+def _lazy_find_subagent():
+    from madspec_cli.features.agents.application.common import find_subagent
+    return find_subagent
+
 
 from ..domain.work_items import coordination_binding_from_session
 from ..shared.system_store.canonical_state import refresh_branch_file_projections
@@ -107,12 +115,18 @@ def list_tasks(request: ListTasksRequest) -> CoordinationResult:
     return CoordinationResult(payload={"tasks": tasks})
 
 
-def create_work_item(request: CreateWorkItemRequest) -> CoordinationResult:
+def create_work_item(
+    request: CreateWorkItemRequest,
+    *,
+    _find_subagent: SubagentFinder | None = None,
+) -> CoordinationResult:
+    if _find_subagent is None:
+        _find_subagent = _lazy_find_subagent()
     store = MemoryStore(request.project_path)
     task = store.fetch_task(request.task_id)
     if task is None or task["branch"] != request.branch_name:
         raise ValueError(f"task '{request.task_id}' was not found")
-    subagent = find_subagent(request.project_path, request.subagent_id)
+    subagent = _find_subagent(request.project_path, request.subagent_id)
     if subagent is None:
         raise ValueError(f"subagent '{request.subagent_id}' was not found")
     work_item = store.create_work_item(
@@ -164,9 +178,15 @@ def list_work_items(request: ListWorkItemsRequest) -> CoordinationResult:
     return CoordinationResult(payload={"work_items": enriched})
 
 
-def claim_work_item(request: ClaimWorkItemRequest) -> CoordinationResult:
+def claim_work_item(
+    request: ClaimWorkItemRequest,
+    *,
+    _find_subagent: SubagentFinder | None = None,
+) -> CoordinationResult:
+    if _find_subagent is None:
+        _find_subagent = _lazy_find_subagent()
     store = MemoryStore(request.project_path)
-    if find_subagent(request.project_path, request.subagent_id) is None:
+    if _find_subagent(request.project_path, request.subagent_id) is None:
         raise ValueError(f"subagent '{request.subagent_id}' was not found")
     work_item = store.fetch_work_item(request.work_item_id)
     if work_item is None or work_item["branch"] != request.branch_name:

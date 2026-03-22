@@ -4,9 +4,8 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from madspec_cli.features.change.infrastructure.storage import resolve_default_base_branch
 from madspec_cli.memory.domain.conflicts import (
     make_conflict_id,
     semantic_content_hash,
@@ -20,6 +19,9 @@ from madspec_cli.memory.shared.storage import (
     read_jsonl,
 )
 from madspec_cli.shared.kernel.result import PayloadResult
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import DefaultBaseBranchResolver
 
 BRANCH_STAGE_KEYS = (
     "mvp.concept",
@@ -83,6 +85,7 @@ def resolve_base_branch(
     source_branch: str,
     target_branch: str,
     explicit_base_branch: str | None,
+    _resolve_default_base_branch: DefaultBaseBranchResolver | None = None,
 ) -> str | None:
     if explicit_base_branch:
         candidate_dir = project_path / ".madspec" / explicit_base_branch
@@ -90,9 +93,12 @@ def resolve_base_branch(
             raise ValueError(f"base branch '{explicit_base_branch}' does not have MADSpec artifacts")
         return explicit_base_branch
 
+    if _resolve_default_base_branch is None:
+        from madspec_cli.features.change.infrastructure.storage import resolve_default_base_branch
+        _resolve_default_base_branch = resolve_default_base_branch
     candidates: list[str] = []
     try:
-        candidates.append(resolve_default_base_branch(project_path))
+        candidates.append(_resolve_default_base_branch(project_path))
     except Exception:
         pass
     candidates.extend(["main", "master"])

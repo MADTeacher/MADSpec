@@ -1,8 +1,11 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..shared.storage import get_memory_paths, read_json, read_jsonl
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator
 from ..shared.system_store.canonical_state import load_canonical_branch_state
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 from ..shared.system_store.store import MemoryStore
@@ -38,6 +41,7 @@ def build_runtime_observability(
     stage: str | None = None,
     step_id: str | None = None,
     limit: int = 5,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
     store = MemoryStore(project_path)
     canonical = load_canonical_branch_state(project_path, branch_name)
@@ -66,6 +70,7 @@ def build_runtime_observability(
         proposal_state=proposal_state,
         projection_health=projection_health,
         limit=limit,
+        _evaluate_branch_policies=_evaluate_branch_policies,
     )
     orphan_sessions = _orphan_sessions(
         store,
@@ -201,6 +206,7 @@ def _conflict_state(
     proposal_state: dict[str, Any],
     projection_health: dict[str, Any],
     limit: int,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
     record_conflicts = [
         _conflict_entry(
@@ -230,6 +236,9 @@ def _conflict_state(
         )
         for item in proposal_state["unresolved"][:limit]
     ]
+    if _evaluate_branch_policies is None:
+        from madspec_cli.features.policy.application.common import evaluate_branch_policies
+        _evaluate_branch_policies = evaluate_branch_policies
     integrity_conflicts = [
         _conflict_entry(
             kind="integrity_conflict",
@@ -240,7 +249,17 @@ def _conflict_state(
             repair_hint="Run memory consolidate or inspect the affected projection file and rebuild it from canonical SQLite state.",
             status="error",
         )
-        for message in validate_branch_memory(project_path, branch_name)[:limit]
+        for message in validate_branch_memory(
+            project_path, branch_name,
+            policy_violations=_evaluate_branch_policies(
+                project_path,
+                branch_name,
+                stage=None,
+                operation="validate",
+                include_system_policies=False,
+                create_policy_if_missing=False,
+            )["violations"],
+        )[:limit]
     ]
     projection_conflicts = [
         _conflict_entry(

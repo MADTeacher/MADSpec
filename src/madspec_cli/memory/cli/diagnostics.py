@@ -15,7 +15,7 @@ from ..application.inspect_record import InspectRecordRequest, execute as inspec
 from ..application.timeline import TimelineRequest, execute as memory_timeline
 from ..application.why_next_step import WhyNextStepRequest, execute as explain_next_step
 from ..application.resolve_branch import resolve_branch
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared import SYSTEM_SESSION_KEY
 
 
 def doctor(

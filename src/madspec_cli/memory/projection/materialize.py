@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from madspec_cli.features.change.infrastructure.storage import build_change_context
 from madspec_cli.memory.shared.system_store.store import MemoryStore
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import ChangeContextBuilder
 
 from ..shared.stage_scope import resolve_stage_scope
 from ..stages.architecture.state import render_data_model_markdown, render_openapi_yaml
@@ -56,6 +59,7 @@ def consolidate_branch_memory(
     *,
     stage: str | None = None,
     full: bool = False,
+    _build_change_context: ChangeContextBuilder | None = None,
 ) -> list[Path]:
     state = load_branch_projection_state(project_path, branch_name)
     records = load_materialization_records(
@@ -353,7 +357,10 @@ def consolidate_branch_memory(
         for record in review_records
         if record.get("record_type") in {"improvement", "review_finding", "question"}
     ]
-    change_context = build_change_context(project_path, branch_name)
+    if _build_change_context is None:
+        from madspec_cli.features.change.infrastructure.storage import build_change_context
+        _build_change_context = build_change_context
+    change_context = _build_change_context(project_path, branch_name)
 
     if "review" in scope.view_keys or "improvements" in scope.view_keys:
         review_text, improvements_text = render_review_artifacts(

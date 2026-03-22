@@ -12,7 +12,7 @@ from ..application.consolidate_memory import ConsolidateMemoryRequest, execute a
 from ..application.validate_memory import ValidateMemoryRequest, execute as validate_memory
 from ..application.resolve_branch import resolve_branch
 from ..shared.storage import get_memory_paths, read_jsonl
-from ..shared.system_store import build_db_status, run_reindex
+from ..application.system_store_ops import build_db_status, run_reindex
 
 
 def memory_init(

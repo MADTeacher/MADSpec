@@ -113,7 +113,7 @@ def commit_runtime_mutation(
         generated_views = [str(path.relative_to(project_path)) for path in generated_paths]
         from ..validation import validate_branch_memory
 
-        validation_errors = validate_branch_memory(project_path, branch_name, stage=stage)
+        validation_errors = validate_branch_memory(project_path, branch_name, stage=stage, policy_violations=[])
         if validation_errors:
             raise ValueError("; ".join(validation_errors))
     except Exception as exc:

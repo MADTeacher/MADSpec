@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from madspec_cli.features.git.infrastructure.operations import get_current_branch
 from madspec_cli.memory import consolidate_branch_memory, ensure_memory_layout
-from madspec_cli.project_state import create_madspec_config, ensure_branch_dir
+from madspec_cli.shared.infra.project_config import create_madspec_config, ensure_branch_dir
 
 
 @dataclass(frozen=True)
@@ -23,6 +22,8 @@ class LegacyLayoutMigration:
 
 
 def scan_legacy_layout(project_path: Path) -> LegacyLayoutScan:
+    from madspec_cli.features.git.infrastructure.operations import get_current_branch
+
     target_branch = get_current_branch(project_path)
     madspec_dir = project_path / ".madspec"
     if not madspec_dir.exists():

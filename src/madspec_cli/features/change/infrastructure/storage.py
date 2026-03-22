@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from madspec_cli.features.git.infrastructure.operations import get_current_branch, is_git_repo
 from madspec_cli.memory.shared.storage import get_memory_paths, now_iso, read_json, read_jsonl, write_json
 from madspec_cli.shared.infra.subprocess_tools import run_subprocess
 
@@ -56,6 +55,8 @@ def get_change_paths(project_path: Path, branch_name: str) -> ChangePaths:
 
 
 def ensure_git_change_support(project_path: Path) -> None:
+    from madspec_cli.features.git.infrastructure.operations import is_git_repo
+
     if not is_git_repo(project_path):
         raise ValueError("change layer requires a git repository; initialize git first")
 
@@ -93,6 +94,8 @@ def current_git_revision(project_path: Path) -> str:
 
 
 def current_git_branch(project_path: Path) -> str:
+    from madspec_cli.features.git.infrastructure.operations import get_current_branch
+
     return get_current_branch(project_path)
 
 

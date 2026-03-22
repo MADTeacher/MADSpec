@@ -12,7 +12,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 from .runtime_feedback import render_runtime_rejection
 from ..application.checkpoint_stage import CheckpointStageRequest, execute as checkpoint_stage
 from ..application.resolve_branch import resolve_branch
-from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared import SYSTEM_SESSION_KEY
 
 
 CHECKPOINT_FROM_FILE_ALIASES = {

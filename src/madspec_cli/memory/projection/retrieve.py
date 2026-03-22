@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
-
-from madspec_cli.features.change.infrastructure.storage import build_change_context, load_change_state
+from typing import TYPE_CHECKING, Any
 
 from ..domain.conflicts import PROJECT_MEMORY_BRANCH, semantic_fingerprint
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import ChangeContextBuilder, ChangeStateLoader
 from ..domain.progress import select_next_executable_step
 from ..domain.step_resolution import resolve_runtime_step_id
 from ..shared.system_store.canonical_state import load_canonical_branch_state
@@ -54,6 +55,8 @@ def retrieve_memory_context(
     full_artifact: bool = False,
     include_history: bool = False,
     include_coordination: bool = True,
+    _build_change_context: ChangeContextBuilder | None = None,
+    _load_change_state: ChangeStateLoader | None = None,
 ) -> dict[str, Any]:
     from ..shared.system_store import search_memory_store
     from ..shared.system_store.store import MemoryStore
@@ -76,8 +79,17 @@ def retrieve_memory_context(
         stage_lower,
         session_key=session_key,
     )
-    change_context = build_change_context(project_path, branch_name)
-    change_state = load_change_state(project_path, branch_name)
+    if _build_change_context is None or _load_change_state is None:
+        from madspec_cli.features.change.infrastructure.storage import (
+            build_change_context as _bcc,
+            load_change_state as _lcs,
+        )
+        if _build_change_context is None:
+            _build_change_context = _bcc
+        if _load_change_state is None:
+            _load_change_state = _lcs
+    change_context = _build_change_context(project_path, branch_name)
+    change_state = _load_change_state(project_path, branch_name)
     canonical = load_canonical_branch_state(project_path, branch_name)
     resolved_limit = 3 if limit is None or limit <= 0 else limit
     if not is_stage_artifact and (limit is None or limit <= 0):

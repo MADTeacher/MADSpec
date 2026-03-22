@@ -3,8 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from madspec_cli.features.policy.application.common import evaluate_branch_policies
-
 from .shared import build_gate
 
 
@@ -16,8 +14,12 @@ def collect_policy_gates(
     operation: str,
     step_id: str | None,
     overrides: dict[str, Any],
+    policy_evaluator=None,
 ) -> list[dict[str, Any]]:
-    payload = evaluate_branch_policies(
+    if policy_evaluator is None:
+        from madspec_cli.features.policy.application.common import evaluate_branch_policies
+        policy_evaluator = evaluate_branch_policies
+    payload = policy_evaluator(
         project_path,
         branch_name,
         stage=stage,

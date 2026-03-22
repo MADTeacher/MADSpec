@@ -10,11 +10,8 @@ from typing import Callable
 
 import httpx
 
-from madspec_cli.features.agents.infrastructure.storage import ensure_agents_layout, render_workspace_agents
-from madspec_cli.features.git.infrastructure.operations import get_current_branch, init_git_repo, is_git_repo
-from madspec_cli.features.policy.infrastructure.storage import ensure_policy_layout
 from madspec_cli.memory import consolidate_branch_memory, ensure_memory_layout, validate_branch_memory
-from madspec_cli.project_state import create_madspec_config, ensure_branch_dir
+from madspec_cli.shared.infra.project_config import create_madspec_config, ensure_branch_dir
 from madspec_cli.shared.infra.github_client import (
     DEFAULT_SSL_CONTEXT,
     ReleaseAsset,
@@ -272,6 +269,11 @@ def initialize_project(
         github_token=github_token,
     )
 
+    from madspec_cli.features.agents.infrastructure.storage import ensure_agents_layout, render_workspace_agents
+    from madspec_cli.features.git.infrastructure.operations import get_current_branch, init_git_repo, is_git_repo
+    from madspec_cli.features.policy.application.common import evaluate_branch_policies
+    from madspec_cli.features.policy.infrastructure.storage import ensure_policy_layout
+
     _emit_progress(emit_progress, "start", "madspec-config")
     try:
         branch_name = get_current_branch(project_path)
@@ -282,7 +284,18 @@ def initialize_project(
         agents_state, _ = ensure_agents_layout(project_path, environment_id=selected_ai)
         render_workspace_agents(project_path, agents_state)
         consolidate_branch_memory(project_path, branch_name)
-        memory_errors = validate_branch_memory(project_path, branch_name)
+        init_policy_payload = evaluate_branch_policies(
+            project_path,
+            branch_name,
+            stage=None,
+            operation="validate",
+            include_system_policies=False,
+            create_policy_if_missing=False,
+        )
+        memory_errors = validate_branch_memory(
+            project_path, branch_name,
+            policy_violations=init_policy_payload["violations"],
+        )
         if memory_errors:
             raise RuntimeError("; ".join(memory_errors))
         _emit_progress(emit_progress, "complete", "madspec-config", f"branch: {branch_name}")

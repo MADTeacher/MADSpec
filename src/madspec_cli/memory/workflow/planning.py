@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
-from madspec_cli.features.policy.application.common import evaluate_branch_policies
+from typing import TYPE_CHECKING, Any
 
 from ..domain.progress import explain_next_executable_step
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator
 from ..shared.progress_utils import (
     _compute_progress_metrics,
     _normalize_function_label,
@@ -119,6 +120,7 @@ def determine_next_step(
     candidate_step: str | None = None,
     candidate_dependencies: list[str] | None = None,
     allow_completed_dependencies: bool = True,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
     progress = load_canonical_branch_state(project_path, branch_name).progress
     planned_steps = progress.get("plannedSteps", [])
@@ -144,7 +146,10 @@ def determine_next_step(
         if candidate_step in normalized_dependencies:
             errors.append("candidate step cannot depend on itself")
 
-        policy_payload = evaluate_branch_policies(
+        if _evaluate_branch_policies is None:
+            from madspec_cli.features.policy.application.common import evaluate_branch_policies
+            _evaluate_branch_policies = evaluate_branch_policies
+        policy_payload = _evaluate_branch_policies(
             project_path,
             branch_name,
             stage=stage,
@@ -347,6 +352,7 @@ def register_planned_step(
     related_artifacts: list[str] | None = None,
     size: str | None = None,
     complexity: str | None = None,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
     ensure_memory_layout(project_path, branch_name, stage=stage)
     canonical = load_canonical_branch_state(project_path, branch_name)
@@ -440,7 +446,10 @@ def register_planned_step(
             errors=[f"no functions catalog found in {catalog_source} for the target stage"],
         ).to_payload()
 
-    policy_payload = evaluate_branch_policies(
+    if _evaluate_branch_policies is None:
+        from madspec_cli.features.policy.application.common import evaluate_branch_policies
+        _evaluate_branch_policies = evaluate_branch_policies
+    policy_payload = _evaluate_branch_policies(
         project_path,
         branch_name,
         stage=stage,

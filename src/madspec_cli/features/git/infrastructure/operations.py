@@ -212,7 +212,7 @@ def ensure_gitignore(project_path: Path) -> GitignoreResult:
 
 def set_branch_config(project_path: Path, branch_name: str) -> BranchSyncResult:
     from madspec_cli.memory import consolidate_branch_memory, ensure_memory_layout
-    from madspec_cli.project_state import create_madspec_config, ensure_branch_dir
+    from madspec_cli.shared.infra.project_config import create_madspec_config, ensure_branch_dir
 
     create_madspec_config(project_path, branch_name)
     branch_dir = ensure_branch_dir(project_path, branch_name)

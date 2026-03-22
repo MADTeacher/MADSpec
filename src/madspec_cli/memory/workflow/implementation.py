@@ -2,12 +2,22 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
-
-from madspec_cli.features.gates.application.common import evaluate_gate_context, gate_failure_messages
-from madspec_cli.features.policy.application.common import evaluate_branch_policies
+from typing import TYPE_CHECKING, Any
 
 from ..domain.progress import select_next_executable_step
+
+if TYPE_CHECKING:
+    from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator, GateEvaluator, GateFailureExtractor
+
+
+def _lazy_gate_imports() -> tuple:
+    from madspec_cli.features.gates.application.common import evaluate_gate_context, gate_failure_messages
+    return evaluate_gate_context, gate_failure_messages
+
+
+def _lazy_policy_import():
+    from madspec_cli.features.policy.application.common import evaluate_branch_policies
+    return evaluate_branch_policies
 from ..domain.step_resolution import resolve_runtime_step_id
 from .implementation_records import (
     build_checkpoint_event,
@@ -482,7 +492,19 @@ def start_implementation_step(
     step_id: str | None = None,
     summary: str | None = None,
     evidence: list[str] | None = None,
+    _evaluate_gate_context: GateEvaluator | None = None,
+    _gate_failure_messages: GateFailureExtractor | None = None,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
+    if _evaluate_gate_context is None or _gate_failure_messages is None:
+        egc, gfm = _lazy_gate_imports()
+        if _evaluate_gate_context is None:
+            _evaluate_gate_context = egc
+        if _gate_failure_messages is None:
+            _gate_failure_messages = gfm
+    if _evaluate_branch_policies is None:
+        _evaluate_branch_policies = _lazy_policy_import()
+
     try:
         normalized_stage = validate_implementation_stage(stage)
     except ValueError as exc:
@@ -492,7 +514,7 @@ def start_implementation_step(
     normalized_evidence = normalize_text_list(evidence)
 
     ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
-    gate_payload = evaluate_gate_context(
+    gate_payload = _evaluate_gate_context(
         project_path,
         branch_name,
         stage=normalized_stage,
@@ -509,7 +531,7 @@ def start_implementation_step(
             "branch": branch_name,
             "stage": normalized_stage,
             "step_id": gate_payload.get("step_id"),
-            "errors": gate_failure_messages(gate_payload),
+            "errors": _gate_failure_messages(gate_payload),
             "gate_summary": gate_payload,
         }
     progress, active_session = load_progress(
@@ -553,7 +575,7 @@ def start_implementation_step(
             "errors": errors,
         }
 
-    policy_payload = evaluate_branch_policies(
+    policy_payload = _evaluate_branch_policies(
         project_path,
         branch_name,
         stage=normalized_stage,
@@ -636,7 +658,19 @@ def checkpoint_implementation_step(
     green_evidence: list[str] | None = None,
     refactor_note: str | None = None,
     evidence: list[str] | None = None,
+    _evaluate_gate_context: GateEvaluator | None = None,
+    _gate_failure_messages: GateFailureExtractor | None = None,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
+    if _evaluate_gate_context is None or _gate_failure_messages is None:
+        egc, gfm = _lazy_gate_imports()
+        if _evaluate_gate_context is None:
+            _evaluate_gate_context = egc
+        if _gate_failure_messages is None:
+            _gate_failure_messages = gfm
+    if _evaluate_branch_policies is None:
+        _evaluate_branch_policies = _lazy_policy_import()
+
     try:
         normalized_stage = validate_implementation_stage(stage)
     except ValueError as exc:
@@ -650,7 +684,7 @@ def checkpoint_implementation_step(
     normalized_phase = tdd_phase.strip().lower() if tdd_phase else None
 
     if not any([normalized_summary, normalized_phase, normalized_red, normalized_green, normalized_refactor_note]):
-        gate_payload = evaluate_gate_context(
+        gate_payload = _evaluate_gate_context(
             project_path,
             branch_name,
             stage=normalized_stage,
@@ -672,12 +706,12 @@ def checkpoint_implementation_step(
             "accepted": False,
             "branch": branch_name,
             "stage": normalized_stage,
-            "errors": gate_failure_messages(gate_payload) or ["checkpoint must include summary, tdd phase, evidence, or refactor note"],
+            "errors": _gate_failure_messages(gate_payload) or ["checkpoint must include summary, tdd phase, evidence, or refactor note"],
             "gate_summary": gate_payload,
         }
 
     ensure_memory_layout(project_path, branch_name, stage=normalized_stage)
-    gate_payload = evaluate_gate_context(
+    gate_payload = _evaluate_gate_context(
         project_path,
         branch_name,
         stage=normalized_stage,
@@ -701,7 +735,7 @@ def checkpoint_implementation_step(
             "branch": branch_name,
             "stage": normalized_stage,
             "step_id": gate_payload.get("step_id"),
-            "errors": gate_failure_messages(gate_payload),
+            "errors": _gate_failure_messages(gate_payload),
             "gate_summary": gate_payload,
         }
     progress, active_session = load_progress(
@@ -768,7 +802,7 @@ def checkpoint_implementation_step(
             ],
         }
 
-    policy_payload = evaluate_branch_policies(
+    policy_payload = _evaluate_branch_policies(
         project_path,
         branch_name,
         stage=normalized_stage,
@@ -866,7 +900,19 @@ def complete_implementation_step(
     facts: list[str] | None = None,
     decisions: list[str] | None = None,
     contracts: list[str] | None = None,
+    _evaluate_gate_context: GateEvaluator | None = None,
+    _gate_failure_messages: GateFailureExtractor | None = None,
+    _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
+    if _evaluate_gate_context is None or _gate_failure_messages is None:
+        egc, gfm = _lazy_gate_imports()
+        if _evaluate_gate_context is None:
+            _evaluate_gate_context = egc
+        if _gate_failure_messages is None:
+            _gate_failure_messages = gfm
+    if _evaluate_branch_policies is None:
+        _evaluate_branch_policies = _lazy_policy_import()
+
     try:
         normalized_stage = validate_implementation_stage(stage)
     except ValueError as exc:
@@ -889,7 +935,7 @@ def complete_implementation_step(
     normalized_contracts = normalize_text_list(contracts)
     normalized_refactor_note = refactor_note.strip() if refactor_note else None
 
-    gate_payload = evaluate_gate_context(
+    gate_payload = _evaluate_gate_context(
         project_path,
         branch_name,
         stage=normalized_stage,
@@ -912,7 +958,7 @@ def complete_implementation_step(
             "branch": branch_name,
             "stage": normalized_stage,
             "step_id": gate_payload.get("step_id"),
-            "errors": gate_failure_messages(gate_payload),
+            "errors": _gate_failure_messages(gate_payload),
             "gate_summary": gate_payload,
         }
 
@@ -1012,7 +1058,7 @@ def complete_implementation_step(
     else:
         status_info["tddPhase"] = "waived"
 
-    policy_payload = evaluate_branch_policies(
+    policy_payload = _evaluate_branch_policies(
         project_path,
         branch_name,
         stage=normalized_stage,
