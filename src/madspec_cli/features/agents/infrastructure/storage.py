@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from madspec_cli.memory.shared.storage import now_iso
 
-from ..domain.builtin_roles import DEFAULT_PROFILE_ID, DEFAULT_SUBAGENT_IDS, role_catalog
+from ..domain.builtin_roles import DEFAULT_PROFILE_ID, DEFAULT_SUBAGENT_IDS
 from ..domain.frontmatter_profiles import (
     SubagentFrontmatterProfile,
-    resolve_subagent_model,
-    subagent_frontmatter_profile_for_environment,
 )
 from ..domain.normalizers import (
     _normalize_tool_policy,
@@ -16,7 +14,7 @@ from ..domain.normalizers import (
     validate_subagent_definition_dependencies,
     validate_subagent_id,
 )
-from ..domain.tool_translation import TOOL_POLICY_KEYS, TOOL_TRANSLATORS, ToolTranslator, translate_tool_policy
+from ..domain.tool_translation import TOOL_POLICY_KEYS, TOOL_TRANSLATORS, ToolTranslator
 from .artifact_export import export_agents_artifact
 from .catalog_store import (
     AGENTS_CATALOG_SCHEMA_VERSION,
@@ -51,6 +49,12 @@ from .render_workspace import (
     render_workspace_agents,
     serialize_frontmatter,
 )
+from .frontmatter_profile_compat import (
+    resolve_subagent_model,
+    subagent_frontmatter_profile_for_environment,
+    translate_tool_policy,
+)
+from .role_catalog_compat import role_catalog
 from .state_store import (
     AGENTS_SCHEMA_VERSION,
     AgentsPaths,

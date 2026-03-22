@@ -99,6 +99,19 @@ def test_tool_policy_translation_is_strict_about_unknown_keys() -> None:
         translate_tool_policy("copilot", {"read": True, "search": True, "deploy": True})
 
 
+def test_role_catalog_accepts_supports_native_subagents_flag() -> None:
+    native_roles = role_catalog(supports_native_subagents=True)
+    fallback_roles = role_catalog(supports_native_subagents=False)
+
+    assert native_roles[0]["renderMode"] == "native"
+    assert fallback_roles[0]["renderMode"] == "fallback"
+
+
+def test_role_catalog_rejects_conflicting_arguments() -> None:
+    with pytest.raises(ValueError, match="Conflicting role_catalog arguments"):
+        role_catalog(environment_id="cursor-agent", supports_native_subagents=False)
+
+
 def test_qwen_tool_translation_returns_environment_specific_tools() -> None:
     translated = translate_tool_policy(
         "qwen",
@@ -106,3 +119,17 @@ def test_qwen_tool_translation_returns_environment_specific_tools() -> None:
     )
 
     assert translated == ["read_file", "glob", "grep_search", "run_shell_command"]
+
+
+def test_tool_policy_translation_accepts_profile_id_directly() -> None:
+    translated = translate_tool_policy(
+        "copilot-subagent-v1",
+        {"read": True, "search": True, "edit": True, "write": False, "bash": True},
+    )
+
+    assert translated == ["read", "search", "edit", "terminal"]
+
+
+def test_tool_policy_translation_rejects_unknown_profile_or_environment() -> None:
+    with pytest.raises(ValueError, match="Unknown subagent frontmatter profile"):
+        translate_tool_policy("missing-environment", {"read": True})
