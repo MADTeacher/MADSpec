@@ -19,7 +19,7 @@ from ..application.proposals import (
     preview,
     publish,
 )
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 
 
 proposals_app = typer.Typer(help="Proposal-based runtime commits for claimed work items")
@@ -59,7 +59,7 @@ def publish_proposal_command(
         command_name="madspec memory proposals publish",
         json_output=json_output,
     )
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     payload = publish(
         PublishProposalRequest(
             project_path=project_path,
@@ -101,7 +101,7 @@ def list_proposals_command(
         command_name="madspec memory proposals list",
         json_output=json_output,
     )
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     payload = list_proposals(
         ListProposalsRequest(
             project_path=project_path,

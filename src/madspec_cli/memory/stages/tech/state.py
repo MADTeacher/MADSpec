@@ -554,3 +554,11 @@ def tech_schema_errors(state: Any) -> list[str]:
     if normalized["codeOrganization"] is not None and not isinstance(normalized["codeOrganization"], dict):
         errors.append("tech state field 'codeOrganization' must be an object or null")
     return errors
+
+
+from madspec_cli.memory.shared.stage_registry import register_stage_default, register_stage_loader, register_stage_validators, register_stage_renderers
+
+register_stage_default("mvp.tech", default_tech_state)
+register_stage_loader("mvp.tech", load_tech_state)
+register_stage_validators("mvp.tech", schema_errors=tech_schema_errors)
+register_stage_renderers("mvp.tech", tech_stack=render_tech_stack_markdown)

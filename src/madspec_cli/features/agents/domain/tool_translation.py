@@ -54,22 +54,22 @@ TOOL_TRANSLATORS = {
 }
 
 
-def translate_tool_policy(environment_id: str, tool_policy: dict[str, Any]) -> dict[str, bool] | list[str] | None:
-    profile = subagent_frontmatter_profile_for_environment(environment_id)
+def translate_tool_policy(subagent_frontmatter_profile: str | None, tool_policy: dict[str, Any]) -> dict[str, bool] | list[str] | None:
+    profile = subagent_frontmatter_profile_for_environment(subagent_frontmatter_profile)
     translator_id = profile.tool_translator_id
     if translator_id is None:
         return None
     try:
         translator = TOOL_TRANSLATORS[translator_id]
     except KeyError as exc:
-        raise ValueError(f"Unknown tool translator for {environment_id}: {translator_id}") from exc
+        raise ValueError(f"Unknown tool translator: {translator_id}") from exc
 
     generic_keys = set(tool_policy)
     allowed_generic_keys = {source for source, _ in translator.mapping} | set(translator.ignored_sources)
     unexpected_keys = generic_keys - allowed_generic_keys
     if unexpected_keys:
         raise ValueError(
-            f"Unsupported tool policy keys for {environment_id}: {', '.join(sorted(unexpected_keys))}"
+            f"Unsupported tool policy keys: {', '.join(sorted(unexpected_keys))}"
         )
 
     if translator.output_format == "mapping":

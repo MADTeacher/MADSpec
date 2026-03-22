@@ -279,3 +279,11 @@ def is_empty_design_state(state: dict[str, Any]) -> bool:
             normalized["ratifiedAt"],
         ]
     )
+
+
+from madspec_cli.memory.shared.stage_registry import register_stage_default, register_stage_loader, register_stage_validators, register_stage_renderers
+
+register_stage_default("mvp.design", default_design_state)
+register_stage_loader("mvp.design", load_design_state)
+register_stage_validators("mvp.design", schema_errors=design_schema_errors, reference_errors=design_reference_errors)
+register_stage_renderers("mvp.design", ui_design=render_ui_design_markdown)

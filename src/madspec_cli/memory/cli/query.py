@@ -10,7 +10,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
 
 from ..application.retrieve_context import RetrieveMemoryContextRequest, execute as retrieve_context
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 from ..shared.system_store.sessions import load_runtime_session
 from ..shared.system_store import search_memory_store
@@ -36,7 +36,7 @@ def memory_retrieve(
     """Retrieve minimal structured context for a stage."""
     ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     resolved_limit = limit if limit is not None else (3 if stage.strip().lower() in {"mvp.concept", "mvp.design", "mvp.tech", "deploy", "mvp.architecture", "mvp.plan", "feature.init", "feature.plan"} else 5)
     result = retrieve_context(
         RetrieveMemoryContextRequest(
@@ -96,7 +96,7 @@ def memory_search(
 ) -> None:
     """Inspect hybrid recall candidates without loading full stage context."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     active_session = load_runtime_session(
         project_path,
         branch_name=target_branch,

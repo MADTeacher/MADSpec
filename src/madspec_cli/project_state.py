@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 from .features.git.infrastructure.operations import get_current_branch
-from .ui import console
 
 MADSPEC_CONFIG_VERSION = "1.0.0"
 MADSPEC_AGENTS_SCHEMA_VERSION = 1
@@ -17,10 +16,6 @@ DEFAULT_PARALLEL_RUNTIME_POLICY = {
 
 def resolve_branch_name(project_path: Path, branch_name: str | None) -> str:
     return branch_name or get_current_branch(project_path)
-
-
-def emit_json(payload: dict) -> None:
-    console.print_json(json.dumps(payload, ensure_ascii=False))
 
 
 def default_parallel_runtime_policy() -> dict[str, bool]:

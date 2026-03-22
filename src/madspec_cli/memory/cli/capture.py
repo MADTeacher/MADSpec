@@ -10,7 +10,7 @@ from madspec_cli.shared.cli.file_input import ArgsFileLifecycle, read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.capture_stage import CaptureStageRequest, execute as capture_stage
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
@@ -387,7 +387,7 @@ def memory_capture(
         raise typer.Exit(1)
 
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = capture_stage(
         CaptureStageRequest(
             project_path=project_path,

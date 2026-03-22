@@ -424,3 +424,11 @@ def render_deployment_markdown(
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+from madspec_cli.memory.shared.stage_registry import register_stage_default, register_stage_loader, register_stage_validators, register_stage_renderers
+
+register_stage_default("deploy", default_deploy_state)
+register_stage_loader("deploy", load_deploy_state)
+register_stage_validators("deploy", schema_errors=deploy_schema_errors)
+register_stage_renderers("deploy", deployment=render_deployment_markdown)

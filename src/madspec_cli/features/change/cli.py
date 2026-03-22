@@ -4,7 +4,7 @@ from pathlib import Path
 
 import typer
 
-from madspec_cli.memory.domain.branch_layout import resolve_target_branch
+from madspec_cli.memory.application.resolve_branch import resolve_branch
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
@@ -30,7 +30,7 @@ def init(
 ) -> None:
     """Initialize the canonical change bundle store for the branch."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = init_change(
             InitChangeRequest(project_path=project_path, branch_name=target_branch, base_branch=base_branch)
@@ -57,7 +57,7 @@ def propose(
 ) -> None:
     """Create a pending change bundle proposal."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = propose_change(
             ProposeChangeRequest(
@@ -88,7 +88,7 @@ def diff(
 ) -> None:
     """Show the computed delta against the fixed baseline."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = diff_change(
             DiffChangeRequest(project_path=project_path, branch_name=target_branch, proposal_id=proposal_id)
@@ -114,7 +114,7 @@ def preview(
 ) -> None:
     """Show the full proposal payload before apply."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = preview_change(
             PreviewChangeRequest(project_path=project_path, branch_name=target_branch, proposal_id=proposal_id)
@@ -139,7 +139,7 @@ def apply(
 ) -> None:
     """Apply a pending change bundle proposal."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = apply_change(
             ApplyChangeRequest(project_path=project_path, branch_name=target_branch, proposal_id=proposal_id)
@@ -162,7 +162,7 @@ def export(
 ) -> None:
     """Export the active change bundle into a portable package."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = export_change(
             ExportChangeRequest(project_path=project_path, branch_name=target_branch)
@@ -185,7 +185,7 @@ def verify(
 ) -> None:
     """Verify the active bundle against the current branch state."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         result = verify_change(
             VerifyChangeRequest(project_path=project_path, branch_name=target_branch)
@@ -213,7 +213,7 @@ def summary(
 ) -> None:
     """Show the applied change bundle and its high-level highlights."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = summary_change(
             SummaryChangeRequest(project_path=project_path, branch_name=target_branch)

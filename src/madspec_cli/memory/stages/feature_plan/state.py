@@ -100,3 +100,11 @@ def render_feature_implementation_plan_markdown(
         project_name=title,
     )
     return text.replace("memory/stages/mvp.plan.json", "memory/stages/feature.plan.json", 1)
+
+
+from madspec_cli.memory.shared.stage_registry import register_stage_default, register_stage_loader, register_stage_validators, register_stage_renderers
+
+register_stage_default("feature.plan", default_plan_state)
+register_stage_loader("feature.plan", load_feature_plan_state)
+register_stage_validators("feature.plan", reference_errors=feature_plan_reference_errors)
+register_stage_renderers("feature.plan", implementation_plan=render_feature_implementation_plan_markdown)

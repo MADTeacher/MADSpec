@@ -9,7 +9,7 @@ from madspec_cli.features.policy.application.show_policy import ShowPolicyReques
 from madspec_cli.memory.application.parallel_runtime import read_parallel_runtime_policy
 from madspec_cli.memory.application.orchestration import CoordinationContextRequest, resolve_coordination_context
 from madspec_cli.memory import retrieve_memory_context
-from madspec_cli.memory.domain.branch_layout import resolve_target_branch
+from madspec_cli.memory.application.resolve_branch import resolve_branch
 from madspec_cli.shared.kernel.result import PayloadResult
 
 from .common import find_subagent
@@ -36,7 +36,7 @@ def execute(request: SubagentContextRequest) -> SubagentContextResult:
     subagent = find_subagent(request.project_path, request.subagent_id)
     if subagent is None:
         raise ValueError(f"subagent '{request.subagent_id}' was not found")
-    branch_name = resolve_target_branch(request.project_path, request.branch_name)
+    branch_name = resolve_branch(request.project_path, request.branch_name)
     stage = request.stage or str(subagent.get("defaultStage") or "feature.plan")
     parallel_runtime = read_parallel_runtime_policy(request.project_path)
     phase2_enabled = parallel_runtime.phase2_enabled

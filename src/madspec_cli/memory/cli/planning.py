@@ -11,7 +11,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 from ..application.determine_next_step import DetermineNextStepRequest, execute as determine_next_step
 from ..application.register_step import RegisterStepRequest, execute as register_step
 from .runtime_feedback import render_runtime_rejection
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
@@ -48,7 +48,7 @@ def memory_next_step(
 ) -> None:
     """Select the next executable step or validate a new planning candidate."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = determine_next_step(
         DetermineNextStepRequest(
             project_path=project_path,
@@ -135,7 +135,7 @@ def memory_register_step(
         raise typer.Exit(1)
 
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = register_step(
         RegisterStepRequest(
             project_path=project_path,

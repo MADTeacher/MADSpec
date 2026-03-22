@@ -62,7 +62,7 @@ def build_environment_profile(environment_id: str) -> dict[str, Any]:
     config = AGENT_CONFIG[environment_id]
     frontmatter_profile = None
     if config.subagent_frontmatter_profile:
-        frontmatter = subagent_frontmatter_profile_for_environment(environment_id)
+        frontmatter = subagent_frontmatter_profile_for_environment(config.subagent_frontmatter_profile)
         frontmatter_profile = {
             "profileId": frontmatter.profile_id,
             "modelStrategy": frontmatter.model_strategy,

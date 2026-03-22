@@ -10,7 +10,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 from ..application.bootstrap_branch_memory import BootstrapBranchMemoryRequest, execute as bootstrap_memory
 from ..application.consolidate_memory import ConsolidateMemoryRequest, execute as consolidate_memory
 from ..application.validate_memory import ValidateMemoryRequest, execute as validate_memory
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 from ..shared.storage import get_memory_paths, read_jsonl
 from ..shared.system_store import build_db_status, run_reindex
 
@@ -21,7 +21,7 @@ def memory_init(
     """Initialize structured memory layout for the current project."""
     show_banner()
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = bootstrap_memory(BootstrapBranchMemoryRequest(project_path=project_path, branch_name=target_branch))
     if result.errors:
         console.print("[red]Memory initialization completed with validation errors:[/red]")
@@ -40,7 +40,7 @@ def memory_status(
 ) -> None:
     """Show structured memory status for the current branch."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     paths = get_memory_paths(project_path, target_branch)
 
     payload = {
@@ -83,7 +83,7 @@ def memory_consolidate(
     """Generate markdown views from structured memory."""
     show_banner()
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = consolidate_memory(ConsolidateMemoryRequest(project_path=project_path, branch_name=target_branch))
     console.print(f"[green]Consolidated branch:[/green] {target_branch}")
     for path in result.generated_paths:
@@ -96,7 +96,7 @@ def memory_validate(
 ) -> None:
     """Validate structured memory and derived views."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = validate_memory(ValidateMemoryRequest(project_path=project_path, branch_name=target_branch))
     if json_output:
         emit_json(result)
@@ -119,7 +119,7 @@ def memory_db_status(
 ) -> None:
     """Show project-level SQLite/vector memory backend status."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name) if branch_name else None
+    target_branch = resolve_branch(project_path, branch_name) if branch_name else None
     payload = build_db_status(project_path, target_branch)
     if json_output:
         emit_json(payload)
@@ -146,7 +146,7 @@ def memory_reindex(
 ) -> None:
     """Process pending index jobs for the project-local memory backend."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name) if branch_name else None
+    target_branch = resolve_branch(project_path, branch_name) if branch_name else None
     payload = run_reindex(project_path, target_branch, limit=limit)
     if json_output:
         emit_json(payload)

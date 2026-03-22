@@ -77,7 +77,8 @@ def _serialize_inline_yaml_scalar(value: Any) -> str:
 
 def render_native_subagent_file(environment_id: str, role: dict[str, Any], *, project_path: Path | None = None) -> str:
     body = load_subagent_body(project_path, role)
-    profile = subagent_frontmatter_profile_for_environment(environment_id)
+    fm_profile_id = AGENT_CONFIG[environment_id].subagent_frontmatter_profile
+    profile = subagent_frontmatter_profile_for_environment(fm_profile_id)
     frontmatter: dict[str, Any] = {}
 
     if profile.include_name:
@@ -87,11 +88,11 @@ def render_native_subagent_file(environment_id: str, role: dict[str, Any], *, pr
     for key, value in profile.static_fields:
         frontmatter[key] = value
 
-    model = resolve_subagent_model(environment_id, role["subagentId"])
+    model = resolve_subagent_model(fm_profile_id, role["subagentId"])
     if profile.model_field and model:
         frontmatter[profile.model_field] = model
 
-    translated_tools = translate_tool_policy(environment_id, role.get("toolPolicy", {}))
+    translated_tools = translate_tool_policy(fm_profile_id, role.get("toolPolicy", {}))
     if profile.tools_field and translated_tools:
         frontmatter[profile.tools_field] = translated_tools
 

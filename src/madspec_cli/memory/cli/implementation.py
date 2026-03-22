@@ -16,7 +16,7 @@ from ..application.implementation_steps import (
     complete as complete_step,
     start as start_step,
 )
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
@@ -99,7 +99,7 @@ def memory_start_step(
         raise typer.Exit(1)
 
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = start_step(
         ImplementationStepRequest(
             project_path=project_path,
@@ -187,7 +187,7 @@ def memory_checkpoint_step(
         raise typer.Exit(1)
 
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = checkpoint_step(
         ImplementationStepRequest(
             project_path=project_path,
@@ -285,7 +285,7 @@ def memory_complete_step(
         raise typer.Exit(1)
 
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = complete_step(
         ImplementationStepRequest(
             project_path=project_path,

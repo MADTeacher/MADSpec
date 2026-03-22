@@ -587,3 +587,10 @@ def migrate_legacy_project_analysis_markdown(path: Path) -> dict[str, Any]:
             state["projectAnalysis"]["projectType"] = line.split(":", 1)[1].strip()
             continue
     return normalize_feature_init_state(state)[0]
+
+
+from madspec_cli.memory.shared.stage_registry import register_stage_default, register_stage_loader, register_stage_renderers
+
+register_stage_default("feature.init", default_feature_init_state)
+register_stage_loader("feature.init", load_feature_init_state)
+register_stage_renderers("feature.init", project_analysis=render_project_analysis_markdown, feature_context=render_feature_context_markdown, architecture=render_feature_architecture_markdown, tech_stack=render_feature_tech_stack_markdown)

@@ -21,7 +21,7 @@ from ..application.branch_merge import (
     propose_merge,
     resolve_conflict,
 )
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 
 
 def compare_branches(
@@ -32,7 +32,7 @@ def compare_branches(
 ) -> None:
     """Compare branch memory state before a merge."""
     project_path = Path.cwd()
-    resolved_target = resolve_target_branch(project_path, target_branch)
+    resolved_target = resolve_branch(project_path, target_branch)
     try:
         payload = compare_branch_memory(
             CompareBranchesRequest(
@@ -65,7 +65,7 @@ def propose_merge_command(
 ) -> None:
     """Create a merge proposal from one branch memory state into another."""
     project_path = Path.cwd()
-    resolved_target = resolve_target_branch(project_path, target_branch)
+    resolved_target = resolve_branch(project_path, target_branch)
     try:
         payload = propose_merge(
             ProposeBranchMergeRequest(

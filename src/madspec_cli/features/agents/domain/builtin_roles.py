@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from madspec_cli.config import AGENT_CONFIG
-
 
 DEFAULT_PROFILE_ID = "default"
 DEFAULT_SUBAGENT_IDS = (
@@ -107,9 +105,8 @@ _ROLE_OUTPUT_CONTRACT = {
 }
 
 
-def role_catalog(*, environment_id: str) -> list[dict[str, Any]]:
-    config = AGENT_CONFIG[environment_id]
-    render_mode = "native" if config.supports_native_subagents else "fallback"
+def role_catalog(*, supports_native_subagents: bool) -> list[dict[str, Any]]:
+    render_mode = "native" if supports_native_subagents else "fallback"
     return [
         {
             "subagentId": role_id,

@@ -504,3 +504,11 @@ def render_implementation_plan_markdown(
     lines.extend(["", "## Checkpoint"])
     lines.append(normalized["checkpointSummary"] or "Пока не зафиксировано.")
     return "\n".join(lines) + "\n"
+
+
+from madspec_cli.memory.shared.stage_registry import register_stage_default, register_stage_loader, register_stage_validators, register_stage_renderers
+
+register_stage_default("mvp.plan", default_plan_state)
+register_stage_loader("mvp.plan", load_plan_state)
+register_stage_validators("mvp.plan", schema_errors=plan_schema_errors, reference_errors=plan_reference_errors)
+register_stage_renderers("mvp.plan", implementation_plan=render_implementation_plan_markdown)

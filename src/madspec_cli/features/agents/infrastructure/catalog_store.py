@@ -103,10 +103,12 @@ def body_file_path(project_path: Path, subagent_id: str) -> Path:
 def load_effective_subagents(project_path: Path, *, state: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     state = state or load_agents_state(project_path)
     environment_id = state.get("environmentId") or detect_agent_environment(project_path) or "cursor-agent"
+    config = AGENT_CONFIG[environment_id]
+    builtin_roles = role_catalog(supports_native_subagents=config.supports_native_subagents)
     effective: dict[str, dict[str, Any]] = {
-        item["subagentId"]: dict(item) for item in role_catalog(environment_id=environment_id)
+        item["subagentId"]: dict(item) for item in builtin_roles
     }
-    ordered_ids = [item["subagentId"] for item in role_catalog(environment_id=environment_id)]
+    ordered_ids = [item["subagentId"] for item in builtin_roles]
     catalog = load_agents_catalog(project_path)
     for item in catalog.get("roles", []):
         subagent_id = str(item.get("subagentId") or "")
@@ -125,7 +127,7 @@ def load_effective_subagents(project_path: Path, *, state: dict[str, Any] | None
             "origin": item.get("kind"),
             "bodySource": project_body_relative_path(subagent_id) if item.get("bodyFile") else f"template:{subagent_id}",
             "enabled": False,
-            "renderMode": "native" if AGENT_CONFIG[environment_id].supports_native_subagents else "fallback",
+            "renderMode": "native" if config.supports_native_subagents else "fallback",
         }
         if subagent_id in effective:
             merged_effective = dict(effective[subagent_id])
@@ -174,7 +176,8 @@ def upsert_catalog_role(
         None,
     )
     state = load_agents_state(project_path)
-    builtin_ids = {item["subagentId"] for item in role_catalog(environment_id=state.get("environmentId") or "cursor-agent")}
+    env_id = state.get("environmentId") or "cursor-agent"
+    builtin_ids = {item["subagentId"] for item in role_catalog(supports_native_subagents=AGENT_CONFIG[env_id].supports_native_subagents)}
     if existing_index is None and normalized_id in builtin_ids:
         if allow_create:
             raise ValueError(f"subagent '{normalized_id}' already exists as a built-in role; use update to override it")
@@ -225,7 +228,8 @@ def remove_catalog_role(project_path: Path, *, subagent_id: str, force: bool) ->
     if existing_index is None:
         raise ValueError(f"project-defined subagent '{normalized_id}' was not found")
     removed = catalog["roles"].pop(existing_index)
-    builtin_ids = {item["subagentId"] for item in role_catalog(environment_id=state.get("environmentId") or "cursor-agent")}
+    env_id_rm = state.get("environmentId") or "cursor-agent"
+    builtin_ids = {item["subagentId"] for item in role_catalog(supports_native_subagents=AGENT_CONFIG[env_id_rm].supports_native_subagents)}
     removing_override_only = removed.get("kind") == "override" and normalized_id in builtin_ids
     if normalized_id in enabled_ids and not force and not removing_override_only:
         raise ValueError(f"subagent '{normalized_id}' is enabled; use --force to remove it")

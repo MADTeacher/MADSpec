@@ -27,7 +27,7 @@ from ..application.orchestration import (
     release_work_item,
     resolve_coordination_context,
 )
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
@@ -65,7 +65,7 @@ def create_task_command(
             command_name="madspec memory tasks create",
             json_output=json_output,
         )
-        target_branch = resolve_target_branch(project_path, branch_name)
+        target_branch = resolve_branch(project_path, branch_name)
         payload = create_task(
             CreateTaskRequest(
                 project_path=project_path,
@@ -100,7 +100,7 @@ def list_tasks_command(
             command_name="madspec memory tasks list",
             json_output=json_output,
         )
-        target_branch = resolve_target_branch(project_path, branch_name)
+        target_branch = resolve_branch(project_path, branch_name)
         payload = list_tasks(
             ListTasksRequest(project_path=project_path, branch_name=target_branch)
         ).to_payload()
@@ -139,7 +139,7 @@ def create_work_item_command(
             command_name="madspec memory work-items create",
             json_output=json_output,
         )
-        target_branch = resolve_target_branch(project_path, branch_name)
+        target_branch = resolve_branch(project_path, branch_name)
         payload = create_work_item(
             CreateWorkItemRequest(
                 project_path=project_path,
@@ -186,7 +186,7 @@ def list_work_items_command(
             command_name="madspec memory work-items list",
             json_output=json_output,
         )
-        target_branch = resolve_target_branch(project_path, branch_name)
+        target_branch = resolve_branch(project_path, branch_name)
         payload = list_work_items(
             ListWorkItemsRequest(
                 project_path=project_path,
@@ -225,7 +225,7 @@ def claim_work_item_command(
             command_name="madspec memory work-items claim",
             json_output=json_output,
         )
-        target_branch = resolve_target_branch(project_path, branch_name)
+        target_branch = resolve_branch(project_path, branch_name)
         payload = claim_work_item(
             ClaimWorkItemRequest(
                 project_path=project_path,
@@ -270,7 +270,7 @@ def release_work_item_command(
             command_name="madspec memory work-items release",
             json_output=json_output,
         )
-        target_branch = resolve_target_branch(project_path, branch_name)
+        target_branch = resolve_branch(project_path, branch_name)
         payload = release_work_item(
             ReleaseWorkItemRequest(
                 project_path=project_path,
@@ -306,7 +306,7 @@ def explain_coordinator_command(
             command_name="madspec memory coordinator explain",
             json_output=json_output,
         )
-        target_branch = resolve_target_branch(project_path, branch_name)
+        target_branch = resolve_branch(project_path, branch_name)
         payload = explain_coordinator(
             ExplainCoordinatorRequest(
                 project_path=project_path,

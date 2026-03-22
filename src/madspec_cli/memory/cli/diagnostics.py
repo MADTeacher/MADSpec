@@ -14,7 +14,7 @@ from ..application.explain_state import ExplainStateRequest, execute as explain_
 from ..application.inspect_record import InspectRecordRequest, execute as inspect_record
 from ..application.timeline import TimelineRequest, execute as memory_timeline
 from ..application.why_next_step import WhyNextStepRequest, execute as explain_next_step
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
@@ -24,7 +24,7 @@ def doctor(
 ) -> None:
     """Run a read-only diagnostic sweep over branch memory and the project backend."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = memory_doctor(
         MemoryDoctorRequest(project_path=project_path, branch_name=target_branch)
     )
@@ -69,7 +69,7 @@ def explain(
     """Explain the current stage context, policy effects, and recall influences."""
     ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     payload = explain_state(
         ExplainStateRequest(
             project_path=project_path,
@@ -132,7 +132,7 @@ def timeline(
 ) -> None:
     """Show a merged timeline from canonical memory records, snapshots, and retrieval runs."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     payload = memory_timeline(
         TimelineRequest(
             project_path=project_path,
@@ -167,7 +167,7 @@ def why_next_step(
 ) -> None:
     """Explain why a particular step is selected next and why others are blocked."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     payload = explain_next_step(
         WhyNextStepRequest(
             project_path=project_path,
@@ -202,7 +202,7 @@ def conflicts(
 ) -> None:
     """List explicit conflicted records and integrity conflicts for the branch."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     payload = list_conflicts(
         MemoryConflictsRequest(
             project_path=project_path,
@@ -242,7 +242,7 @@ def inspect(
 ) -> None:
     """Inspect a canonical memory record together with its source and index state."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = inspect_record(
         InspectRecordRequest(
             project_path=project_path,

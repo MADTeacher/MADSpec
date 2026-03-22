@@ -8,7 +8,7 @@ from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 
 from ..application.learning import LearnFromOutcomesRequest, PromoteMemoryRequest, learn as learn_from_outcomes, promote as promote_memory
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 
 
 def memory_promote(
@@ -17,7 +17,7 @@ def memory_promote(
 ) -> None:
     """Promote validated records into semantic memory."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = promote_memory(PromoteMemoryRequest(project_path=project_path, branch_name=target_branch))
 
     if json_output:
@@ -37,7 +37,7 @@ def memory_learn(
 ) -> None:
     """Convert test/review outcomes into structured learning records."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = learn_from_outcomes(LearnFromOutcomesRequest(project_path=project_path, branch_name=target_branch, input_path=input_path))
 
     if json_output:

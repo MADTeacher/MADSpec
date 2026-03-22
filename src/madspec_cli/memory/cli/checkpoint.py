@@ -11,7 +11,7 @@ from madspec_cli.shared.cli.json_output import emit_json
 
 from .runtime_feedback import render_runtime_rejection
 from ..application.checkpoint_stage import CheckpointStageRequest, execute as checkpoint_stage
-from ..domain.branch_layout import resolve_target_branch
+from ..application.resolve_branch import resolve_branch
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
 
 
@@ -94,7 +94,7 @@ def memory_checkpoint(
         raise typer.Exit(1)
 
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     result = checkpoint_stage(
         CheckpointStageRequest(
             project_path=project_path,

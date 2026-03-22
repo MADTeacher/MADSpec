@@ -796,3 +796,11 @@ def render_data_model_markdown(
 def render_openapi_yaml(state: dict[str, Any], *, branch_name: str) -> str:
     normalized, _ = normalize_architecture_state(state)
     return render_openapi_yaml_document(normalized, branch_name=branch_name)
+
+
+from madspec_cli.memory.shared.stage_registry import register_stage_default, register_stage_loader, register_stage_validators, register_stage_renderers
+
+register_stage_default("mvp.architecture", default_architecture_state)
+register_stage_loader("mvp.architecture", load_architecture_state)
+register_stage_validators("mvp.architecture", schema_errors=architecture_schema_errors, reference_errors=architecture_reference_errors)
+register_stage_renderers("mvp.architecture", architecture=render_architecture_markdown, data_model=render_data_model_markdown, openapi=render_openapi_yaml)

@@ -261,7 +261,7 @@ def normalize_runtime_progress(
     *,
     catalog_override: dict[str, list[str]] | None = None,
 ) -> tuple[dict[str, Any], bool]:
-    from ..workflow.planning import _compute_progress_metrics, extract_function_catalog
+    from .progress_utils import _compute_progress_metrics, extract_function_catalog
 
     normalized, changed = normalize_progress_state(progress)
     normalized, derived_changed = recompute_runtime_progress_fields(
@@ -281,7 +281,7 @@ def recompute_runtime_progress_fields(
     *,
     catalog_override: dict[str, list[str]] | None = None,
 ) -> tuple[dict[str, Any], bool]:
-    from ..workflow.planning import _compute_progress_metrics, extract_function_catalog
+    from .progress_utils import _compute_progress_metrics, extract_function_catalog
 
     normalized = dict(progress)
     changed = False

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import typer
 
-from madspec_cli.memory.domain.branch_layout import resolve_target_branch
+from madspec_cli.memory.application.resolve_branch import resolve_branch
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
@@ -48,7 +48,7 @@ def status(
     """Show the current quality gate status without changing state."""
     ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = gate_status(
             GateStatusRequest(
@@ -84,7 +84,7 @@ def run(
 ) -> None:
     """Evaluate gates for a specific transition context and record an audit event."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = run_gate(
             RunGateRequest(
@@ -124,7 +124,7 @@ def explain(
     """Explain gate results together with relevant waiver and history context."""
     ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = explain_gate(
             ExplainGateRequest(
@@ -164,7 +164,7 @@ def propose_waiver_command(
 ) -> None:
     """Create a pending waiver proposal for a waivable gate."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = propose_waiver(
             ProposeWaiverRequest(
@@ -203,7 +203,7 @@ def apply_waiver_command(
 ) -> None:
     """Apply a pending waiver proposal."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     try:
         payload = apply_waiver(
             ApplyWaiverRequest(

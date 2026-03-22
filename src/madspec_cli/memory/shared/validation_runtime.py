@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..workflow.planning import _compute_progress_metrics, extract_function_catalog
+from .progress_utils import _compute_progress_metrics, extract_function_catalog
 from .storage import read_json
 
 

@@ -448,3 +448,11 @@ def migrate_legacy_concept_markdown(path: Path) -> dict[str, Any]:
 
     normalized, _ = normalize_concept_state(state)
     return normalized
+
+
+from madspec_cli.memory.shared.stage_registry import register_stage_default, register_stage_loader, register_stage_validators, register_stage_renderers
+
+register_stage_default("mvp.concept", default_concept_state)
+register_stage_loader("mvp.concept", load_concept_state)
+register_stage_validators("mvp.concept", schema_errors=concept_schema_errors)
+register_stage_renderers("mvp.concept", concept=render_concept_markdown)

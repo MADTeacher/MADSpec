@@ -4,7 +4,7 @@ from pathlib import Path
 
 import typer
 
-from madspec_cli.memory.domain.branch_layout import resolve_target_branch
+from madspec_cli.memory.application.resolve_branch import resolve_branch
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
@@ -206,7 +206,7 @@ def validate(
     """Validate the current branch state against effective policies."""
     ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     payload = validate_policy(
         ValidatePolicyRequest(
             project_path=project_path,
@@ -281,7 +281,7 @@ def explain(
 ) -> None:
     """Explain a policy or proposal in the current branch context."""
     project_path = Path.cwd()
-    target_branch = resolve_target_branch(project_path, branch_name)
+    target_branch = resolve_branch(project_path, branch_name)
     payload = explain_policy(
         ExplainPolicyRequest(
             project_path=project_path,

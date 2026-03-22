@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from madspec_cli.config import AGENT_CONFIG
-
 
 @dataclass(frozen=True)
 class SubagentFrontmatterProfile:
@@ -59,19 +57,17 @@ SUBAGENT_FRONTMATTER_PROFILES = {
 }
 
 
-def subagent_frontmatter_profile_for_environment(environment_id: str) -> SubagentFrontmatterProfile:
-    config = AGENT_CONFIG[environment_id]
-    profile_id = config.subagent_frontmatter_profile
-    if not profile_id:
-        raise ValueError(f"Environment {environment_id} does not declare a subagent frontmatter profile")
+def subagent_frontmatter_profile_for_environment(subagent_frontmatter_profile: str | None) -> SubagentFrontmatterProfile:
+    if not subagent_frontmatter_profile:
+        raise ValueError("No subagent frontmatter profile declared")
     try:
-        return SUBAGENT_FRONTMATTER_PROFILES[profile_id]
+        return SUBAGENT_FRONTMATTER_PROFILES[subagent_frontmatter_profile]
     except KeyError as exc:
-        raise ValueError(f"Unknown subagent frontmatter profile for {environment_id}: {profile_id}") from exc
+        raise ValueError(f"Unknown subagent frontmatter profile: {subagent_frontmatter_profile}") from exc
 
 
-def resolve_subagent_model(environment_id: str, role_id: str) -> str | None:
-    profile = subagent_frontmatter_profile_for_environment(environment_id)
+def resolve_subagent_model(subagent_frontmatter_profile: str | None, role_id: str) -> str | None:
+    profile = subagent_frontmatter_profile_for_environment(subagent_frontmatter_profile)
     if profile.model_field is None:
         return None
     return profile.role_models.get(role_id)

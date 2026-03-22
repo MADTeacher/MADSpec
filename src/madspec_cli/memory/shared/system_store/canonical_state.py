@@ -3,16 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
+from ... import stages as _stages  # noqa: F401
+from ..stage_registry import get_all_stage_defaults
 from ..storage import _default_progress_state, get_memory_paths
-from ...stages.architecture.state import default_architecture_state
-from ...stages.concept.state import default_concept_state
-from ...stages.design.state import default_design_state
-from ...stages.deploy.state import default_deploy_state
-from ...stages.feature_init.state import default_feature_init_state
-from ...stages.plan.state import default_plan_state
-from ...stages.tech.state import default_tech_state
 from .constants import SYSTEM_SESSION_KEY
 from .layout import ensure_system_memory_layout
 from .sessions import default_session_payload
@@ -41,17 +36,12 @@ _SNAPSHOT_SPECS: tuple[tuple[str, str], ...] = (
     ("feature.plan", "feature_plan_state"),
 )
 
-_SNAPSHOT_DEFAULTS = {
-    "progress": _default_progress_state,
-    "mvp.concept": default_concept_state,
-    "mvp.design": default_design_state,
-    "mvp.tech": default_tech_state,
-    "deploy": default_deploy_state,
-    "mvp.architecture": default_architecture_state,
-    "mvp.plan": default_plan_state,
-    "feature.init": default_feature_init_state,
-    "feature.plan": default_plan_state,
-}
+
+def _get_snapshot_defaults() -> dict[str, Callable[[], dict[str, Any]]]:
+    defaults = get_all_stage_defaults()
+    defaults["progress"] = _default_progress_state
+    return defaults
+
 
 _RECORD_STREAM_PATHS = {
     "decision_log": "decision_log",
@@ -184,7 +174,7 @@ def tag_records_for_stream(records: list[dict[str, Any]], record_stream: str) ->
 def _load_snapshot_payload(store: MemoryStore, branch_name: str, snapshot_key: str) -> dict[str, Any]:
     payload = store.fetch_snapshot(branch_name, snapshot_key)
     if payload is None:
-        return _SNAPSHOT_DEFAULTS[snapshot_key]()
+        return _get_snapshot_defaults()[snapshot_key]()
     payload.pop("_snapshot_key", None)
     payload.pop("_content_hash", None)
     payload.pop("_stage", None)
