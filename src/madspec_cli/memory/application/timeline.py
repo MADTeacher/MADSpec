@@ -100,6 +100,10 @@ def execute(request: TimelineRequest) -> TimelineResult:
         if request.step_id and row.get("step_id") != request.step_id:
             continue
         summary = f"Recall query: {row['query'] or '<auto>'}"
+        if row.get("provider") or row.get("semantic_outcome"):
+            provider_label = row.get("provider") or "unknown-provider"
+            outcome_label = row.get("semantic_outcome") or ("used" if row.get("semantic_enabled") else "skipped")
+            summary = f"{summary} [{provider_label}, outcome={outcome_label}]"
         items.append(
             {
                 "timestamp": row.get("created_at"),
@@ -119,6 +123,15 @@ def execute(request: TimelineRequest) -> TimelineResult:
                 "work_item_id": None,
                 "proposal_id": None,
                 "scope": "branch",
+                "provider": row.get("provider"),
+                "model": row.get("model"),
+                "revision": row.get("revision"),
+                "dimension": row.get("dimension"),
+                "namespace_path": row.get("namespace_path"),
+                "bootstrap_status": row.get("bootstrap_status"),
+                "semantic_outcome": row.get("semantic_outcome"),
+                "error_kind": row.get("error_kind"),
+                "error_message": row.get("error_message"),
             }
         )
 

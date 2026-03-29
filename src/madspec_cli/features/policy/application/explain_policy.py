@@ -5,7 +5,8 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import build_policy_context, get_policy_paths
+from ..infrastructure.paths import get_policy_paths
+from ..infrastructure.queries import build_policy_context
 from .shared import find_policy, find_proposal
 from .validate_policy import ValidatePolicyRequest, execute as validate_policy
 

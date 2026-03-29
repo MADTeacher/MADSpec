@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib
 from pathlib import Path
 
 import httpx
@@ -14,14 +15,13 @@ from madspec_cli.github_api import (
 )
 from madspec_cli.features.init.infrastructure.initializer_core import merge_json_files
 from madspec_cli.memory import (
-    _compute_progress_metrics,
     consolidate_branch_memory,
     ensure_memory_layout,
-    extract_function_catalog,
     get_memory_paths,
     validate_branch_memory,
-    write_json,
 )
+from madspec_cli.memory.shared.storage import write_json
+from madspec_cli.memory.workflow.planning import _compute_progress_metrics, extract_function_catalog
 
 
 def test_top_level_package_re_exports_app_and_main() -> None:
@@ -30,11 +30,16 @@ def test_top_level_package_re_exports_app_and_main() -> None:
 
 
 def test_memory_package_re_exports_compatibility_surface() -> None:
-    from madspec_cli.memory import get_memory_paths as exported_get_memory_paths
-    from madspec_cli.memory import register_planned_step as exported_register_planned_step
+    memory_module = importlib.import_module("madspec_cli.memory")
 
-    assert callable(exported_get_memory_paths)
-    assert callable(exported_register_planned_step)
+    assert callable(memory_module.get_memory_paths)
+    assert callable(memory_module.register_planned_step)
+    assert not hasattr(memory_module, "_compute_progress_metrics")
+    assert not hasattr(memory_module, "extract_function_catalog")
+    assert not hasattr(memory_module, "make_record")
+    assert not hasattr(memory_module, "append_jsonl")
+    assert not hasattr(memory_module, "read_jsonl")
+    assert not hasattr(memory_module, "write_json")
 
 
 def test_memory_internal_modules_do_not_import_memory_root() -> None:
@@ -49,6 +54,105 @@ def test_memory_internal_modules_do_not_import_memory_root() -> None:
             offenders.append(str(path.relative_to(memory_dir.parents[2])))
 
     assert offenders == []
+
+
+def test_boundary_modules_do_not_depend_on_forbidden_layers(repo_root: Path) -> None:
+    project_config = (
+        repo_root / "src" / "madspec_cli" / "shared" / "infra" / "project_config.py"
+    ).read_text(encoding="utf-8")
+    memory_storage = (
+        repo_root / "src" / "madspec_cli" / "memory" / "shared" / "storage.py"
+    ).read_text(encoding="utf-8")
+    git_operations = (
+        repo_root / "src" / "madspec_cli" / "features" / "git" / "infrastructure" / "operations.py"
+    ).read_text(encoding="utf-8")
+    policy_storage = (
+        repo_root / "src" / "madspec_cli" / "features" / "policy" / "infrastructure" / "storage.py"
+    ).read_text(encoding="utf-8")
+    change_storage = (
+        repo_root / "src" / "madspec_cli" / "features" / "change" / "infrastructure" / "storage.py"
+    ).read_text(encoding="utf-8")
+    policy_repository = (
+        repo_root / "src" / "madspec_cli" / "features" / "policy" / "infrastructure" / "repository.py"
+    ).read_text(encoding="utf-8")
+    change_repository = (
+        repo_root / "src" / "madspec_cli" / "features" / "change" / "infrastructure" / "repository.py"
+    ).read_text(encoding="utf-8")
+    init_cli = (
+        repo_root / "src" / "madspec_cli" / "features" / "init" / "cli.py"
+    ).read_text(encoding="utf-8")
+    agents_cli = (
+        repo_root / "src" / "madspec_cli" / "features" / "agents" / "cli.py"
+    ).read_text(encoding="utf-8")
+    policy_cli = (
+        repo_root / "src" / "madspec_cli" / "features" / "policy" / "cli.py"
+    ).read_text(encoding="utf-8")
+    change_cli = (
+        repo_root / "src" / "madspec_cli" / "features" / "change" / "cli.py"
+    ).read_text(encoding="utf-8")
+    gates_cli = (
+        repo_root / "src" / "madspec_cli" / "features" / "gates" / "cli.py"
+    ).read_text(encoding="utf-8")
+    features_init = (
+        repo_root / "src" / "madspec_cli" / "features" / "__init__.py"
+    ).read_text(encoding="utf-8")
+    gates_init = (
+        repo_root / "src" / "madspec_cli" / "features" / "gates" / "__init__.py"
+    ).read_text(encoding="utf-8")
+    git_init = (
+        repo_root / "src" / "madspec_cli" / "features" / "git" / "__init__.py"
+    ).read_text(encoding="utf-8")
+    init_init = (
+        repo_root / "src" / "madspec_cli" / "features" / "init" / "__init__.py"
+    ).read_text(encoding="utf-8")
+    meta_init = (
+        repo_root / "src" / "madspec_cli" / "features" / "meta" / "__init__.py"
+    ).read_text(encoding="utf-8")
+
+    assert "features.git.infrastructure.operations" not in project_config
+    assert ".system_store" not in memory_storage
+    assert "madspec_cli.memory" not in git_operations
+    assert "shared.infra.project_config" not in git_operations
+    assert "MemoryStore" not in policy_storage
+    assert "render_policy_markdown" not in policy_storage
+    assert "normalize_policy_payload" not in policy_storage
+    assert "run_subprocess" not in change_storage
+    assert "build_git_diff" not in change_storage
+    assert "render_change_summary_markdown" not in change_storage
+    assert "MemoryStore" not in policy_repository
+    assert "MemoryStore" not in change_repository
+    assert "Live" not in init_cli
+    assert "Panel" not in init_cli
+    assert "shutil.rmtree" not in init_cli
+    assert "StepTracker" not in init_cli
+    assert "emit_error(" not in policy_cli
+    assert "emit_error(" not in change_cli
+    assert "emit_error(" not in gates_cli
+    assert agents_cli.count("emit_error(") <= 2
+    assert change_cli.count("raise typer.Exit(1)") == 0
+    assert policy_cli.count("raise typer.Exit(1)") == 0
+    assert gates_cli.count("raise typer.Exit(1)") == 0
+    assert " import cli" not in features_init
+    assert " import cli" not in gates_init
+    assert " import cli" not in git_init
+    assert " import cli" not in init_init
+    assert " import cli" not in meta_init
+
+
+def test_nested_agents_guides_exist_and_describe_stable_entry_points(repo_root: Path) -> None:
+    expected = {
+        repo_root / "src" / "madspec_cli" / "memory" / "AGENTS.md": ["Стабильные точки входа", "memory/__init__.py"],
+        repo_root / "src" / "madspec_cli" / "memory" / "shared" / "system_store" / "AGENTS.md": ["store.py", "__init__.py"],
+        repo_root / "src" / "madspec_cli" / "features" / "agents" / "AGENTS.md": ["infrastructure/storage.py", "application/"],
+        repo_root / "src" / "madspec_cli" / "features" / "policy" / "AGENTS.md": ["infrastructure/storage.py", "service.py"],
+        repo_root / "src" / "madspec_cli" / "features" / "change" / "AGENTS.md": ["infrastructure/storage.py", "service.py"],
+    }
+
+    for path, expected_snippets in expected.items():
+        assert path.exists()
+        content = path.read_text(encoding="utf-8")
+        for snippet in expected_snippets:
+            assert snippet in content
 
 
 def test_rate_limit_headers_are_parsed_and_formatted() -> None:

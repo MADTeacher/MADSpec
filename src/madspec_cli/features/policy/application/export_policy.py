@@ -5,7 +5,7 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import export_policy_artifact
+from ..infrastructure.service import export_policy_artifact
 
 
 @dataclass(frozen=True)

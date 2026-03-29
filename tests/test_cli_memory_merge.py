@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 
-from madspec_cli.memory import append_jsonl, get_memory_paths, make_record, read_jsonl, write_json
+from madspec_cli.memory import get_memory_paths
+from madspec_cli.memory.shared.records import make_record
+from madspec_cli.memory.shared.storage import append_jsonl, read_jsonl, write_json
 
 from tests.support import step_metadata, step_status
 

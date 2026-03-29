@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from ...domain.conflicts import PROJECT_MEMORY_BRANCH
 from .constants import SEARCH_SCOPES
-from .layout import get_system_memory_paths
+from .layout import VectorNamespace, get_system_memory_paths
+from .provider_factory import (
+    EmbeddingProviderRuntimeError,
+    build_embedding_provider,
+    resolve_configured_embeddings,
+)
 from .store import MemoryStore
 from .text import (
     _flatten_for_search,
@@ -14,14 +20,33 @@ from .text import (
     _snippet,
     _status_allowed,
 )
-from .vector import VectorMemoryIndex
+from .vector import BaseEmbeddingProvider, HashEmbeddingProvider, VectorMemoryIndex
+
+
+class RetrievalEmbeddingProviderError(RuntimeError):
+    def __init__(self, payload: dict[str, Any]) -> None:
+        super().__init__(payload["message"])
+        self.payload = payload
 
 
 class RetrievalOrchestrator:
-    def __init__(self, project_path: Path) -> None:
+    def __init__(
+        self,
+        project_path: Path,
+        *,
+        provider: BaseEmbeddingProvider | None = None,
+        provider_factory: Callable[[], BaseEmbeddingProvider] | None = None,
+    ) -> None:
         self.project_path = project_path
         self.store = MemoryStore(project_path)
-        self.index = VectorMemoryIndex(get_system_memory_paths(project_path).lancedb_dir)
+        self._provider = provider
+        self._provider_factory = provider_factory or (
+            lambda: build_embedding_provider(project_path, allow_bootstrap=True)
+        )
+        self._namespace: VectorNamespace | None = None
+        self.index: VectorMemoryIndex | None = None
+        if provider is not None:
+            self.index = self._build_index(provider)
 
     def search(
         self,
@@ -39,6 +64,8 @@ class RetrievalOrchestrator:
     ) -> dict[str, Any]:
         normalized_scope = scope if scope in SEARCH_SCOPES else "branch"
         active_session = active_session or {}
+        configured_embeddings = resolve_configured_embeddings(self.project_path).to_status_payload(self.project_path)
+        active_namespace = get_system_memory_paths(self.project_path).active_vector_namespace.to_payload(self.project_path)
         auto_query = _build_auto_query(
             stage=stage,
             step_id=step_id,
@@ -51,14 +78,29 @@ class RetrievalOrchestrator:
             active_session=active_session,
             resolved_query=resolved_query,
         )
+        semantic_requested = bool(resolved_query and not disable_semantic and triggers)
+        semantic_runtime = _build_semantic_runtime_payload(
+            configured_embeddings=configured_embeddings,
+            active_vector_namespace=active_namespace,
+            semantic_requested=semantic_requested,
+            semantic_used=False,
+            semantic_outcome=_semantic_outcome(
+                disable_semantic=disable_semantic,
+                resolved_query=resolved_query,
+                semantic_requested=semantic_requested,
+            ),
+        )
         if not resolved_query:
             return {
                 "query": query,
                 "resolved_query": None,
                 "scope": normalized_scope,
-                "runtime_revision": self.store.fetch_branch_revision(branch),
+                "runtime_revision": self.store.fetch_branch_revision(
+                    PROJECT_MEMORY_BRANCH if normalized_scope == "project" else branch
+                ),
                 "semantic_enabled": False,
                 "triggers": triggers,
+                "semantic_runtime": semantic_runtime,
                 "exact_matches": [],
                 "lexical_matches": [],
                 "semantic_matches": [],
@@ -87,10 +129,72 @@ class RetrievalOrchestrator:
         )
         if resolved_query and len(exact) + len(lexical) < recall_limit:
             triggers = [*triggers, "recall_gap"]
-        semantic_enabled = bool(resolved_query and not disable_semantic and triggers)
+            semantic_requested = bool(resolved_query and not disable_semantic and triggers)
+            semantic_runtime["semantic_requested"] = semantic_requested
+            if semantic_runtime["semantic_outcome"] == "skipped":
+                semantic_runtime["semantic_outcome"] = _semantic_outcome(
+                    disable_semantic=disable_semantic,
+                    resolved_query=resolved_query,
+                    semantic_requested=semantic_requested,
+                )
+        semantic_enabled = semantic_requested
         semantic: list[dict[str, Any]] = []
         if semantic_enabled:
-            self.store.process_pending_jobs(branch=branch, limit=max(recall_limit * 4, 20))
+            try:
+                provider, namespace = self._ensure_semantic_runtime()
+            except EmbeddingProviderRuntimeError as exc:
+                error_payload = _build_provider_error_payload(
+                    exc=exc,
+                    configured_embeddings=configured_embeddings,
+                    active_vector_namespace=active_namespace,
+                    branch=branch,
+                    stage=stage,
+                    step_id=step_id,
+                    query=query,
+                    resolved_query=resolved_query,
+                    triggers=triggers,
+                    exact_count=len(exact),
+                    lexical_count=len(lexical),
+                )
+                semantic_runtime["semantic_outcome"] = "provider_error"
+                semantic_runtime["provider_error"] = error_payload
+                self.store.log_retrieval_run(
+                    branch=branch,
+                    stage=stage,
+                    step_id=step_id,
+                    query=query,
+                    semantic_enabled=False,
+                    triggers=triggers,
+                    exact_count=len(exact),
+                    lexical_count=len(lexical),
+                    semantic_count=0,
+                    merged_count=0,
+                    provider=error_payload["provider"],
+                    model=error_payload["model"],
+                    revision=configured_embeddings.get("revision"),
+                    dimension=configured_embeddings.get("dimension"),
+                    namespace_path=active_namespace["path"],
+                    bootstrap_status=error_payload["bootstrap"].get("status"),
+                    semantic_outcome="provider_error",
+                    error_kind=error_payload["kind"],
+                    error_message=error_payload["message"],
+                )
+                raise RetrievalEmbeddingProviderError(error_payload) from exc
+            semantic_runtime["semantic_used"] = True
+            semantic_runtime["semantic_outcome"] = "used"
+            semantic_runtime["runtime_provider"] = {
+                "provider": provider.provider_kind,
+                "model": provider.model_key,
+                "revision": namespace.revision,
+                "dimension": provider.dimension,
+                "namespacePath": namespace.relative_namespace(self.project_path),
+            }
+            self.store.process_pending_jobs(
+                branch=branch,
+                limit=max(recall_limit * 4, 20),
+                provider=provider,
+                namespace=namespace,
+            )
             semantic = self._semantic_search(
                 resolved_query,
                 branch=branch,
@@ -116,20 +220,32 @@ class RetrievalOrchestrator:
             stage=stage,
             step_id=step_id,
             query=query,
-            semantic_enabled=semantic_enabled,
+            semantic_enabled=semantic_runtime["semantic_used"],
             triggers=triggers,
             exact_count=len(exact),
             lexical_count=len(lexical),
             semantic_count=len(semantic),
             merged_count=len(merged),
+            provider=((semantic_runtime.get("runtime_provider") or {}).get("provider") or configured_embeddings.get("provider")),
+            model=((semantic_runtime.get("runtime_provider") or {}).get("model") or configured_embeddings.get("model")),
+            revision=((semantic_runtime.get("runtime_provider") or {}).get("revision") or configured_embeddings.get("revision")),
+            dimension=((semantic_runtime.get("runtime_provider") or {}).get("dimension") or configured_embeddings.get("dimension")),
+            namespace_path=active_namespace["path"],
+            bootstrap_status=((configured_embeddings.get("bootstrap") or {}).get("status") or configured_embeddings.get("status")),
+            semantic_outcome=str(semantic_runtime["semantic_outcome"]),
+            error_kind=None,
+            error_message=None,
         )
         return {
             "query": query,
             "resolved_query": resolved_query,
             "scope": normalized_scope,
-            "runtime_revision": self.store.fetch_branch_revision(branch),
-            "semantic_enabled": semantic_enabled,
+            "runtime_revision": self.store.fetch_branch_revision(
+                PROJECT_MEMORY_BRANCH if normalized_scope == "project" else branch
+            ),
+            "semantic_enabled": semantic_runtime["semantic_used"],
             "triggers": triggers,
+            "semantic_runtime": semantic_runtime,
             "exact_matches": exact,
             "lexical_matches": lexical,
             "semantic_matches": semantic,
@@ -148,7 +264,8 @@ class RetrievalOrchestrator:
         include_obsolete: bool,
         include_conflicted: bool,
     ) -> list[dict[str, Any]]:
-        candidates = self.index.search(
+        index = self._ensure_index()
+        candidates = index.search(
             query,
             branch=branch,
             stage=stage,
@@ -244,6 +361,104 @@ class RetrievalOrchestrator:
             "content_hash": artifact["content_hash"],
             "ts": artifact["updated_at"],
         }
+
+
+    def _build_index(self, provider: BaseEmbeddingProvider) -> VectorMemoryIndex:
+        namespace = get_system_memory_paths(self.project_path).active_vector_namespace
+        self._namespace = namespace
+        return VectorMemoryIndex(
+            namespace.namespace_dir,
+            provider=provider,
+            provider_kind=namespace.provider,
+            model_key=namespace.model,
+            revision=namespace.revision,
+            dimension=namespace.dimension,
+        )
+
+    def _ensure_semantic_runtime(self) -> tuple[BaseEmbeddingProvider, VectorNamespace]:
+        if self._provider is None:
+            self._provider = self._provider_factory()
+        if self._namespace is None:
+            self.index = self._build_index(self._provider)
+        elif self.index is None:
+            self.index = self._build_index(self._provider)
+        return self._provider, self._namespace
+
+    def _ensure_index(self) -> VectorMemoryIndex:
+        if self.index is None:
+            self._ensure_semantic_runtime()
+        assert self.index is not None
+        return self.index
+
+
+def _build_semantic_runtime_payload(
+    *,
+    configured_embeddings: dict[str, Any],
+    active_vector_namespace: dict[str, Any],
+    semantic_requested: bool,
+    semantic_used: bool,
+    semantic_outcome: str,
+) -> dict[str, Any]:
+    return {
+        "configured_embeddings": configured_embeddings,
+        "active_vector_namespace": active_vector_namespace,
+        "semantic_requested": semantic_requested,
+        "semantic_used": semantic_used,
+        "semantic_outcome": semantic_outcome,
+        "runtime_provider": None,
+        "provider_error": None,
+    }
+
+
+def _semantic_outcome(
+    *,
+    disable_semantic: bool,
+    resolved_query: str | None,
+    semantic_requested: bool,
+) -> str:
+    if disable_semantic:
+        return "disabled"
+    if not resolved_query or not semantic_requested:
+        return "skipped"
+    return "used"
+
+
+def _build_provider_error_payload(
+    *,
+    exc: EmbeddingProviderRuntimeError,
+    configured_embeddings: dict[str, Any],
+    active_vector_namespace: dict[str, Any],
+    branch: str,
+    stage: str,
+    step_id: str | None,
+    query: str | None,
+    resolved_query: str | None,
+    triggers: list[str],
+    exact_count: int,
+    lexical_count: int,
+) -> dict[str, Any]:
+    bootstrap = (configured_embeddings.get("bootstrap") or {}).copy()
+    return {
+        "kind": "embedding_provider_error",
+        "provider": exc.provider,
+        "model": exc.model,
+        "status": exc.status,
+        "message": str(exc),
+        "bootstrap": bootstrap,
+        "branch": branch,
+        "stage": stage,
+        "step_id": step_id,
+        "query": query,
+        "resolved_query": resolved_query,
+        "triggers": list(triggers),
+        "exact_count": exact_count,
+        "lexical_count": lexical_count,
+        "active_vector_namespace": active_vector_namespace,
+        "guidance": (
+            "Run `madspec memory bootstrap-model`, then `madspec memory reindex`, "
+            "or switch `.madspec/config.json` to a ready provider."
+        ),
+    }
 
 
 def _semantic_triggers(

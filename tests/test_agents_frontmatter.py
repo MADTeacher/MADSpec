@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from madspec_cli.features.agents.infrastructure.storage import (
-    build_environment_profile,
-    render_native_subagent_file,
-    role_catalog,
-    translate_tool_policy,
-)
+from madspec_cli.features.agents.infrastructure.frontmatter_profile_compat import translate_tool_policy
+from madspec_cli.features.agents.infrastructure.render_workspace import render_native_subagent_file
+from madspec_cli.features.agents.infrastructure.role_catalog_compat import role_catalog
+from madspec_cli.features.agents.infrastructure.state_store import build_environment_profile
 
 
 def _role(environment_id: str, subagent_id: str) -> dict[str, object]:

@@ -5,7 +5,7 @@ from typing import Any
 from ..stages.deploy.state import DEPLOY_STAGE
 from ..stages.feature_init.state import FEATURE_INIT_STAGE
 from .capture_models import CaptureInputs, ParsedStageBundle, PreparedCapture
-from .parsers import validate_capture_scope
+from .capture_scope import validate_capture_scope
 from .shared import append_unique
 from .updates import build_stage_summary_bundles, has_capture_payload
 
@@ -19,87 +19,7 @@ def prepare_capture(
     _enrich_feature_init(inputs, parsed)
     _enrich_deploy(inputs, parsed)
 
-    scope_errors = validate_capture_scope(
-        normalized_stage=inputs.stage,
-        normalized_project_name=inputs.project_name,
-        normalized_system_overview=inputs.system_overview,
-        normalized_audiences=inputs.audiences,
-        normalized_scenarios=inputs.scenarios,
-        normalized_pain_points=inputs.pain_points,
-        concept_feature_updates=parsed.concept_feature_updates,
-        normalized_constraints=inputs.constraints,
-        normalized_assumptions=inputs.assumptions,
-        normalized_design_overview=inputs.design_overview,
-        normalized_platforms=inputs.platforms,
-        design_zone_updates=parsed.design_zone_updates,
-        design_screen_updates=parsed.design_screen_updates,
-        design_screen_feature_links=parsed.design_screen_feature_links,
-        design_flow_updates=parsed.design_flow_updates,
-        design_flow_step_updates=parsed.design_flow_step_updates,
-        design_flow_alternative_updates=parsed.design_flow_alternative_updates,
-        design_navigation_updates=parsed.design_navigation_updates,
-        normalized_platform_constraints=inputs.platform_constraints,
-        design_screen_data_updates=parsed.design_screen_data_updates,
-        normalized_stack_overview=inputs.stack_overview,
-        normalized_project_type=inputs.project_type,
-        normalized_requirements=inputs.requirements,
-        normalized_preferences=inputs.preferences,
-        normalized_tech_constraints=inputs.tech_constraints,
-        tech_component_updates=parsed.tech_component_updates,
-        tech_library_updates=parsed.tech_library_updates,
-        tech_code_organization=parsed.tech_code_organization,
-        tech_alternative_updates=parsed.tech_alternative_updates,
-        normalized_architecture_overview=inputs.architecture_overview,
-        architecture_project_structure=parsed.architecture_project_structure,
-        architecture_directory_updates=parsed.architecture_directory_updates,
-        architecture_entity_updates=parsed.architecture_entity_updates,
-        architecture_entity_field_updates=parsed.architecture_entity_field_updates,
-        architecture_entity_relationship_updates=parsed.architecture_entity_relationship_updates,
-        architecture_entity_state_updates=parsed.architecture_entity_state_updates,
-        architecture_endpoint_updates=parsed.architecture_endpoint_updates,
-        architecture_endpoint_screen_updates=parsed.architecture_endpoint_screen_updates,
-        architecture_endpoint_field_updates=parsed.architecture_endpoint_field_updates,
-        architecture_endpoint_error_updates=parsed.architecture_endpoint_error_updates,
-        architecture_integration_updates=parsed.architecture_integration_updates,
-        normalized_code_principles=inputs.code_principles,
-        architecture_pattern_updates=parsed.architecture_pattern_updates,
-        normalized_security_notes=inputs.security_notes,
-        normalized_performance_notes=inputs.performance_notes,
-        normalized_plan_overview=inputs.plan_overview,
-        normalized_planning_principles=inputs.planning_principles,
-        normalized_deploy_overview=inputs.deploy_overview,
-        normalized_deploy_goals=inputs.deploy_goals,
-        deploy_environment_updates=parsed.deploy_environment_updates,
-        deploy_unit_updates=parsed.deploy_unit_updates,
-        normalized_config_notes=inputs.config_notes,
-        normalized_secret_notes=inputs.secret_notes,
-        normalized_cicd_triggers=inputs.cicd_triggers,
-        normalized_cicd_steps=inputs.cicd_steps,
-        normalized_release_artifacts=inputs.release_artifacts,
-        normalized_migration_notes=inputs.migration_notes,
-        normalized_backup_notes=inputs.backup_notes,
-        normalized_recovery_checks=inputs.recovery_checks,
-        normalized_observability_notes=inputs.observability_notes,
-        normalized_security_controls=inputs.security_controls,
-        normalized_release_strategy=inputs.release_strategy,
-        normalized_rollback_strategy=inputs.rollback_strategy,
-        normalized_next_actions=inputs.next_actions,
-        normalized_feature_goal=inputs.feature_goal,
-        normalized_problem=inputs.problem,
-        normalized_expected_outcome=inputs.expected_outcome,
-        normalized_framework=inputs.framework,
-        normalized_structure_notes=inputs.structure_notes,
-        feature_init_feature_updates=parsed.feature_init_feature_updates,
-        feature_existing_modules=parsed.feature_existing_modules,
-        feature_modified_files=parsed.feature_modified_files,
-        feature_new_files=parsed.feature_new_files,
-        normalized_feature_interface_contracts=inputs.interface_contracts,
-        feature_dependencies=parsed.feature_dependencies,
-        normalized_feature_risks=inputs.risks,
-        normalized_feature_recommendations=inputs.recommendations,
-        normalized_feature_tech_notes=inputs.tech_notes,
-        normalized_feature_architecture_notes=inputs.architecture_notes,
-    )
+    scope_errors = validate_capture_scope(inputs=inputs, parsed=parsed)
     if scope_errors:
         return _error_payload(branch_name, inputs.stage, scope_errors)
 

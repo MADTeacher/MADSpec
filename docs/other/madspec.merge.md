@@ -16,6 +16,7 @@
 4. Для каждого конфликта используй `madspec memory resolve-conflict`.
 5. Применяй слияние только после явного подтверждения пользователя через `madspec memory merge-branches --proposal-id <ID> --json-output`.
 6. Для продвижения знаний на уровень проекта используй `madspec memory promote-branch-knowledge --json-output`.
+7. Если после продвижения нужно убрать дубли или несостыковки в project-level знаниях, используй `madspec memory semantic retrieve --scope project`, затем `madspec memory semantic prune` или `replace`.
 
 ## Правила
 
@@ -31,3 +32,4 @@
 - `resolve-conflict` меняет только предложение на слияние
 - `merge-branches` применяет изменения в память целевой ветки и пересобирает производные представления
 - `promote-branch-knowledge` поднимает подтвержденные знания в память проекта
+- `semantic retrieve --scope project` и `semantic prune|replace --scope project` читают и очищают именно project-level knowledge в `records` с branch `__project__`, без подмешивания branch-level semantic records

@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from ...domain.conflicts import PROJECT_MEMORY_BRANCH
 from .constants import ARTIFACT_STAGE_HINTS, RECORD_STATUSES
 
 
@@ -115,7 +116,7 @@ def _matches_scope(
     scope: str,
 ) -> bool:
     if scope == "project":
-        return True
+        return row_branch == PROJECT_MEMORY_BRANCH
     if row_branch != branch:
         return False
     if scope == "branch":

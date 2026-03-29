@@ -33,7 +33,7 @@ $ARGUMENTS
 ## Канонический источник истины
 
 - `.madspec/system/memory/memory.sqlite`
-- `.madspec/system/memory/lancedb/`
+- `.madspec/system/memory/lancedb/` как корень векторного хранилища и активное пространство индекса внутри него
 - `.madspec/<BRANCH>/memory/*.json*`
 - `.madspec/<BRANCH>/memory/**/*.jsonl`
 
@@ -48,6 +48,8 @@ $ARGUMENTS
 5. Для истории используй `madspec memory timeline --json-output`.
 6. Для явных конфликтов используй `madspec memory conflicts --json-output`.
 7. Для адресной инспекции используй `madspec memory inspect-record --id ... --json-output`.
+8. Если вопрос связан с семантическим поиском, выбранным провайдером `memory.embeddings` или подготовкой локальной семантической модели, используй `madspec memory search` или `madspec memory retrieve` и анализируй `semantic_runtime`; структурированную ошибку `kind="embedding_provider_error"` трактуй как реальную проблему конфигурации или подготовки модели, а не как допустимый тихий откат.
+9. Если пользователь менял `memory.embeddings`, дополнительно проверь `madspec memory status`, `madspec memory db-status` или `madspec memory doctor`: они должны показать, готов ли кэш локальной семантической модели и требуется ли `madspec memory reindex`. Если кэш не готов, используй `madspec memory bootstrap-model` как явный путь подготовки локального кэша проекта перед переиндексацией.
 
 ## Правила
 
@@ -55,3 +57,4 @@ $ARGUMENTS
 - Не подменяй `doctor` ручными догадками о состоянии слоя `SQLite` и векторного индекса.
 - Не объясняй выбор следующего шага без опоры на `why-next-step` или `explain`.
 - Если `doctor` показывает рассинхронизацию производных представлений, сначала сообщи об этом пользователю, а не правь Markdown-тихим образом.
+- Если `doctor` или `db-status` показывают, что кэш локальной семантической модели не готов или требуется переиндексация, сначала объясни пользователю это состояние и рекомендуй `madspec memory bootstrap-model`, затем `madspec memory reindex`.

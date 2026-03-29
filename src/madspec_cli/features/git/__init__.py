@@ -1,3 +1,1 @@
-from . import cli
-
-__all__ = ["cli"]
+from __future__ import annotations

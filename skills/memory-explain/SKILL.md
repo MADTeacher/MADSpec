@@ -30,7 +30,7 @@ description: Операционный навык для объяснения и 
 ## Источник истины
 
 - `.madspec/system/memory/memory.sqlite`
-- `.madspec/system/memory/lancedb/`
+- `.madspec/system/memory/lancedb/` как корень векторного хранилища и его активное пространство индекса `provider/model/revision/dimension`
 - `.madspec/<BRANCH>/memory/progress.json`
 - `.madspec/<BRANCH>/memory/stages/*.json`
 - `.madspec/<BRANCH>/memory/working/*.json*`

@@ -19,11 +19,13 @@ from ..workflow.implementation import (
     start_implementation_step,
 )
 from ..workflow.planning import register_planned_step
+from .branch_state import refresh_branch_state
 
 PROPOSAL_TYPES = {
     "plan_change",
     "runtime_step_update",
     "semantic_update",
+    "semantic_cleanup",
     "artifact_update",
 }
 
@@ -75,6 +77,9 @@ class ProposalResult(PayloadResult):
 
 def publish(request: PublishProposalRequest) -> ProposalResult:
     normalized_type = _validate_proposal_type(request.proposal_type)
+    normalized_payload = dict(request.payload)
+    _validate_publish_payload(normalized_type, normalized_payload)
+    normalized_target_scope = _normalize_target_scope(normalized_type, request.target_scope)
     store = MemoryStore(request.project_path)
     coordination = store.fetch_session_coordination(
         branch=request.branch_name,
@@ -87,7 +92,6 @@ def publish(request: PublishProposalRequest) -> ProposalResult:
         task_id=request.task_id,
         work_item_id=request.work_item_id,
     )
-    _validate_publish_payload(normalized_type, request.payload)
 
     ts = now_iso()
     proposal = {
@@ -101,8 +105,8 @@ def publish(request: PublishProposalRequest) -> ProposalResult:
         "subagent_id": request.subagent_id,
         "owner_id": bound["owner_id"],
         "base_revision": request.base_revision,
-        "target_scope": dict(request.target_scope),
-        "payload": dict(request.payload),
+        "target_scope": normalized_target_scope,
+        "payload": normalized_payload,
         "conflict_hints": dict(request.conflict_hints),
         "apply_summary": None,
         "created_at": ts,
@@ -244,7 +248,7 @@ def apply(request: ApplyProposalRequest) -> ProposalResult:
         return ProposalResult(payload={"proposal": updated, "apply_result": apply_payload, "accepted": False})
 
     current_revision = store.fetch_branch_revision(proposal["branch"])
-    if proposal["proposal_type"] in {"runtime_step_update", "artifact_update"} and current_revision != int(
+    if proposal["proposal_type"] in {"runtime_step_update", "artifact_update", "semantic_cleanup"} and current_revision != int(
         proposal["base_revision"]
     ):
         apply_payload = {
@@ -277,6 +281,7 @@ def apply(request: ApplyProposalRequest) -> ProposalResult:
 
     apply_payload = _apply_proposal_payload(request.project_path, proposal)
     if apply_payload.get("accepted", True):
+        refresh_branch_state(request.project_path, proposal["branch"], full=True)
         updated = _transition_proposal(
             proposal,
             status="applied",
@@ -364,11 +369,26 @@ def _validate_publish_payload(proposal_type: str, payload: dict[str, Any]) -> No
         required = {"stage", "operation"}
     elif proposal_type == "semantic_update":
         required = {"stage", "operation"}
+    elif proposal_type == "semantic_cleanup":
+        required = {"scope", "operation"}
     else:
         required = {"artifacts"}
     missing = sorted(key for key in required if key not in payload)
     if missing:
         raise ValueError(f"proposal payload is missing required keys: {', '.join(missing)}")
+    if proposal_type == "semantic_cleanup":
+        from .semantic_cleanup import validate_semantic_cleanup_proposal_payload
+
+        validate_semantic_cleanup_proposal_payload(payload)
+
+
+def _normalize_target_scope(proposal_type: str, target_scope: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(target_scope)
+    if proposal_type != "semantic_cleanup":
+        return normalized
+    if normalized and normalized.get("scope") not in {None, "semantic-knowledge"}:
+        raise ValueError("semantic_cleanup proposals must use target_scope.scope='semantic-knowledge'")
+    return {"scope": "semantic-knowledge"}
 
 
 def _proposal_summary(proposal: dict[str, Any]) -> dict[str, Any]:
@@ -586,6 +606,11 @@ def _apply_proposal_payload(project_path: Path, proposal: dict[str, Any]) -> dic
                 **semantic_options,
             )
         raise ValueError("semantic_update operation must be capture or checkpoint")
+
+    if proposal_type == "semantic_cleanup":
+        from .semantic_cleanup import apply_semantic_cleanup_proposal
+
+        return apply_semantic_cleanup_proposal(project_path, proposal)
 
     return _apply_artifact_update(project_path, proposal)
 

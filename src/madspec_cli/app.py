@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import typer
 
+from .features.agents import cli as agents_cli
 from .features.change import cli as change_cli
 from .features.gates import cli as gates_cli
-from .features.agents import cli as agents_cli
-from .features import git as git_feature
-from .features import init as init_feature
-from .features import meta as meta_feature
+from .features.git import cli as git_cli
+from .features.init import cli as init_cli
+from .features.meta import cli as meta_cli
 from .features.policy import cli as policy_cli
 from .memory import cli as memory_cli
 from .memory.cli import merge as memory_merge_cli
@@ -31,9 +31,9 @@ def callback(ctx: typer.Context) -> None:
         maybe_show_root_banner()
 
 
-init_feature.cli.register(app)
-git_feature.cli.register(app)
-meta_feature.cli.register(app)
+init_cli.register(app)
+git_cli.register(app)
+meta_cli.register(app)
 change_cli.register(app)
 gates_cli.register(app)
 agents_cli.register(app)

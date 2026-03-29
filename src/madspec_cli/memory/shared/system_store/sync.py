@@ -8,7 +8,8 @@ from .canonical_state import (
     bootstrap_branch_canonical_state,
     refresh_branch_file_projections,
 )
-from .layout import ensure_system_memory_layout
+from .layout import ensure_system_memory_layout, get_system_memory_paths
+from .provider_factory import build_embedding_provider, resolve_configured_embeddings
 from .sessions import project_active_session
 from .retrieval import RetrievalOrchestrator
 from .store import MemoryStore
@@ -179,7 +180,9 @@ def sync_jsonl_path_to_store(path: Path, records: list[dict[str, Any]]) -> None:
 
 def build_db_status(project_path: Path, branch_name: str | None = None) -> dict[str, Any]:
     ensure_system_memory_layout(project_path)
-    return MemoryStore(project_path).describe_status(branch_name)
+    payload = MemoryStore(project_path).describe_status(branch_name)
+    payload["configured_embeddings"] = resolve_configured_embeddings(project_path).to_status_payload(project_path)
+    return payload
 
 
 def run_reindex(project_path: Path, branch_name: str | None = None, *, limit: int = 200) -> dict[str, Any]:
@@ -193,7 +196,16 @@ def run_reindex(project_path: Path, branch_name: str | None = None, *, limit: in
                 if not path.is_dir() or path.name == "system":
                     continue
                 bootstrap_branch_canonical_state(project_path, path.name)
-    return MemoryStore(project_path).process_pending_jobs(branch=branch_name, limit=limit)
+    store = MemoryStore(project_path)
+    provider = build_embedding_provider(project_path, allow_bootstrap=True)
+    namespace = get_system_memory_paths(project_path).active_vector_namespace
+    return store.process_pending_jobs(
+        branch=branch_name,
+        limit=limit,
+        provider=provider,
+        namespace=namespace,
+        rebuild=True,
+    )
 
 
 def search_memory_store(

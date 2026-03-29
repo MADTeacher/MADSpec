@@ -14,6 +14,7 @@ The framework supports multiple AI agents, allowing teams to use their preferred
 
 - Any changes to `__init__.py` for MADSpec CLI require updating the version in `pyproject.toml`
 - All command changes require testing with each supported agent
+- For repository-wide test runs, use `uv run --with pytest python -m pytest -q`
 - Any change to the content or workflow of any `madspec.*` framework command must update that command's documentation in the same change
 - Any CLI change that affects commands, arguments, output shape, workflow behavior, or generated project structure must update the CLI documentation in `docs/cli/` in the same change
 - If a `madspec.*` workflow command change also affects CLI usage or behavior, update both the workflow docs and the corresponding `docs/cli/` reference in the same change

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import build_change_context
+from ..infrastructure.rendering import build_change_context
 from .shared import require_change_state
 
 

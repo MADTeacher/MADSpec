@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import json
 
-from madspec_cli.memory import append_jsonl, get_memory_paths, make_record
+from madspec_cli.memory import get_memory_paths
+from madspec_cli.memory.shared.records import make_record
+from madspec_cli.memory.shared.storage import append_jsonl
+from madspec_cli.memory.shared.system_store.model_bootstrap import resolve_model_cache_root
+from tests.support import sync_branch_state, write_madspec_config
 
 
 def test_memory_commands_support_validation_and_retrieve_json(
@@ -48,12 +52,45 @@ def test_memory_commands_support_validation_and_retrieve_json(
     assert db_status_payload["sqlite_path"] == ".madspec/system/memory/memory.sqlite"
     assert db_status_payload["stage_snapshots"] >= 1
     assert db_status_payload["vector_backend"] == "lancedb"
+    assert db_status_payload["vector_root_dir"] == ".madspec/system/memory/lancedb"
+    assert db_status_payload["active_vector_namespace"] == ".madspec/system/memory/lancedb/hash/default/current/64"
+    assert db_status_payload["active_vector_provider"] == "hash"
+    assert db_status_payload["active_vector_model"] == "default"
+    assert db_status_payload["active_vector_revision"] == "current"
+    assert db_status_payload["active_vector_dimension"] == 64
+    assert db_status_payload["known_vector_namespaces"] == [
+        {
+            "provider": "hash",
+            "model": "default",
+            "revision": "current",
+            "dimension": 64,
+            "path": ".madspec/system/memory/lancedb/hash/default/current/64",
+        }
+    ]
+    assert db_status_payload["configured_embeddings"]["provider"] == "hash"
+    assert db_status_payload["configured_embeddings"]["status"] == "not_required"
+    assert db_status_payload["configured_embeddings"]["ready"] is True
+    assert db_status_payload["index_state"]["reindexRequired"] is True
+    assert db_status_payload["index_state"]["reason"] == "not_confirmed"
 
     reindex_result = invoke_cli(["memory", "reindex", "--branch", "main", "--json-output"])
     assert reindex_result.exit_code == 0, reindex_result.stdout
     reindex_payload = json.loads(reindex_result.stdout)
     assert reindex_payload["lease_acquired"] is True
     assert reindex_payload["processed"] >= 1
+    assert reindex_payload["target_namespace"] == {
+        "provider": "hash",
+        "model": "default",
+        "revision": "current",
+        "dimension": 64,
+        "path": ".madspec/system/memory/lancedb/hash/default/current/64",
+    }
+
+    db_status_after_reindex_result = invoke_cli(["memory", "db-status", "--branch", "main", "--json-output"])
+    assert db_status_after_reindex_result.exit_code == 0, db_status_after_reindex_result.stdout
+    db_status_after_reindex = json.loads(db_status_after_reindex_result.stdout)
+    assert db_status_after_reindex["index_state"]["reindexRequired"] is False
+    assert db_status_after_reindex["index_state"]["reason"] == "current"
 
     retrieve_result = invoke_cli(
         [
@@ -75,9 +112,14 @@ def test_memory_commands_support_validation_and_retrieve_json(
     assert payload["semantic"]["decisions"][0]["summary"] == "Validated planning decision"
     assert payload["recall"]["resolved_query"] == "Validated planning decision"
     assert payload["recall"]["semantic_enabled"] is False
+    assert payload["recall"]["semantic_runtime"]["semantic_outcome"] == "disabled"
+    assert payload["recall"]["semantic_runtime"]["configured_embeddings"]["provider"] == "hash"
     assert payload["recall"]["merged"][0]["summary"] == "Validated planning decision"
     assert payload["observability"]["shared_branch_state"]["runtime_revision"] >= 0
+    assert payload["observability"]["embeddings"]["configured_embeddings"]["provider"] == "hash"
     assert payload["observability"]["summary"]["projection_status"] in {"ok", "warn", "error"}
+    assert payload["observability"]["summary"]["semantic_integrity_status"] in {"ok", "warn", "error"}
+    assert payload["observability"]["summary"]["semantic_integrity_project_issue_count"] >= 0
 
     search_result = invoke_cli(
         [
@@ -96,7 +138,10 @@ def test_memory_commands_support_validation_and_retrieve_json(
     search_payload = json.loads(search_result.stdout)
     assert search_payload["runtime_revision"] >= 0
     assert search_payload["exact_matches"]
+    assert search_payload["semantic_runtime"]["configured_embeddings"]["provider"] == "hash"
+    assert search_payload["semantic_runtime"]["semantic_outcome"] == "used"
     assert search_payload["merged"][0]["summary"] == "Validated planning decision"
+    assert search_payload["observability"]["embeddings"]["semantic_outcome"] == "used"
     assert search_payload["observability"]["summary"]["pending_proposal_count"] >= 0
     assert "current_session_state" in search_payload["observability"]
 
@@ -213,6 +258,97 @@ def test_memory_commands_support_validation_and_retrieve_json(
     assert next_step_payload["selected_step"] == "step-02-auth-flow"
 
 
+def test_memory_bootstrap_model_prepares_dense_cache_without_reindex(tmp_path, monkeypatch, invoke_cli) -> None:
+    project_path = tmp_path / "dense-bootstrap"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    config_path = write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["memory"] = {
+        "embeddings": {
+            "provider": "local-hf-onnx",
+            "model": "multilingual-e5-small",
+            "downloadPolicy": "none",
+            "cacheDir": ".madspec/system/models",
+            "revision": None,
+        }
+    }
+    config_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    def fake_download(spec, cache_root, revision):
+        del spec, revision
+        snapshot_dir = cache_root / "snapshot"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        (snapshot_dir / "model.onnx").write_text("placeholder", encoding="utf-8")
+        return snapshot_dir, "current"
+
+    monkeypatch.setattr(
+        "madspec_cli.memory.shared.system_store.model_bootstrap._download_model_snapshot",
+        fake_download,
+    )
+
+    result = invoke_cli(["memory", "bootstrap-model", "--json-output"])
+
+    assert result.exit_code == 0, result.stdout
+    bootstrap_payload = json.loads(result.stdout)
+    assert bootstrap_payload["provider"] == "local-hf-onnx"
+    assert bootstrap_payload["model"] == "multilingual-e5-small"
+    assert bootstrap_payload["ready"] is True
+    assert bootstrap_payload["downloaded"] is True
+    assert bootstrap_payload["next_action"] == "Run `madspec memory reindex` to rebuild the active vector namespace."
+
+    cache_root = resolve_model_cache_root(project_path, ".madspec/system/models", "multilingual-e5-small", None)
+    assert (cache_root / "manifest.json").exists()
+
+    db_status_result = invoke_cli(["memory", "db-status", "--branch", "main", "--json-output"])
+    assert db_status_result.exit_code == 0, db_status_result.stdout
+    db_status_payload = json.loads(db_status_result.stdout)
+    assert db_status_payload["configured_embeddings"]["ready"] is True
+    assert db_status_payload["index_state"]["reindexRequired"] is True
+
+
+def test_memory_bootstrap_model_requires_force_for_corrupted_cache(tmp_path, monkeypatch, invoke_cli) -> None:
+    project_path = tmp_path / "dense-corrupted"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    config_path = write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["memory"] = {
+        "embeddings": {
+            "provider": "local-hf-onnx",
+            "model": "multilingual-e5-small",
+            "downloadPolicy": "on-first-use",
+            "cacheDir": ".madspec/system/models",
+            "revision": None,
+        }
+    }
+    config_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    cache_root = resolve_model_cache_root(project_path, ".madspec/system/models", "multilingual-e5-small", None)
+    cache_root.mkdir(parents=True, exist_ok=True)
+    (cache_root / "manifest.json").write_text("{broken", encoding="utf-8")
+
+    failed = invoke_cli(["memory", "bootstrap-model", "--json-output"])
+    assert failed.exit_code == 1, failed.stdout
+    assert "bootstrap-model --force" in json.loads(failed.stdout)["message"]
+
+    def fake_download(spec, target_cache_root, revision):
+        del spec, revision
+        snapshot_dir = target_cache_root / "snapshot"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        (snapshot_dir / "model.onnx").write_text("placeholder", encoding="utf-8")
+        return snapshot_dir, "current"
+
+    monkeypatch.setattr(
+        "madspec_cli.memory.shared.system_store.model_bootstrap._download_model_snapshot",
+        fake_download,
+    )
+
+    forced = invoke_cli(["memory", "bootstrap-model", "--force"])
+    assert forced.exit_code == 0, forced.stdout
+    assert "Next step:" in forced.stdout
+
+
 def test_memory_retrieve_and_explain_support_toon_output(make_madspec_project, invoke_cli) -> None:
     project_path = make_madspec_project()
 
@@ -243,6 +379,7 @@ def test_memory_retrieve_and_explain_support_toon_output(make_madspec_project, i
     assert "branch: main" in retrieve_result.stdout
     assert "policy_context:" in retrieve_result.stdout
     assert "semantic:" in retrieve_result.stdout
+    assert "semantic_runtime:" in retrieve_result.stdout
 
     explain_result = invoke_cli(
         ["memory", "explain", "--branch", "main", "--stage", "mvp.plan", "--toon-output"]
@@ -252,3 +389,229 @@ def test_memory_retrieve_and_explain_support_toon_output(make_madspec_project, i
     assert "runtime_revision:" in explain_result.stdout
     assert "summary:" in explain_result.stdout
     assert "gate_summary:" in explain_result.stdout
+
+
+def test_memory_search_and_retrieve_text_show_embeddings_runtime(make_madspec_project, invoke_cli) -> None:
+    project_path = make_madspec_project()
+
+    init_result = invoke_cli(["memory", "init", "--branch", "main"])
+    assert init_result.exit_code == 0, init_result.stdout
+
+    paths = get_memory_paths(project_path, "main")
+    append_jsonl(
+        paths["decisions"],
+        [
+            make_record(
+                "main",
+                "mvp.plan",
+                "agent",
+                "Searchable planning decision",
+                status="validated",
+                semantic_kind="decision",
+                record_type="decision",
+            )
+        ],
+    )
+
+    search_result = invoke_cli(
+        ["memory", "search", "--branch", "main", "--stage", "mvp.plan", "--query", "Searchable planning decision"]
+    )
+    assert search_result.exit_code == 0, search_result.stdout
+    assert "Embeddings:" in search_result.stdout
+    assert "Active namespace:" in search_result.stdout
+
+    retrieve_result = invoke_cli(
+        ["memory", "retrieve", "--branch", "main", "--stage", "mvp.plan", "--query", "Searchable planning decision"]
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    assert "Embeddings:" in retrieve_result.stdout
+    assert "Active namespace:" in retrieve_result.stdout
+
+
+def test_memory_search_and_retrieve_return_structured_provider_error(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = tmp_path / "provider-error"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    config_path = project_path / ".madspec" / "config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["memory"] = {
+        "embeddings": {
+            "provider": "local-hf-onnx",
+            "model": "multilingual-e5-small",
+            "downloadPolicy": "none",
+            "cacheDir": ".madspec/system/models",
+            "revision": None,
+        }
+    }
+    config_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    init_memory_branch(branch="main", project_path=project_path)
+    paths = get_memory_paths(project_path, "main")
+    append_jsonl(
+        paths.decisions,
+        [
+            make_record(
+                "main",
+                "mvp.plan",
+                "agent",
+                "Dense search error",
+                status="validated",
+                semantic_kind="decision",
+                record_type="decision",
+            )
+        ],
+    )
+    sync_branch_state(project_path, "main")
+
+    search_result = invoke_cli(
+        [
+            "memory",
+            "search",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--query",
+            "Dense search error",
+            "--json-output",
+        ]
+    )
+    assert search_result.exit_code == 1, search_result.stdout
+    search_payload = json.loads(search_result.stdout)
+    assert search_payload["kind"] == "embedding_provider_error"
+    assert search_payload["provider"] == "local-hf-onnx"
+    assert search_payload["bootstrap"]["status"] == "missing"
+
+    retrieve_result = invoke_cli(
+        [
+            "memory",
+            "retrieve",
+            "--branch",
+            "main",
+            "--stage",
+            "mvp.plan",
+            "--query",
+            "Dense search error",
+            "--toon-output",
+        ]
+    )
+    assert retrieve_result.exit_code == 1, retrieve_result.stdout
+    assert "kind: embedding_provider_error" in retrieve_result.stdout
+    assert "provider: local-hf-onnx" in retrieve_result.stdout
+
+
+def test_memory_search_and_retrieve_use_pinned_active_namespace(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = tmp_path / "pinned-revision"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    config_path = project_path / ".madspec" / "config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["memory"] = {
+        "embeddings": {
+            "provider": "local-hf-onnx",
+            "model": "multilingual-e5-small",
+            "downloadPolicy": "on-first-use",
+            "cacheDir": ".madspec/system/models",
+            "revision": "hf-pin-123",
+        }
+    }
+    config_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    cache_root = project_path / ".madspec" / "system" / "models" / "multilingual-e5-small" / "hf-pin-123"
+    snapshot_dir = cache_root / "snapshot"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    (snapshot_dir / "model.onnx").write_text("placeholder", encoding="utf-8")
+    (cache_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "providerKind": "local-hf-onnx",
+                "modelKey": "multilingual-e5-small",
+                "requestedRevision": "hf-pin-123",
+                "resolvedRevision": "hf-pin-123",
+                "hfRepoId": "intfloat/multilingual-e5-small",
+                "dimension": 384,
+                "localPath": str(snapshot_dir.relative_to(project_path)),
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    paths = get_memory_paths(project_path, "main")
+    append_jsonl(
+        paths.decisions,
+        [
+            make_record(
+                "main",
+                "mvp.plan",
+                "agent",
+                "Pinned revision decision",
+                status="validated",
+                semantic_kind="decision",
+                record_type="decision",
+            )
+        ],
+    )
+    sync_branch_state(project_path, "main")
+
+    class FakeDenseProvider:
+        provider_kind = "local-hf-onnx"
+        model_key = "multilingual-e5-small"
+        dimension = 384
+
+        def embed_query(self, text: str) -> list[float]:
+            return [1.0] + [0.0] * 383
+
+        def embed_passage(self, text: str) -> list[float]:
+            return [1.0] + [0.0] * 383
+
+        def embed_text(self, text: str) -> list[float]:
+            return self.embed_passage(text)
+
+    monkeypatch.setattr(
+        "madspec_cli.memory.shared.system_store.sync.build_embedding_provider",
+        lambda *_args, **_kwargs: FakeDenseProvider(),
+    )
+    monkeypatch.setattr(
+        "madspec_cli.memory.shared.system_store.retrieval.build_embedding_provider",
+        lambda *_args, **_kwargs: FakeDenseProvider(),
+    )
+
+    reindex_result = invoke_cli(["memory", "reindex", "--branch", "main", "--json-output"])
+    assert reindex_result.exit_code == 0, reindex_result.stdout
+    assert json.loads(reindex_result.stdout)["target_namespace"]["path"] == (
+        ".madspec/system/memory/lancedb/local-hf-onnx/multilingual-e5-small/hf-pin-123/384"
+    )
+
+    search_result = invoke_cli(
+        ["memory", "search", "--branch", "main", "--stage", "mvp.plan", "--query", "Pinned revision decision", "--json-output"]
+    )
+    assert search_result.exit_code == 0, search_result.stdout
+    search_payload = json.loads(search_result.stdout)
+    assert search_payload["semantic_runtime"]["active_vector_namespace"]["path"] == (
+        ".madspec/system/memory/lancedb/local-hf-onnx/multilingual-e5-small/hf-pin-123/384"
+    )
+    assert search_payload["semantic_runtime"]["runtime_provider"]["namespacePath"] == (
+        ".madspec/system/memory/lancedb/local-hf-onnx/multilingual-e5-small/hf-pin-123/384"
+    )
+
+    retrieve_result = invoke_cli(
+        ["memory", "retrieve", "--branch", "main", "--stage", "mvp.plan", "--query", "Pinned revision decision", "--json-output"]
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    assert retrieve_payload["recall"]["semantic_runtime"]["active_vector_namespace"]["path"] == (
+        ".madspec/system/memory/lancedb/local-hf-onnx/multilingual-e5-small/hf-pin-123/384"
+    )

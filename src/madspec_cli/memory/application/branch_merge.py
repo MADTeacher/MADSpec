@@ -26,14 +26,13 @@ from madspec_cli.memory.shared.storage import (
     write_json,
 )
 from madspec_cli.memory.shared.system_store.store import MemoryStore
-from madspec_cli.memory.shared.system_store.sync import sync_branch_memory_to_store
 from madspec_cli.memory.semantic.shared import append_unique
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..projection.materialize import consolidate_branch_memory
 from ..shared.storage import ensure_memory_layout
 from ..shared.validation import validate_branch_memory
 
+from .branch_state import refresh_branch_state
 from .branch_compare import (
     SEMANTIC_KIND_PATHS,
     compare_branch_memory,
@@ -208,8 +207,7 @@ def merge_branches(
     except Exception:
         _restore_target_files(original_files)
         store.purge_branch(target_branch, include_artifacts=True)
-        sync_branch_memory_to_store(request.project_path, target_branch)
-        consolidate_branch_memory(request.project_path, target_branch)
+        refresh_branch_state(request.project_path, target_branch, full=True)
         raise
 
     merge_policy_payload = _evaluate_branch_policies(
@@ -227,8 +225,7 @@ def merge_branches(
     if validation_errors:
         _restore_target_files(original_files)
         store.purge_branch(target_branch, include_artifacts=True)
-        sync_branch_memory_to_store(request.project_path, target_branch)
-        consolidate_branch_memory(request.project_path, target_branch)
+        refresh_branch_state(request.project_path, target_branch, full=True)
         return BranchMergeResult(
             payload={
                 "applied": False,
@@ -444,8 +441,7 @@ def _apply_proposal(project_path: Path, proposal: dict[str, Any]) -> dict[str, A
 
     store = MemoryStore(project_path)
     store.purge_branch(target_branch, include_artifacts=True)
-    sync_branch_memory_to_store(project_path, target_branch)
-    generated = consolidate_branch_memory(project_path, target_branch)
+    generated = refresh_branch_state(project_path, target_branch, full=True)
     return {"generated_artifacts": [str(path.relative_to(project_path)) for path in generated]}
 
 

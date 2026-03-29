@@ -10,8 +10,8 @@ from madspec_cli.memory import (
     register_planned_step,
     retrieve_memory_context,
     validate_branch_memory,
-    write_json,
 )
+from madspec_cli.memory.shared.storage import write_json
 from tests.memory_runtime.support import step_metadata, step_status
 
 
@@ -62,6 +62,7 @@ def test_determine_next_step_validates_candidate_and_selects_ready_step(memory_p
             },
         },
     )
+    memory_project.sync()
 
     candidate = determine_next_step(
         memory_project.project_path,
@@ -337,4 +338,3 @@ def test_ensure_memory_layout_migrates_plan_state_from_legacy_progress(memory_pr
     migrated = json.loads(paths["plan_state"].read_text(encoding="utf-8"))
     assert migrated["planOverview"] == "Legacy overview"
     assert migrated["stepCatalog"][0]["stepId"] == "step-01-authentication"
-

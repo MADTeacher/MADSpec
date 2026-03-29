@@ -6,9 +6,10 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any
 
+from .layout import VectorNamespace, get_system_memory_paths, record_successful_reindex
 from .leases import normalize_writer_lease_row
 from .text import _dump_json, _flatten_for_search, _now_iso, _record_search_text
-from .vector import VectorMemoryIndex, _chunk_source_text
+from .vector import BaseEmbeddingProvider, HashEmbeddingProvider, VectorMemoryIndex, _chunk_source_text
 
 if TYPE_CHECKING:
     from .store import MemoryStore
@@ -98,21 +99,38 @@ def process_pending_jobs(
     *,
     branch: str | None = None,
     limit: int = 100,
+    provider: BaseEmbeddingProvider | None = None,
+    namespace: VectorNamespace | None = None,
+    rebuild: bool = False,
 ) -> dict[str, Any]:
     owner_id = f"{os.getpid()}-{uuid.uuid4()}"
     lease_result = acquire_lease(store, "indexer", owner_id, ttl_seconds=30)
     if not lease_result["acquired"]:
         return {"processed": 0, "failed": 0, "lease_acquired": False}
-    index = VectorMemoryIndex(store.paths.lancedb_dir)
+    resolved_provider = provider or HashEmbeddingProvider()
+    resolved_namespace = namespace or get_system_memory_paths(store.project_path).active_vector_namespace
+    index = VectorMemoryIndex(
+        resolved_namespace.namespace_dir,
+        provider=resolved_provider,
+        provider_kind=resolved_namespace.provider,
+        model_key=resolved_namespace.model,
+        revision=resolved_namespace.revision,
+        dimension=resolved_namespace.dimension,
+    )
     index.ensure_layout()
+    if rebuild:
+        index.clear_tables()
     processed = 0
     failed = 0
     try:
         with store.connect() as conn:
-            sql = "SELECT * FROM index_jobs WHERE status IN ('pending', 'failed')"
+            if rebuild:
+                sql = "SELECT * FROM index_jobs"
+            else:
+                sql = "SELECT * FROM index_jobs WHERE status IN ('pending', 'failed')"
             params: list[Any] = []
             if branch:
-                sql += " AND branch = ?"
+                sql += " WHERE branch = ?" if rebuild else " AND branch = ?"
                 params.append(branch)
             sql += " ORDER BY updated_at ASC, job_id ASC LIMIT ?"
             params.append(limit)
@@ -135,7 +153,14 @@ def process_pending_jobs(
                     )
     finally:
         release_lease(store, "indexer", owner_id)
-    return {"processed": processed, "failed": failed, "lease_acquired": True}
+    if rebuild and failed == 0:
+        record_successful_reindex(store.project_path, resolved_namespace)
+    return {
+        "processed": processed,
+        "failed": failed,
+        "lease_acquired": True,
+        "target_namespace": resolved_namespace.to_payload(store.project_path),
+    }
 
 
 def log_retrieval_run(
@@ -151,14 +176,25 @@ def log_retrieval_run(
     lexical_count: int,
     semantic_count: int,
     merged_count: int,
+    provider: str | None,
+    model: str | None,
+    revision: str | None,
+    dimension: int | None,
+    namespace_path: str | None,
+    bootstrap_status: str | None,
+    semantic_outcome: str | None,
+    error_kind: str | None,
+    error_message: str | None,
 ) -> None:
     with store.connect() as conn:
         conn.execute(
             """
             INSERT INTO retrieval_runs (
                 run_id, branch, stage, step_id, query, semantic_enabled, triggers_json,
-                exact_count, lexical_count, semantic_count, merged_count, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                exact_count, lexical_count, semantic_count, merged_count,
+                provider, model, revision, dimension, namespace_path, bootstrap_status,
+                semantic_outcome, error_kind, error_message, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(uuid.uuid4()),
@@ -172,6 +208,15 @@ def log_retrieval_run(
                 lexical_count,
                 semantic_count,
                 merged_count,
+                provider,
+                model,
+                revision,
+                dimension,
+                namespace_path,
+                bootstrap_status,
+                semantic_outcome,
+                error_kind,
+                error_message,
                 _now_iso(),
             ),
         )

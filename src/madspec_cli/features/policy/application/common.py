@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Any
 
 from ..domain.models import PolicyValidationResult
-from ..infrastructure.storage import effective_policies, load_policy_state, policy_matches_scope
+from ..infrastructure.normalization import policy_matches_scope
+from ..infrastructure.queries import effective_policies
+from ..infrastructure.repository import load_policy_state
 
 
 def _normalize_stage(value: str | None) -> str | None:

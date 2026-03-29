@@ -5,9 +5,9 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..projection.materialize import consolidate_branch_memory
 from ..semantic.learning import learn_from_outcomes, promote_validated_records
 from ..shared.storage import ensure_memory_layout
+from .branch_state import refresh_branch_state
 
 
 @dataclass(frozen=True)
@@ -36,12 +36,12 @@ class LearnFromOutcomesResult(PayloadResult):
 def promote(request: PromoteMemoryRequest) -> PromoteMemoryResult:
     ensure_memory_layout(request.project_path, request.branch_name, full=True)
     payload = promote_validated_records(request.project_path, request.branch_name)
-    consolidate_branch_memory(request.project_path, request.branch_name, full=True)
+    refresh_branch_state(request.project_path, request.branch_name, full=True)
     return PromoteMemoryResult(payload={"branch": request.branch_name, "promoted": payload})
 
 
 def learn(request: LearnFromOutcomesRequest) -> LearnFromOutcomesResult:
     ensure_memory_layout(request.project_path, request.branch_name, full=True)
     payload = learn_from_outcomes(request.project_path, request.branch_name, request.input_path)
-    consolidate_branch_memory(request.project_path, request.branch_name, full=True)
+    refresh_branch_state(request.project_path, request.branch_name, full=True)
     return LearnFromOutcomesResult(payload={"branch": request.branch_name, **payload})

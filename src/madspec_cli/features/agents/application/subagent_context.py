@@ -5,8 +5,8 @@ from pathlib import Path
 
 from madspec_cli.memory.application.parallel_runtime import read_parallel_runtime_policy
 from madspec_cli.memory.application.orchestration import CoordinationContextRequest, resolve_coordination_context
-from madspec_cli.memory import retrieve_memory_context
 from madspec_cli.memory.application.resolve_branch import resolve_branch
+from madspec_cli.memory.views import retrieve_memory_context
 from madspec_cli.shared.kernel.result import PayloadResult
 
 from .common import find_subagent

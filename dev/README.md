@@ -1,5 +1,25 @@
 # Dev Notes
 
+## Архив Документов `dev`
+
+Все roadmap-, RFC- и ADR-документы в этой директории переведены в архивный режим.
+
+Их роль теперь историческая:
+
+- они фиксируют уже принятые решения, этапы rollout и исторический контекст изменений;
+- они больше не считаются источником текущего product/runtime-контракта;
+- актуальная истина должна читаться из `README.md`, `docs/cli/`, `skills/` и из текущего кода.
+
+## Состав Архива
+
+- `dev/architecture-boundaries-roadmap.md` — архив дорожной карты по очистке архитектурных границ
+- `dev/architecture-refactoring-next-steps.md` — архив второй волны архитектурного рефакторинга
+- `dev/madspec-cli-agentic-refactor-rfc.md` — архив RFC по упрощению архитектуры `madspec_cli`
+- `dev/memory-embedding-provider-roadmap.md` — архив roadmap/ADR по embedding provider и векторному слою
+- `dev/parallel-memory-roadmap.md` — архив roadmap по parallel memory и multi-agent runtime
+- `dev/phase2-cutover-roadmap.md` — архив rollout-перехода на `Phase 2` по умолчанию
+- `dev/semantic-layer-roadmap.md` — архив roadmap по развитию семантического слоя памяти
+
 ## Локальное тестирование CLI через `uv`
 
 Если нужно протестировать изменения в `madspec` локально, не публикуя их на GitHub, устанавливайте CLI прямо из текущего checkout репозитория.

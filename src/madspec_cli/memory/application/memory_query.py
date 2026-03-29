@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..shared.system_store import search_memory_store as _search_memory_store
 from ..shared.system_store.sessions import load_runtime_session as _load_runtime_session
+from ..shared.system_store.sync import search_memory_store as _search_memory_store
 
 
 def search_memory_store(

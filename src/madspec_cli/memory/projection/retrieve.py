@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ..domain.conflicts import PROJECT_MEMORY_BRANCH, semantic_fingerprint
+from ..domain.conflicts import PROJECT_MEMORY_BRANCH
 
 if TYPE_CHECKING:
     from madspec_cli.shared.kernel.ports import ChangeContextBuilder, ChangeStateLoader
@@ -58,10 +59,15 @@ def retrieve_memory_context(
     _build_change_context: ChangeContextBuilder | None = None,
     _load_change_state: ChangeStateLoader | None = None,
 ) -> dict[str, Any]:
-    from ..shared.system_store import search_memory_store
+    from ..shared.system_store.sync import search_memory_store
     from ..shared.system_store.store import MemoryStore
 
     store = MemoryStore(project_path)
+    semantic_statuses = ["validated"]
+    if include_obsolete:
+        semantic_statuses.append("obsolete")
+    if include_conflicted:
+        semantic_statuses.append("conflicted")
     stage_lower = stage.lower()
     is_stage_artifact = stage_lower in {
         "mvp.concept",
@@ -80,8 +86,10 @@ def retrieve_memory_context(
         session_key=session_key,
     )
     if _build_change_context is None or _load_change_state is None:
-        from madspec_cli.features.change.infrastructure.storage import (
+        from madspec_cli.features.change.infrastructure.rendering import (
             build_change_context as _bcc,
+        )
+        from madspec_cli.features.change.infrastructure.repository import (
             load_change_state as _lcs,
         )
         if _build_change_context is None:
@@ -137,15 +145,15 @@ def retrieve_memory_context(
         },
     }
     if scope == "project":
-        project_records = store.list_records(
+        project_records = store.list_semantic_record_details(
             branch=PROJECT_MEMORY_BRANCH,
-            statuses=["validated"],
-            limit=500,
+            statuses=semantic_statuses,
+            limit=10000,
         )
         project_semantic = {"facts": [], "decisions": [], "contracts": []}
         for item in project_records:
-            payload = item.get("payload", {})
-            semantic_kind = payload.get("semantic_kind")
+            payload = dict(item.get("payload") or {})
+            semantic_kind = str(payload.get("semantic_kind") or item.get("semantic_kind") or "")
             if semantic_kind == "fact":
                 project_semantic["facts"].append(payload)
             elif semantic_kind == "decision":
@@ -153,17 +161,12 @@ def retrieve_memory_context(
             elif semantic_kind == "contract":
                 project_semantic["contracts"].append(payload)
         for semantic_key in ("facts", "decisions", "contracts"):
-            branch_records = semantic_sets["validated"][semantic_key]
-            merged_records: list[dict[str, Any]] = []
-            seen: set[str] = set()
-            for record in [*project_semantic[semantic_key], *branch_records]:
-                fingerprint = semantic_fingerprint(record)
-                if fingerprint in seen:
-                    continue
-                merged_records.append(record)
-                seen.add(fingerprint)
-            semantic_sets["validated"][semantic_key] = merged_records
-            semantic_sets["stage"][semantic_key] = [*project_semantic[semantic_key], *semantic_sets["stage"][semantic_key]]
+            project_semantic[semantic_key] = sorted(
+                project_semantic[semantic_key],
+                key=lambda item: (str(item.get("ts", "")), str(item.get("id", ""))),
+            )
+        semantic_sets["validated"] = copy.deepcopy(project_semantic)
+        semantic_sets["stage"] = copy.deepcopy(project_semantic)
 
     semantic_facts = semantic_sets["validated"]["facts"]
     semantic_decisions = semantic_sets["validated"]["decisions"]

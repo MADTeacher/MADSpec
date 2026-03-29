@@ -5,7 +5,9 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import build_git_diff, build_snapshot_diff, capture_branch_snapshot, load_change_state
+from madspec_cli.features.change.infrastructure.git_ops import build_git_diff
+from ..infrastructure.repository import load_change_state
+from ..infrastructure.snapshot import build_snapshot_diff, capture_branch_snapshot
 from .shared import find_proposal, require_change_state
 
 

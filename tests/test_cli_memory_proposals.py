@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 
+from madspec_cli.memory.shared.records import make_record
+from madspec_cli.memory.shared.storage import ensure_memory_layout
+from madspec_cli.memory.shared.system_store import refresh_branch_projections
 from madspec_cli.memory.shared.system_store.sessions import save_runtime_session
 from madspec_cli.memory.shared.system_store.store import MemoryStore
 
@@ -82,6 +85,81 @@ def _create_claim(
     )
     assert claim_result.exit_code == 0, claim_result.stdout
     return task_payload, work_item_payload
+
+
+def _seed_branch_semantic(project_path, branch_name: str) -> dict[str, list[dict[str, object]]]:
+    ensure_memory_layout(project_path, branch_name, full=True)
+    store = MemoryStore(project_path)
+    facts = [
+        _semantic_record(
+            branch_name,
+            "mvp.plan",
+            "fact",
+            "Keep current leaderboard snapshot for replay",
+            source="memory.promote",
+            metadata={"topic": "leaderboard", "variant": "canonical"},
+        ),
+        _semantic_record(
+            branch_name,
+            "mvp.plan",
+            "fact",
+            "Keep current leaderboard snapshot for replay",
+            source="memory.promote",
+            metadata={"topic": "leaderboard", "variant": "duplicate"},
+        ),
+    ]
+    decisions = [
+        _semantic_record(
+            branch_name,
+            "mvp.plan",
+            "decision",
+            "Resolve matchmaking before prize distribution",
+            source="memory.promote",
+            metadata={"priority": "p1"},
+        )
+    ]
+    contracts = [
+        _semantic_record(
+            branch_name,
+            "mvp.architecture",
+            "contract",
+            "POST /matches must return replay token",
+            source="memory.promote",
+            metadata={"endpoint": "POST /matches"},
+        )
+    ]
+    store.upsert_records_batch([*facts, *decisions, *contracts])
+    refresh_branch_projections(project_path, branch_name, full=True)
+    return {"facts": facts, "decisions": decisions, "contracts": contracts}
+
+
+def _semantic_record(
+    branch_name: str,
+    stage: str,
+    semantic_kind: str,
+    summary: str,
+    *,
+    source: str,
+    metadata: dict[str, object],
+) -> dict[str, object]:
+    record = make_record(
+        branch_name,
+        stage,
+        source,
+        summary,
+        status="validated",
+        evidence=[f"{stage}:{semantic_kind}"],
+        scope="branch",
+        semantic_kind=semantic_kind,
+        record_type=semantic_kind,
+        metadata=metadata,
+    )
+    record["record_stream"] = {
+        "fact": "facts",
+        "decision": "decisions",
+        "contract": "contracts",
+    }[semantic_kind]
+    return record
 
 
 def test_memory_proposals_publish_list_preview_apply_plan_change(
@@ -479,6 +557,100 @@ def test_memory_proposals_runtime_conflict_and_ownership_violation(
     assert rejected_payload["proposal"]["apply_summary"]["reason"] == "ownership_violation"
 
 
+def test_memory_proposals_publish_and_apply_semantic_cleanup(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = _setup_claimed_work_item(tmp_path, monkeypatch, invoke_cli, init_memory_branch)
+    seeded = _seed_branch_semantic(project_path, "main")
+    _, work_item_payload = _create_claim(
+        invoke_cli,
+        task_title="Coordinate semantic cleanup",
+        work_title="Cleanup semantic branch knowledge",
+        subagent_id="developer",
+        session_key="cleanup",
+        step_id=None,
+        path="semantic/facts.jsonl",
+    )
+    store = MemoryStore(project_path)
+    base_revision = store.fetch_branch_revision("main")
+
+    publish_result = invoke_cli(
+        [
+            "memory",
+            "proposals",
+            "publish",
+            "--branch",
+            "main",
+            "--type",
+            "semantic_cleanup",
+            "--session-key",
+            "cleanup",
+            "--subagent-id",
+            "developer",
+            "--base-revision",
+            str(base_revision),
+            "--payload-json",
+            json.dumps(
+                {
+                    "scope": "branch",
+                    "operation": "prune",
+                    "summary": "Prune duplicate semantic fact",
+                    "operations": [
+                        {
+                            "semantic_kind": "fact",
+                            "record_id": seeded["facts"][1]["id"],
+                        }
+                    ],
+                }
+            ),
+            "--json-output",
+        ]
+    )
+    assert publish_result.exit_code == 0, publish_result.stdout
+    publish_payload = json.loads(publish_result.stdout)
+    proposal = publish_payload["proposal"]
+    proposal_id = proposal["proposal_id"]
+    assert proposal["proposal_type"] == "semantic_cleanup"
+    assert proposal["target_scope"] == {"scope": "semantic-knowledge"}
+    assert proposal["work_item_id"] == work_item_payload["work_item"]["work_item_id"]
+
+    apply_result = invoke_cli(
+        [
+            "memory",
+            "proposals",
+            "apply",
+            "--proposal-id",
+            proposal_id,
+            "--json-output",
+        ]
+    )
+    assert apply_result.exit_code == 0, apply_result.stdout
+    apply_payload = json.loads(apply_result.stdout)
+    assert apply_payload["proposal"]["status"] == "applied"
+    assert apply_payload["apply_result"]["accepted"] is True
+    assert apply_payload["apply_result"]["details"]["removed_count"] == 1
+
+    retrieve_result = invoke_cli(
+        [
+            "memory",
+            "semantic",
+            "retrieve",
+            "--scope",
+            "branch",
+            "--branch",
+            "main",
+            "--json-output",
+        ]
+    )
+    assert retrieve_result.exit_code == 0, retrieve_result.stdout
+    retrieve_payload = json.loads(retrieve_result.stdout)
+    fact_ids = {item["id"] for item in retrieve_payload["semantic"]["facts"]}
+    assert seeded["facts"][1]["id"] not in fact_ids
+
+
 def test_memory_proposals_show_up_in_timeline_and_doctor(
     tmp_path,
     monkeypatch,
@@ -707,7 +879,7 @@ def test_memory_proposals_are_blocked_when_phase2_is_disabled(
     project_path = tmp_path / "demo"
     project_path.mkdir()
     monkeypatch.chdir(project_path)
-    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent", phase2_enabled=False)
     init_memory_branch(branch="main", project_path=project_path)
 
     result = invoke_cli(
@@ -724,7 +896,7 @@ def test_memory_proposals_are_blocked_when_phase2_is_disabled(
     assert result.exit_code == 1, result.stdout
     payload = json.loads(result.stdout)
     assert payload["reason"] == "phase2_disabled"
-    assert payload["message"] == "Phase 2 coordinator runtime is opt-in"
+    assert payload["message"] == "Phase 2 coordinator runtime is disabled for this project"
 
 
 def test_direct_runtime_write_still_works_when_phase2_is_disabled_even_with_claimed_state(
@@ -736,7 +908,7 @@ def test_direct_runtime_write_still_works_when_phase2_is_disabled_even_with_clai
     project_path = tmp_path / "demo"
     project_path.mkdir()
     monkeypatch.chdir(project_path)
-    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent", phase2_enabled=False)
     init_memory_branch(branch="main", project_path=project_path)
 
     branch_dir = project_path / ".madspec" / "main"

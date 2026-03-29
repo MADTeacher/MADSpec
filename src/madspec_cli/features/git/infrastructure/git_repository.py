@@ -10,7 +10,6 @@ from .operations import (
     get_current_branch_info,
     init_repo,
     list_madspec_branches,
-    set_branch_config,
 )
 
 
@@ -23,9 +22,6 @@ class GitRepository:
 
     def create_branch(self, project_path: Path, branch_name: str):
         return create_branch(project_path, branch_name)
-
-    def set_branch(self, project_path: Path, branch_name: str):
-        return set_branch_config(project_path, branch_name)
 
     def commit_all(self, project_path: Path, message: str):
         return commit_all(project_path, message)

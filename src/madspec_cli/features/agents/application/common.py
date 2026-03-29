@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..infrastructure.storage import (
-    DEFAULT_PROFILE_ID,
-    DEFAULT_SUBAGENT_IDS,
-    build_environment_profile,
+from ..domain.builtin_roles import DEFAULT_PROFILE_ID, DEFAULT_SUBAGENT_IDS
+from ..infrastructure.catalog_store import (
     create_profile_proposal,
     find_effective_subagent,
     list_agent_proposals,
-    load_agents_state,
     load_effective_subagents,
 )
+from ..infrastructure.state_store import build_environment_profile, load_agents_state
 
 
 def find_subagent(project_path, subagent_id: str) -> dict[str, Any] | None:

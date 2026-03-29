@@ -4,16 +4,12 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from madspec_cli.memory import consolidate_branch_memory
 from madspec_cli.memory.shared.storage import now_iso
+from madspec_cli.memory.views import consolidate_branch_memory
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import (
-    append_change_history,
-    append_change_proposal,
-    save_change_state,
-    write_change_summary_artifact,
-)
+from ..infrastructure.export import write_change_summary_artifact
+from ..infrastructure.repository import append_change_history, append_change_proposal, save_change_state
 from .shared import build_change_bundle, find_proposal, refresh_bundle_content_hashes, require_change_state
 
 

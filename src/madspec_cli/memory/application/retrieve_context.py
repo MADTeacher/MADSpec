@@ -58,5 +58,6 @@ def execute(request: RetrieveMemoryContextRequest) -> RetrieveMemoryContextResul
         stage=request.stage,
         step_id=payload.get("step_id"),
         limit=request.limit,
+        semantic_runtime=((payload.get("recall") or {}).get("semantic_runtime")),
     )
     return RetrieveMemoryContextResult(payload=payload)

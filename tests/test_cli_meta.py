@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from madspec_cli.features.meta import cli as meta_cli
+import madspec_cli.features.meta.cli as meta_cli
 from madspec_cli.features.meta.application.version_info import VersionInfoResult
 
 

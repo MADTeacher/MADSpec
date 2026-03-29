@@ -9,7 +9,6 @@ from .shared.infra.project_config import (
     get_madspec_config_path,
     normalize_parallel_runtime_policy,
     read_madspec_config,
-    resolve_branch_name,
     update_madspec_config,
     write_madspec_config,
 )
@@ -25,7 +24,6 @@ __all__ = [
     "get_madspec_config_path",
     "normalize_parallel_runtime_policy",
     "read_madspec_config",
-    "resolve_branch_name",
     "update_madspec_config",
     "write_madspec_config",
 ]

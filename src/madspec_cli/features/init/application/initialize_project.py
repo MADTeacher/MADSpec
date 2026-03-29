@@ -14,6 +14,7 @@ def execute(request: InitializeProjectRequest) -> InitializeProjectResult:
     result = core_initialize_project(
         request.project_path,
         selected_ai=request.selected_ai,
+        memory_embeddings=request.memory_selection.to_config_payload(),
         here=request.here,
         no_git=request.no_git,
         should_init_git=request.should_init_git,
@@ -28,4 +29,5 @@ def execute(request: InitializeProjectRequest) -> InitializeProjectResult:
         branch_name=result.branch_name,
         git_error_message=result.git_error_message,
         config_error_message=result.config_error_message,
+        memory_bootstrap=result.memory_bootstrap,
     )

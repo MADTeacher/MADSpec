@@ -4,12 +4,14 @@ from pathlib import Path
 
 import typer
 
-from madspec_cli.shared.cli.banners import console, show_banner
+from madspec_cli.memory.shared import SYSTEM_SESSION_KEY
+from madspec_cli.shared.cli.banners import console
+from madspec_cli.shared.cli.command_runner import execute_cli_action
 from madspec_cli.shared.cli.file_input import ArgsFileLifecycle, read_args_file
 from madspec_cli.shared.cli.json_output import emit_json
 from madspec_cli.shared.cli.presenters import emit_error
-from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_output_mode
-from madspec_cli.memory.shared import SYSTEM_SESSION_KEY
+from madspec_cli.shared.cli.toon_output import ensure_structured_output_mode
+from madspec_cli.shared.cli.banners import show_banner
 
 from .application.apply_profile import ApplyProfileRequest, execute as apply_profile
 from .application.create_subagent import CreateSubagentRequest, execute as create_subagent
@@ -45,15 +47,7 @@ SUBAGENT_FROM_FILE_ALIASES = {
 }
 
 
-@agents_app.command("profile")
-def profile(
-    json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
-) -> None:
-    payload = profile_agents(AgentProfileRequest(project_path=Path.cwd())).to_payload()
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
+def _print_profile_payload(payload: dict[str, object]) -> None:
     console.print(f"[cyan]Среда:[/cyan] {payload['environment']['environmentId']}")
     console.print(f"[cyan]Профиль:[/cyan] {payload['profile']['profileId']}")
     console.print(f"[cyan]Состояние:[/cyan] {payload['state_file']}")
@@ -61,20 +55,82 @@ def profile(
     console.print(f"[cyan]Включенные субагенты:[/cyan] {', '.join(enabled) if enabled else 'нет'}")
 
 
-@agents_app.command("recommend")
-def recommend(
-    json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
-) -> None:
-    payload = recommend_agents(RecommendAgentsRequest(project_path=Path.cwd())).to_payload()
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
+def _print_recommend_payload(payload: dict[str, object]) -> None:
     console.print(f"[cyan]Среда:[/cyan] {payload['environment']['environmentId']}")
     console.print(f"[cyan]Профиль:[/cyan] {payload['profileId']}")
     console.print(payload["summary"])
     for item in payload["recommendedSubagents"]:
         console.print(f"- `{item['subagentId']}` [{item['renderMode']}] {item['description']}")
+
+
+def _print_propose_profile_payload(payload: dict[str, object]) -> None:
+    console.print(f"[green]Создано предложение:[/green] {payload['proposalId']}")
+    console.print(f"[cyan]Среда:[/cyan] {payload['environmentId']}")
+    console.print(f"[cyan]Измененные поля:[/cyan] {', '.join(payload['diff']['changedFields']) or 'нет'}")
+
+
+def _print_apply_profile_payload(payload: dict[str, object], *, proposal_id: str) -> None:
+    console.print(f"[green]Предложение применено:[/green] {proposal_id}")
+    console.print(f"[cyan]Сформировано файлов:[/cyan] {len(payload['rendered']['created'])}")
+
+
+def _print_list_payload(payload: dict[str, object]) -> None:
+    console.print(f"[cyan]Среда:[/cyan] {payload['environmentId']}")
+    for item in payload["subagents"]:
+        console.print(f"- `{item['subagentId']}` включен={item['enabled']} [{item['renderMode']}] {item['description']}")
+
+
+def _print_show_payload(payload: dict[str, object]) -> None:
+    console.print(f"[cyan]Субагент:[/cyan] {payload['subagentId']}")
+    console.print(f"[cyan]Источник:[/cyan] {payload.get('origin')}")
+    console.print(f"[cyan]Включен:[/cyan] {payload.get('enabled')}")
+    console.print(f"[cyan]Источник текста:[/cyan] {payload.get('bodySource')}")
+    console.print(payload["description"])
+
+
+def _print_context_payload(payload: dict[str, object]) -> None:
+    console.print(f"[cyan]Субагент:[/cyan] {payload['subagent']['subagentId']}")
+    console.print(f"[cyan]Ветка:[/cyan] {payload['branch']}")
+    console.print(f"[cyan]Стадия:[/cyan] {payload['stage']}")
+    console.print(f"[cyan]Подтверждения правил:[/cyan] {len(payload['policy']['policy_context']['required'])}")
+    console.print(f"[cyan]Статус gate-проверок:[/cyan] {payload['gates']['overall_status']}")
+
+
+def _load_subagent_input(
+    *,
+    from_file: str,
+    body_file: str | None,
+) -> tuple[ArgsFileLifecycle, dict[str, object], str | None]:
+    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file)
+    payload_data = read_args_file(
+        from_file,
+        aliases=SUBAGENT_FROM_FILE_ALIASES,
+        allowed_keys=SUBAGENT_FROM_FILE_ALLOWED_KEYS,
+    )
+    body_text = Path(body_file).read_text(encoding="utf-8") if body_file else None
+    return args_file_lifecycle, payload_data, body_text
+
+
+@agents_app.command("profile")
+def profile(
+    json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
+) -> None:
+    execute_cli_action(
+        lambda: profile_agents(AgentProfileRequest(project_path=Path.cwd())).to_payload(),
+        json_output=json_output,
+        text_output=_print_profile_payload,
+    )
+
+
+@agents_app.command("recommend")
+def recommend(
+    json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
+) -> None:
+    execute_cli_action(
+        lambda: recommend_agents(RecommendAgentsRequest(project_path=Path.cwd())).to_payload(),
+        json_output=json_output,
+        text_output=_print_recommend_payload,
+    )
 
 
 @agents_app.command("propose-profile")
@@ -84,22 +140,19 @@ def propose_profile_command(
     subagent: list[str] = typer.Option(None, "--subagent", help="Включить субагент в предлагаемом профиле; флаг можно повторять"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    payload = propose_profile(
-        ProposeProfileRequest(
-            project_path=Path.cwd(),
-            environment_id=environment,
-            profile_id=profile_id,
-            enabled_subagents=subagent or None,
-            requested_by="agents.propose-profile",
-        )
-    ).to_payload()
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
-    console.print(f"[green]Создано предложение:[/green] {payload['proposalId']}")
-    console.print(f"[cyan]Среда:[/cyan] {payload['environmentId']}")
-    console.print(f"[cyan]Измененные поля:[/cyan] {', '.join(payload['diff']['changedFields']) or 'нет'}")
+    execute_cli_action(
+        lambda: propose_profile(
+            ProposeProfileRequest(
+                project_path=Path.cwd(),
+                environment_id=environment,
+                profile_id=profile_id,
+                enabled_subagents=subagent or None,
+                requested_by="agents.propose-profile",
+            )
+        ).to_payload(),
+        json_output=json_output,
+        text_output=_print_propose_profile_payload,
+    )
 
 
 @agents_app.command("apply-profile")
@@ -107,19 +160,13 @@ def apply_profile_command(
     proposal_id: str = typer.Option(..., "--proposal-id", help="Идентификатор ожидающего предложения"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    try:
-        payload = apply_profile(
+    execute_cli_action(
+        lambda: apply_profile(
             ApplyProfileRequest(project_path=Path.cwd(), proposal_id=proposal_id)
-        ).to_payload()
-    except Exception as exc:
-        emit_error(exc, json_output=json_output, toon_output=toon_output)
-        raise typer.Exit(1) from exc
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
-    console.print(f"[green]Предложение применено:[/green] {proposal_id}")
-    console.print(f"[cyan]Сформировано файлов:[/cyan] {len(payload['rendered']['created'])}")
+        ).to_payload(),
+        json_output=json_output,
+        text_output=lambda payload: _print_apply_profile_payload(payload, proposal_id=proposal_id),
+    )
 
 
 @subagents_app.command("list")
@@ -127,16 +174,13 @@ def list_command(
     enabled_only: bool = typer.Option(False, "--enabled-only", help="Показывать только включенных субагентов"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    payload = list_subagents(
-        ListSubagentsRequest(project_path=Path.cwd(), enabled_only=enabled_only)
-    ).to_payload()
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
-    console.print(f"[cyan]Среда:[/cyan] {payload['environmentId']}")
-    for item in payload["subagents"]:
-        console.print(f"- `{item['subagentId']}` включен={item['enabled']} [{item['renderMode']}] {item['description']}")
+    execute_cli_action(
+        lambda: list_subagents(
+            ListSubagentsRequest(project_path=Path.cwd(), enabled_only=enabled_only)
+        ).to_payload(),
+        json_output=json_output,
+        text_output=_print_list_payload,
+    )
 
 
 @subagents_app.command("show")
@@ -144,22 +188,13 @@ def show_command(
     subagent_id: str = typer.Option(..., "--subagent-id", help="Идентификатор субагента"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    try:
-        payload = show_subagent(
+    execute_cli_action(
+        lambda: show_subagent(
             ShowSubagentRequest(project_path=Path.cwd(), subagent_id=subagent_id)
-        ).to_payload()
-    except Exception as exc:
-        emit_error(exc, json_output=json_output)
-        raise typer.Exit(1) from exc
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
-    console.print(f"[cyan]Субагент:[/cyan] {payload['subagentId']}")
-    console.print(f"[cyan]Источник:[/cyan] {payload.get('origin')}")
-    console.print(f"[cyan]Включен:[/cyan] {payload.get('enabled')}")
-    console.print(f"[cyan]Источник текста:[/cyan] {payload.get('bodySource')}")
-    console.print(payload["description"])
+        ).to_payload(),
+        json_output=json_output,
+        text_output=_print_show_payload,
+    )
 
 
 @subagents_app.command("create")
@@ -169,14 +204,9 @@ def create_command(
     body_file: str = typer.Option(..., "--body-file", help="Путь к Markdown-файлу с текстом субагента"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file)
     try:
-        payload_data = read_args_file(
-            from_file,
-            aliases=SUBAGENT_FROM_FILE_ALIASES,
-            allowed_keys=SUBAGENT_FROM_FILE_ALLOWED_KEYS,
-        )
-        body_text = Path(body_file).read_text(encoding="utf-8")
+        args_file_lifecycle, payload_data, body_text = _load_subagent_input(from_file=from_file, body_file=body_file)
+        assert body_text is not None
         payload = create_subagent(
             CreateSubagentRequest(
                 project_path=Path.cwd(),
@@ -203,14 +233,8 @@ def update_command(
     body_file: str = typer.Option(None, "--body-file", help="Необязательный Markdown-файл с текстом субагента"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    args_file_lifecycle = ArgsFileLifecycle.from_path(from_file)
     try:
-        payload_data = read_args_file(
-            from_file,
-            aliases=SUBAGENT_FROM_FILE_ALIASES,
-            allowed_keys=SUBAGENT_FROM_FILE_ALLOWED_KEYS,
-        )
-        body_text = Path(body_file).read_text(encoding="utf-8") if body_file else None
+        args_file_lifecycle, payload_data, body_text = _load_subagent_input(from_file=from_file, body_file=body_file)
         payload = update_subagent(
             UpdateSubagentRequest(
                 project_path=Path.cwd(),
@@ -236,22 +260,17 @@ def remove_command(
     force: bool = typer.Option(False, "--force", help="Удалить даже если субагент включен"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    try:
-        payload = remove_subagent(
+    execute_cli_action(
+        lambda: remove_subagent(
             RemoveSubagentRequest(
                 project_path=Path.cwd(),
                 subagent_id=subagent_id,
                 force=force,
             )
-        ).to_payload()
-    except Exception as exc:
-        emit_error(exc, json_output=json_output)
-        raise typer.Exit(1) from exc
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
-    console.print(f"[green]Субагент удален:[/green] {subagent_id}")
+        ).to_payload(),
+        json_output=json_output,
+        text_output=lambda _payload: console.print(f"[green]Субагент удален:[/green] {subagent_id}"),
+    )
 
 
 @subagents_app.command("enable")
@@ -259,18 +278,13 @@ def enable_command(
     subagent_id: str = typer.Option(..., "--subagent-id", help="Идентификатор субагента"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    try:
-        payload = toggle_subagent(
+    execute_cli_action(
+        lambda: toggle_subagent(
             ToggleSubagentRequest(project_path=Path.cwd(), subagent_id=subagent_id, enabled=True)
-        ).to_payload()
-    except Exception as exc:
-        emit_error(exc, json_output=json_output)
-        raise typer.Exit(1) from exc
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
-    console.print(f"[green]Субагент включен:[/green] {subagent_id}")
+        ).to_payload(),
+        json_output=json_output,
+        text_output=lambda _payload: console.print(f"[green]Субагент включен:[/green] {subagent_id}"),
+    )
 
 
 @subagents_app.command("disable")
@@ -278,18 +292,13 @@ def disable_command(
     subagent_id: str = typer.Option(..., "--subagent-id", help="Идентификатор субагента"),
     json_output: bool = typer.Option(False, "--json-output", help="Вывести машиночитаемый JSON"),
 ) -> None:
-    try:
-        payload = toggle_subagent(
+    execute_cli_action(
+        lambda: toggle_subagent(
             ToggleSubagentRequest(project_path=Path.cwd(), subagent_id=subagent_id, enabled=False)
-        ).to_payload()
-    except Exception as exc:
-        emit_error(exc, json_output=json_output)
-        raise typer.Exit(1) from exc
-    if json_output:
-        emit_json(payload)
-        return
-    show_banner()
-    console.print(f"[green]Субагент отключен:[/green] {subagent_id}")
+        ).to_payload(),
+        json_output=json_output,
+        text_output=lambda _payload: console.print(f"[green]Субагент отключен:[/green] {subagent_id}"),
+    )
 
 
 @subagents_app.command("context")
@@ -305,8 +314,8 @@ def context_command(
     toon_output: bool = typer.Option(False, "--toon-output", help="Вывести TOON для агентского контекста"),
 ) -> None:
     ensure_structured_output_mode(json_output=json_output, toon_output=toon_output)
-    try:
-        payload = subagent_context(
+    execute_cli_action(
+        lambda: subagent_context(
             SubagentContextRequest(
                 project_path=Path.cwd(),
                 subagent_id=subagent_id,
@@ -317,22 +326,11 @@ def context_command(
                 task_id=task_id,
                 work_item_id=work_item_id,
             )
-        ).to_payload()
-    except Exception as exc:
-        emit_error(exc, json_output=json_output)
-        raise typer.Exit(1) from exc
-    if json_output:
-        emit_json(payload)
-        return
-    if toon_output:
-        emit_toon(payload)
-        return
-    show_banner()
-    console.print(f"[cyan]Субагент:[/cyan] {payload['subagent']['subagentId']}")
-    console.print(f"[cyan]Ветка:[/cyan] {payload['branch']}")
-    console.print(f"[cyan]Стадия:[/cyan] {payload['stage']}")
-    console.print(f"[cyan]Подтверждения правил:[/cyan] {len(payload['policy']['policy_context']['required'])}")
-    console.print(f"[cyan]Статус gate-проверок:[/cyan] {payload['gates']['overall_status']}")
+        ).to_payload(),
+        json_output=json_output,
+        toon_output=toon_output,
+        text_output=_print_context_payload,
+    )
 
 
 def register(app: typer.Typer) -> None:

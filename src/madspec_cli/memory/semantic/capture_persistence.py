@@ -37,6 +37,7 @@ from ..stages.plan.state import PLAN_STAGE, load_plan_state, update_plan_state
 from ..stages.tech.state import TECH_STAGE, load_tech_state
 from .capture_models import PersistedCaptureResult, PreparedCapture
 from .records import (
+    RecordBuildContext,
     build_contract_records,
     build_decision_records,
     build_fact_records,
@@ -50,80 +51,18 @@ def _capture_semantic_fingerprints(
     branch_name: str,
     prepared: PreparedCapture,
 ) -> set[str]:
-    inputs = prepared.inputs
+    context = RecordBuildContext(
+        branch_name=branch_name,
+        ts="",
+        inputs=prepared.inputs,
+        parsed=prepared.parsed,
+    )
     return {
         semantic_fingerprint(record)
         for record in (
-            build_fact_records(
-                branch_name=branch_name,
-                normalized_stage=inputs.stage,
-                normalized_status=inputs.status,
-                normalized_evidence=inputs.evidence,
-                normalized_facts=inputs.facts,
-                normalized_system_overview=inputs.system_overview,
-                normalized_project_name=inputs.project_name,
-                normalized_audiences=inputs.audiences,
-                normalized_scenarios=inputs.scenarios,
-                normalized_pain_points=inputs.pain_points,
-                normalized_assumptions=inputs.assumptions,
-                normalized_design_overview=inputs.design_overview,
-                normalized_platforms=inputs.platforms,
-                normalized_project_type=inputs.project_type,
-                normalized_stack_overview=inputs.stack_overview,
-                normalized_requirements=inputs.requirements,
-                normalized_architecture_overview=inputs.architecture_overview,
-                architecture_project_structure=prepared.parsed.architecture_project_structure,
-                architecture_directory_updates=prepared.parsed.architecture_directory_updates,
-                architecture_entity_updates=prepared.parsed.architecture_entity_updates,
-                architecture_entity_field_updates=prepared.parsed.architecture_entity_field_updates,
-                architecture_integration_updates=prepared.parsed.architecture_integration_updates,
-                normalized_code_principles=inputs.code_principles,
-                normalized_security_notes=inputs.security_notes,
-                normalized_performance_notes=inputs.performance_notes,
-                normalized_preferences=inputs.preferences,
-                normalized_plan_overview=inputs.plan_overview,
-                design_zone_updates=prepared.parsed.design_zone_updates,
-                design_screen_updates=prepared.parsed.design_screen_updates,
-                design_flow_updates=prepared.parsed.design_flow_updates,
-                design_flow_step_updates=prepared.parsed.design_flow_step_updates,
-                design_screen_data_updates=prepared.parsed.design_screen_data_updates,
-                ts="",
-            )
-            + build_decision_records(
-                branch_name=branch_name,
-                normalized_stage=inputs.stage,
-                normalized_status=inputs.status,
-                normalized_evidence=inputs.evidence,
-                normalized_decisions=inputs.decisions,
-                concept_feature_updates=prepared.parsed.concept_feature_updates,
-                design_screen_feature_links=prepared.parsed.design_screen_feature_links,
-                architecture_entity_relationship_updates=prepared.parsed.architecture_entity_relationship_updates,
-                architecture_entity_state_updates=prepared.parsed.architecture_entity_state_updates,
-                architecture_endpoint_updates=prepared.parsed.architecture_endpoint_updates,
-                architecture_endpoint_screen_updates=prepared.parsed.architecture_endpoint_screen_updates,
-                architecture_endpoint_field_updates=prepared.parsed.architecture_endpoint_field_updates,
-                architecture_pattern_updates=prepared.parsed.architecture_pattern_updates,
-                tech_component_updates=prepared.parsed.tech_component_updates,
-                tech_library_updates=prepared.parsed.tech_library_updates,
-                tech_code_organization=prepared.parsed.tech_code_organization,
-                tech_alternative_updates=prepared.parsed.tech_alternative_updates,
-                design_navigation_updates=prepared.parsed.design_navigation_updates,
-                design_flow_alternative_updates=prepared.parsed.design_flow_alternative_updates,
-                normalized_planning_principles=inputs.planning_principles,
-                ts="",
-            )
-            + build_contract_records(
-                branch_name=branch_name,
-                normalized_stage=inputs.stage,
-                normalized_status=inputs.status,
-                normalized_evidence=inputs.evidence,
-                normalized_contracts=inputs.contracts,
-                normalized_constraints=inputs.constraints,
-                normalized_platform_constraints=inputs.platform_constraints,
-                normalized_tech_constraints=inputs.tech_constraints,
-                architecture_endpoint_error_updates=prepared.parsed.architecture_endpoint_error_updates,
-                ts="",
-            )
+            build_fact_records(context)
+            + build_decision_records(context)
+            + build_contract_records(context)
         )
     }
 
@@ -141,6 +80,12 @@ def _build_capture_plan(
     parsed = prepared.parsed
     bundles = prepared.bundles
     ts = now_iso()
+    record_context = RecordBuildContext(
+        branch_name=branch_name,
+        ts=ts,
+        inputs=inputs,
+        parsed=parsed,
+    )
 
     active_session = read_runtime_session_payload(
         project_path,
@@ -178,16 +123,7 @@ def _build_capture_plan(
     active_session["last_checkpoint_at"] = ts
     active_session["updated_at"] = ts
 
-    note_records = build_note_records(
-        branch_name=branch_name,
-        normalized_stage=inputs.stage,
-        normalized_status=inputs.status,
-        normalized_summary=inputs.summary,
-        normalized_questions=inputs.questions,
-        normalized_pending_actions=inputs.pending_actions,
-        normalized_evidence=inputs.evidence,
-        ts=ts,
-    )
+    note_records = build_note_records(record_context)
 
     concept_state = canonical.snapshots.get(CONCEPT_STAGE) or load_concept_state(paths.concept_state)
     design_state = canonical.snapshots.get(DESIGN_STAGE) or load_design_state(paths.design_state)
@@ -303,76 +239,9 @@ def _build_capture_plan(
             next_actions=inputs.next_actions,
         )
 
-    fact_records = build_fact_records(
-        branch_name=branch_name,
-        normalized_stage=inputs.stage,
-        normalized_status=inputs.status,
-        normalized_evidence=inputs.evidence,
-        normalized_facts=inputs.facts,
-        normalized_system_overview=inputs.system_overview,
-        normalized_project_name=inputs.project_name,
-        normalized_audiences=inputs.audiences,
-        normalized_scenarios=inputs.scenarios,
-        normalized_pain_points=inputs.pain_points,
-        normalized_assumptions=inputs.assumptions,
-        normalized_design_overview=inputs.design_overview,
-        normalized_platforms=inputs.platforms,
-        normalized_project_type=inputs.project_type,
-        normalized_stack_overview=inputs.stack_overview,
-        normalized_requirements=inputs.requirements,
-        normalized_architecture_overview=inputs.architecture_overview,
-        architecture_project_structure=parsed.architecture_project_structure,
-        architecture_directory_updates=parsed.architecture_directory_updates,
-        architecture_entity_updates=parsed.architecture_entity_updates,
-        architecture_entity_field_updates=parsed.architecture_entity_field_updates,
-        architecture_integration_updates=parsed.architecture_integration_updates,
-        normalized_code_principles=inputs.code_principles,
-        normalized_security_notes=inputs.security_notes,
-        normalized_performance_notes=inputs.performance_notes,
-        normalized_preferences=inputs.preferences,
-        normalized_plan_overview=inputs.plan_overview,
-        design_zone_updates=parsed.design_zone_updates,
-        design_screen_updates=parsed.design_screen_updates,
-        design_flow_updates=parsed.design_flow_updates,
-        design_flow_step_updates=parsed.design_flow_step_updates,
-        design_screen_data_updates=parsed.design_screen_data_updates,
-        ts=ts,
-    )
-    decision_records = build_decision_records(
-        branch_name=branch_name,
-        normalized_stage=inputs.stage,
-        normalized_status=inputs.status,
-        normalized_evidence=inputs.evidence,
-        normalized_decisions=inputs.decisions,
-        concept_feature_updates=parsed.concept_feature_updates,
-        design_screen_feature_links=parsed.design_screen_feature_links,
-        architecture_entity_relationship_updates=parsed.architecture_entity_relationship_updates,
-        architecture_entity_state_updates=parsed.architecture_entity_state_updates,
-        architecture_endpoint_updates=parsed.architecture_endpoint_updates,
-        architecture_endpoint_screen_updates=parsed.architecture_endpoint_screen_updates,
-        architecture_endpoint_field_updates=parsed.architecture_endpoint_field_updates,
-        architecture_pattern_updates=parsed.architecture_pattern_updates,
-        tech_component_updates=parsed.tech_component_updates,
-        tech_library_updates=parsed.tech_library_updates,
-        tech_code_organization=parsed.tech_code_organization,
-        tech_alternative_updates=parsed.tech_alternative_updates,
-        design_navigation_updates=parsed.design_navigation_updates,
-        design_flow_alternative_updates=parsed.design_flow_alternative_updates,
-        normalized_planning_principles=inputs.planning_principles,
-        ts=ts,
-    )
-    contract_records = build_contract_records(
-        branch_name=branch_name,
-        normalized_stage=inputs.stage,
-        normalized_status=inputs.status,
-        normalized_evidence=inputs.evidence,
-        normalized_contracts=inputs.contracts,
-        normalized_constraints=inputs.constraints,
-        normalized_platform_constraints=inputs.platform_constraints,
-        normalized_tech_constraints=inputs.tech_constraints,
-        architecture_endpoint_error_updates=parsed.architecture_endpoint_error_updates,
-        ts=ts,
-    )
+    fact_records = build_fact_records(record_context)
+    decision_records = build_decision_records(record_context)
+    contract_records = build_contract_records(record_context)
 
     snapshot_payloads: dict[str, dict[str, Any]] = {}
     if inputs.stage == CONCEPT_STAGE:

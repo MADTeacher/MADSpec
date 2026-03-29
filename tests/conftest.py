@@ -56,7 +56,11 @@ def make_madspec_project(tmp_path: Path, monkeypatch):
     def _make(*, branch: str = "main", project_path: Path | None = None) -> Path:
         project = project_path or tmp_path
         monkeypatch.chdir(project)
-        write_madspec_config(project, branch)
+        config_path = project / ".madspec" / "config.json"
+        if config_path.exists():
+            write_madspec_config(project, branch, phase2_enabled=None)
+        else:
+            write_madspec_config(project, branch)
         return project
 
     return _make

@@ -210,22 +210,6 @@ def ensure_gitignore(project_path: Path) -> GitignoreResult:
     )
 
 
-def set_branch_config(project_path: Path, branch_name: str) -> BranchSyncResult:
-    from madspec_cli.memory import consolidate_branch_memory, ensure_memory_layout
-    from madspec_cli.shared.infra.project_config import create_madspec_config, ensure_branch_dir
-
-    create_madspec_config(project_path, branch_name)
-    branch_dir = ensure_branch_dir(project_path, branch_name)
-    ensure_memory_layout(project_path, branch_name)
-    consolidate_branch_memory(project_path, branch_name)
-    return BranchSyncResult(
-        branch=branch_name,
-        config_path=str(project_path / ".madspec" / "config.json"),
-        branch_dir=str(branch_dir),
-        memory_dir=str(branch_dir / "memory"),
-    )
-
-
 def init_repo(project_path: Path, *, commit_message: str = "Initial commit from MADSpec template") -> RepoInitResult:
     gitignore = ensure_gitignore(project_path)
     if is_git_repo(project_path):
@@ -255,10 +239,9 @@ def init_git_repo(project_path: Path, quiet: bool = False) -> tuple[bool, str | 
         return False, str(exc)
 
 
-def create_branch(project_path: Path, branch_name: str) -> BranchCreateResult:
+def create_branch(project_path: Path, branch_name: str) -> str:
     _run_git(project_path, ["checkout", "-b", branch_name])
-    sync = set_branch_config(project_path, branch_name)
-    return BranchCreateResult(branch=branch_name, sync=sync)
+    return branch_name
 
 
 def commit_all(project_path: Path, message: str) -> CommitResult:

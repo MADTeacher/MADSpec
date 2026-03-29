@@ -1,5 +1,7 @@
 # Parallel Memory and Multi-Agent Runtime Roadmap
 
+> Статус: архивный документ. Основные решения и rollout по parallel memory уже реализованы; файл сохранён как исторический roadmap и больше не считается активным планом.
+
 Этот документ одновременно служит дорожной картой и архитектурным решением уровня Epic 0 для parallel runtime в MADSpec. До завершения Epics 1–5 именно этот файл фиксирует baseline по canonical source, session model, ownership, conflict policy и rollout order.
 
 ## 1. Goal and Non-Goals
@@ -1011,7 +1013,7 @@ Ownership задается по scope и используется для writer-
   - `skills/madspec-cli-operator/SKILL.md`
 - добавить rollout policy:
   - Phase 1 может быть включаемой через feature flag или config toggle, если реализация рискованна;
-  - Phase 2 может оставаться opt-in до стабилизации.
+  - На раннем этапе rollout Phase 2 мог оставаться opt-in до стабилизации; это замечание сохранено только как исторический контекст.
 
 **Deliverables**
 

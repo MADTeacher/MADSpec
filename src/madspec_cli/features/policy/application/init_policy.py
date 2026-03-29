@@ -6,14 +6,10 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import (
-    append_policy_history,
-    ensure_policy_layout,
-    get_policy_paths,
-    list_policy_history,
-    load_policy_state,
-    now_iso,
-)
+from ..infrastructure.normalization import now_iso
+from ..infrastructure.paths import get_policy_paths
+from ..infrastructure.repository import list_policy_history, load_policy_state
+from ..infrastructure.service import append_policy_history, ensure_policy_layout
 
 
 @dataclass(frozen=True)

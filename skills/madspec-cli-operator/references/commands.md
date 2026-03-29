@@ -33,7 +33,7 @@
 - `madspec init` — развернуть шаблон проекта под выбранного агента (`cursor-agent`, `opencode`, `kilocode`, `roo`, `sourcecraft`, `qwen`, `copilot`)
 - `madspec check` — проверить наличие git и поддерживаемых агентных инструментов
 - `madspec version` — показать версию CLI и шаблона
-- `madspec migrate` — перенести старую плоскую `.madspec/` структуру в размещение, привязанное к веткам; не включает `parallelRuntime.phase2Enabled` и не меняет rollout policy
+- `madspec migrate` — перенести старую плоскую `.madspec/` структуру в размещение, привязанное к веткам; сохраняет явный project config и нормализует runtime к текущему контракту по умолчанию
 
 ### Git-операции
 
@@ -48,13 +48,14 @@
 ### Структурированная память
 
 - `madspec memory init` — создать структуру памяти для ветки
-- `madspec memory status` — проверить текущее состояние памяти
-- `madspec memory db-status` — проверить состояние `SQLite` и векторного индекса
+- `madspec memory status` — проверить текущее состояние памяти, выбранную конфигурацию `memory.embeddings` и требуется ли подтверждающая переиндексация
+- `madspec memory db-status` — проверить состояние `SQLite`, векторного индекса, кэша локальной семантической модели и требуется ли `madspec memory reindex`
+- `madspec memory bootstrap-model` — явно подготовить выбранную локальную семантическую модель в локальном кэше проекта без изменения `.madspec/config.json` и без автоматического `reindex`
 - `madspec memory capture` — накапливать проверенные факты, решения, контракты и вопросы по стадии; поддерживает `--from-file` и `--session-key`
 - `madspec memory checkpoint` — завершить неитеративную стадию и обновить производное состояние; поддерживает `--from-file` и `--session-key`
-- `madspec memory retrieve` — получить минимальный контекст стадии или шага; поддерживает `--session-key`, смешанный поиск через `--query`, `--disable-semantic`, `--recall-limit`, `--scope`; для `mvp.concept` по умолчанию возвращает краткий `concept_status`, для `mvp.design` — `design_status`, для `mvp.tech` — `tech_status`, для `mvp.plan` — `plan_status`, а полное состояние артефакта стадии отдает только по `--full-artifact`
-- `madspec memory search` — посмотреть кандидатов из точного, полнотекстового и семантического поиска без полного контекста стадии; поддерживает `--session-key`
-- `madspec memory doctor` — провести диагностическую проверку без изменения памяти ветки, слоя `SQLite`, векторного индекса и производных представлений
+- `madspec memory retrieve` — получить минимальный контекст стадии или шага; поддерживает `--session-key`, смешанный поиск через `--query`, `--disable-semantic`, `--recall-limit`, `--scope`; для `mvp.concept` по умолчанию возвращает краткий `concept_status`, для `mvp.design` — `design_status`, для `mvp.tech` — `tech_status`, для `mvp.plan` — `plan_status`, а полное состояние артефакта стадии отдает только по `--full-artifact`; в `recall.semantic_runtime` показывает выбранный провайдер, готовность модели и итог семантического пути
+- `madspec memory search` — посмотреть кандидатов из точного, полнотекстового и семантического поиска без полного контекста стадии; поддерживает `--session-key`; возвращает top-level `semantic_runtime` и при проблеме провайдера локальной семантической модели завершает команду структурированным payload с `kind="embedding_provider_error"`
+- `madspec memory doctor` — провести диагностическую проверку без изменения памяти ветки, слоя `SQLite`, векторного индекса, кэша локальной семантической модели и производных представлений; теперь также возвращает semantic diagnostics через top-level `semantic_integrity` и semantic-specific `checks`
 - `madspec memory explain` — объяснить контекст стадии, влияние правил и результатов поиска по смыслу
 - `madspec memory timeline` — показать объединенную историю записей, снимков состояния и `retrieval_runs`
 - `madspec memory why-next-step` — объяснить выбор следующего шага и блокировки остальных шагов
@@ -66,14 +67,15 @@
 - `madspec memory resolve-conflict` — изменить решение по конфликту внутри предложения на слияние
 - `madspec memory merge-branches` — применить ранее подготовленное предложение на слияние
 - `madspec memory promote-branch-knowledge` — поднять подтвержденные знания из ветки на уровень проекта
-- `madspec memory reindex` — обработать ожидающие задания индексирования и обновить векторные фрагменты
+- `madspec memory reindex` — пересобрать активное пространство индекса и тем самым подтвердить, что текущее активное пространство соответствует выбранным `memory.embeddings`; после `madspec memory bootstrap-model` это следующий обязательный шаг для локальной семантической модели
+- `madspec memory gc vector-namespaces` — показать или удалить неактивные пространства индекса целиком; активное пространство не затрагивается
 - `madspec memory consolidate` — пересобрать Markdown-представления из структурированной памяти
 - `madspec memory validate` — проверить согласованность памяти и производных представлений
 - `madspec memory register-step` — зарегистрировать шаг планирования; поддерживает `--from-file` и `--session-key`
 - `madspec memory start-step` — запустить шаг реализации; поддерживает `--from-file` и `--session-key`
 - `madspec memory checkpoint-step` — зафиксировать промежуточное состояние шага; поддерживает `--from-file` и `--session-key`
 - `madspec memory complete-step` — завершить шаг реализации; поддерживает `--from-file` и `--session-key`
-- `madspec memory tasks ...`, `madspec memory work-items ...`, `madspec memory proposals ...`, `madspec memory coordinator explain` — относятся к opt-in Phase 2 и требуют `parallelRuntime.phase2Enabled=true`
+- `madspec memory tasks ...`, `madspec memory work-items ...`, `madspec memory proposals ...`, `madspec memory coordinator explain` — относятся к Phase 2 и доступны по умолчанию; при явном `parallelRuntime.phase2Enabled=false` возвращают `reason="phase2_disabled"`
 
 ### Слой правил
 

@@ -5,7 +5,8 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import build_policy_context, list_policy_proposals, load_policy_state
+from ..infrastructure.queries import build_policy_context
+from ..infrastructure.repository import list_policy_proposals, load_policy_state
 
 
 @dataclass(frozen=True)

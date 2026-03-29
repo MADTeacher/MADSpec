@@ -5,6 +5,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..domain.progress import select_next_executable_step
+from ..domain.workflow_rules import (
+    validate_checkpoint_step_rules,
+    validate_complete_step_rules,
+    validate_start_step_rules,
+)
+from ..domain.step_resolution import resolve_runtime_step_id
 
 if TYPE_CHECKING:
     from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator, GateEvaluator, GateFailureExtractor
@@ -18,7 +24,8 @@ def _lazy_gate_imports() -> tuple:
 def _lazy_policy_import():
     from madspec_cli.features.policy.application.common import evaluate_branch_policies
     return evaluate_branch_policies
-from ..domain.step_resolution import resolve_runtime_step_id
+
+
 from .implementation_records import (
     build_checkpoint_event,
     build_completion_event,
@@ -28,13 +35,11 @@ from .implementation_records import (
 from .implementation_shared import (
     IMPLEMENTATION_STAGES,
     append_unique,
-    is_step_ready,
     load_progress,
     normalize_text_list,
     set_active_step,
     step_dependencies,
     validate_implementation_stage,
-    validate_start_step,
 )
 from ..shared.storage import (
     ensure_memory_layout,
@@ -565,14 +570,17 @@ def start_implementation_step(
         ownership_error["stage"] = normalized_stage
         return ownership_error
 
-    errors = validate_start_step(progress, selected_step)
-    if errors:
+    rule_report = validate_start_step_rules(
+        progress=progress,
+        step_id=selected_step,
+    )
+    if rule_report.errors:
         return {
             "accepted": False,
             "branch": branch_name,
             "stage": normalized_stage,
             "step_id": selected_step,
-            "errors": errors,
+            "errors": rule_report.errors,
         }
 
     policy_payload = _evaluate_branch_policies(
@@ -768,39 +776,34 @@ def checkpoint_implementation_step(
         ownership_error["stage"] = normalized_stage
         return ownership_error
 
-    planned_steps = progress.get("plannedSteps", [])
-    if selected_step not in planned_steps:
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "step_id": selected_step,
-            "errors": [f"step '{selected_step}' is not present in plannedSteps"],
-        }
-
     metadata = progress.get("stepMetadata", {}).get(selected_step, {})
     status_info = progress.get("stepStatus", {}).get(selected_step, {})
-    if status_info.get("status") == "completed":
+    rule_report = validate_checkpoint_step_rules(
+        progress=progress,
+        step_id=selected_step,
+        summary=normalized_summary,
+        tdd_phase=normalized_phase,
+        red_evidence=normalized_red,
+        green_evidence=normalized_green,
+        refactor_note=normalized_refactor_note,
+    )
+    if rule_report.errors:
         return {
             "accepted": False,
             "branch": branch_name,
             "stage": normalized_stage,
             "step_id": selected_step,
-            "errors": [f"step '{selected_step}' is already completed"],
+            "errors": rule_report.errors,
         }
-
-    tdd_policy = metadata.get("tddPolicy")
-    allowed_phases = {"waived"} if tdd_policy in {"waived", "not-applicable"} else {"not_started", "red", "green", "refactor"}
-    if normalized_phase and normalized_phase not in allowed_phases:
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "step_id": selected_step,
-            "errors": [
-                "tdd phase must be one of: " + ", ".join(sorted(allowed_phases))
-            ],
-        }
+    tdd_policy = rule_report.normalized["effective_tdd_policy"]
+    effective_phase = rule_report.normalized["tdd_phase"] or status_info.get("tddPhase")
+    effective_red = append_unique(status_info.get("redEvidence", []), normalized_red)
+    effective_green = append_unique(status_info.get("greenEvidence", []), normalized_green)
+    effective_refactor_note = (
+        rule_report.normalized["refactor_note"]
+        if rule_report.normalized["refactor_note"] is not None
+        else status_info.get("refactorNote")
+    )
 
     policy_payload = _evaluate_branch_policies(
         project_path,
@@ -811,11 +814,11 @@ def checkpoint_implementation_step(
         overrides={
             "step_kind": metadata.get("kind"),
             "tdd_policy": tdd_policy,
-            "tdd_phase": normalized_phase or status_info.get("tddPhase"),
+            "tdd_phase": effective_phase,
             "status": "in_progress",
-            "red_evidence": append_unique(status_info.get("redEvidence", []), normalized_red),
-            "green_evidence": append_unique(status_info.get("greenEvidence", []), normalized_green),
-            "refactor_note": normalized_refactor_note if normalized_refactor_note is not None else status_info.get("refactorNote"),
+            "red_evidence": effective_red,
+            "green_evidence": effective_green,
+            "refactor_note": effective_refactor_note,
         },
         include_system_policies=False,
     )
@@ -993,70 +996,23 @@ def complete_implementation_step(
         ownership_error["stage"] = normalized_stage
         return ownership_error
 
-    planned_steps = progress.get("plannedSteps", [])
-    completed_steps = progress.setdefault("completedSteps", [])
-    if selected_step not in planned_steps:
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "step_id": selected_step,
-            "errors": [f"step '{selected_step}' is not present in plannedSteps"],
-        }
-    if selected_step in completed_steps:
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "step_id": selected_step,
-            "errors": [f"step '{selected_step}' is already completed"],
-        }
-    if not is_step_ready(progress, selected_step):
-        return {
-            "accepted": False,
-            "branch": branch_name,
-            "stage": normalized_stage,
-            "step_id": selected_step,
-            "errors": [
-                f"step '{selected_step}' has incomplete dependencies: {', '.join(step_dependencies(progress, selected_step))}"
-            ],
-        }
-
     metadata = progress.get("stepMetadata", {}).get(selected_step, {})
-    status_info = progress.setdefault("stepStatus", {}).setdefault(selected_step, {})
-    status_info["redEvidence"] = append_unique(status_info.get("redEvidence", []), normalized_red)
-    status_info["greenEvidence"] = append_unique(status_info.get("greenEvidence", []), normalized_green)
-    if normalized_refactor_note is not None:
-        status_info["refactorNote"] = normalized_refactor_note
-
-    if metadata.get("tddPolicy") == "required":
-        if not status_info.get("redEvidence"):
-            return {
-                "accepted": False,
-                "branch": branch_name,
-                "stage": normalized_stage,
-                "step_id": selected_step,
-                "errors": [f"completed code step '{selected_step}' must record redEvidence"],
-            }
-        if not status_info.get("greenEvidence"):
-            return {
-                "accepted": False,
-                "branch": branch_name,
-                "stage": normalized_stage,
-                "step_id": selected_step,
-                "errors": [f"completed code step '{selected_step}' must record greenEvidence"],
-            }
-        if not isinstance(status_info.get("refactorNote"), str) or not status_info.get("refactorNote", "").strip():
-            return {
-                "accepted": False,
-                "branch": branch_name,
-                "stage": normalized_stage,
-                "step_id": selected_step,
-                "errors": [f"completed code step '{selected_step}' must record refactorNote"],
-            }
-        status_info["tddPhase"] = "completed"
-    else:
-        status_info["tddPhase"] = "waived"
+    rule_report = validate_complete_step_rules(
+        progress=progress,
+        step_id=selected_step,
+        summary=normalized_summary,
+        red_evidence=normalized_red,
+        green_evidence=normalized_green,
+        refactor_note=normalized_refactor_note,
+    )
+    if rule_report.errors:
+        return {
+            "accepted": False,
+            "branch": branch_name,
+            "stage": normalized_stage,
+            "step_id": selected_step,
+            "errors": rule_report.errors,
+        }
 
     policy_payload = _evaluate_branch_policies(
         project_path,
@@ -1066,12 +1022,12 @@ def complete_implementation_step(
         step_id=selected_step,
         overrides={
             "step_kind": metadata.get("kind"),
-            "tdd_policy": metadata.get("tddPolicy"),
-            "tdd_phase": status_info.get("tddPhase"),
+            "tdd_policy": rule_report.normalized["effective_tdd_policy"],
+            "tdd_phase": rule_report.normalized["effective_tdd_phase"],
             "status": "completed",
-            "red_evidence": status_info.get("redEvidence", []),
-            "green_evidence": status_info.get("greenEvidence", []),
-            "refactor_note": status_info.get("refactorNote"),
+            "red_evidence": rule_report.normalized["combined_red_evidence"],
+            "green_evidence": rule_report.normalized["combined_green_evidence"],
+            "refactor_note": rule_report.normalized["effective_refactor_note"],
         },
         include_system_policies=False,
     )

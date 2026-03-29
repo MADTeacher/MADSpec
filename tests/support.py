@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from madspec_cli.memory import ensure_memory_layout, get_memory_paths
+from madspec_cli.memory import get_memory_paths
+from madspec_cli.memory.application.branch_state import (
+    BootstrapBranchStateRequest,
+    bootstrap_branch_state,
+    refresh_branch_state,
+)
 
 
 def step_status(
@@ -74,7 +79,7 @@ def write_madspec_config(
     branch: str = "main",
     version: str = "1.0.0",
     agent_environment: str | None = None,
-    phase2_enabled: bool | None = None,
+    phase2_enabled: bool | None = True,
 ) -> Path:
     madspec_dir = project_path / ".madspec"
     madspec_dir.mkdir(parents=True, exist_ok=True)
@@ -104,8 +109,12 @@ def bootstrap_project(tmp_path: Path, branch: str = "main", project_name: str = 
     project_path = tmp_path / project_name
     project_path.mkdir()
     write_madspec_config(project_path, branch)
-    ensure_memory_layout(project_path, branch)
+    bootstrap_branch_state(BootstrapBranchStateRequest(project_path=project_path, branch_name=branch))
     return get_memory_paths(project_path, branch)
+
+
+def sync_branch_state(project_path: Path, branch: str = "main", *, stage: str | None = None, full: bool = True) -> None:
+    refresh_branch_state(project_path, branch, stage=stage, full=full)
 
 
 def write_concept_markdown(branch_dir: Path, variant: str = "default") -> Path:

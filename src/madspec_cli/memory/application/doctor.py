@@ -8,7 +8,12 @@ from madspec_cli.memory.shared.storage import get_memory_paths
 
 if TYPE_CHECKING:
     from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator
-from madspec_cli.memory.shared.system_store.layout import get_system_memory_paths
+from madspec_cli.memory.shared.system_store.layout import (
+    build_reindex_status,
+    get_system_memory_paths,
+    has_legacy_flat_vector_layout,
+)
+from madspec_cli.memory.shared.system_store.provider_factory import resolve_configured_embeddings
 from madspec_cli.memory.shared.system_store.store import MemoryStore
 from madspec_cli.memory.shared.validation import validate_branch_memory
 from madspec_cli.memory.shared.validation_views import validate_generated_stage_views
@@ -16,6 +21,7 @@ from madspec_cli.shared.kernel.result import PayloadResult
 
 from .diagnostics_shared import overall_status
 from .observability import build_runtime_observability
+from .semantic_integrity import build_semantic_integrity
 
 REQUIRED_SQLITE_TABLES = {
     "artifacts",
@@ -83,7 +89,7 @@ def execute(
         "decisions": paths.decisions,
         "contracts": paths.contracts,
         "sqlite_file": system_paths.sqlite_file,
-        "vector_dir": system_paths.lancedb_dir,
+        "vector_root_dir": system_paths.vector_root_dir,
         "schema_version": system_paths.schema_version,
     }
     missing_paths = [
@@ -132,6 +138,9 @@ def execute(
     indexing_payload, indexing_check = _indexing_diagnostics(request.project_path, request.branch_name)
     checks.append(indexing_check)
 
+    embeddings_payload, embeddings_check = _embeddings_diagnostics(request.project_path)
+    checks.append(embeddings_check)
+
     lease_payload, lease_check = _lease_diagnostics(request.project_path, request.branch_name)
     checks.append(lease_check)
 
@@ -163,6 +172,46 @@ def execute(
         request.project_path,
         branch_name=request.branch_name,
         limit=10,
+    )
+    semantic_integrity = build_semantic_integrity(
+        request.project_path,
+        branch_name=request.branch_name,
+    )
+    checks.append(
+        _semantic_integrity_check(
+            "semantic_integrity_branch",
+            semantic_integrity["branch"],
+            ok_summary="branch semantic integrity is healthy",
+            warn_summary="branch semantic integrity requires attention",
+            error_summary="branch semantic integrity has canonical or projection mismatches",
+        )
+    )
+    checks.append(
+        _semantic_integrity_check(
+            "semantic_integrity_project",
+            semantic_integrity["project"],
+            ok_summary="project semantic integrity is healthy",
+            warn_summary="project semantic integrity requires attention",
+            error_summary="project semantic integrity has canonical record mismatches",
+        )
+    )
+    checks.append(
+        _semantic_integrity_check(
+            "semantic_integrity_active_namespace",
+            semantic_integrity["active_vector_namespace"],
+            ok_summary="active semantic namespace matches canonical semantic records",
+            warn_summary="active semantic namespace requires attention",
+            error_summary="active semantic namespace contains stale or mismatched semantic chunks",
+        )
+    )
+    checks.append(
+        _semantic_integrity_check(
+            "semantic_integrity_inactive_namespaces",
+            semantic_integrity["inactive_vector_namespaces"],
+            ok_summary="inactive semantic namespaces have no semantic residue",
+            warn_summary="inactive semantic namespaces still contain semantic residue",
+            error_summary="inactive semantic namespaces have integrity problems",
+        )
     )
     projection_health = observability["projection_health"]
     stale_projection_details = [item["summary"] for item in projection_health["stale_projections"][:10]]
@@ -263,9 +312,11 @@ def execute(
             "vector": vector_payload,
             "generated_views": generated_views,
             "indexing": indexing_payload,
+            "embeddings_status": embeddings_payload,
             "writer_leases": lease_payload,
             "runtime_proposals": proposal_payload,
             "coordinator": coordinator_payload,
+            "semantic_integrity": semantic_integrity,
             "observability": observability,
         }
     )
@@ -327,14 +378,26 @@ def _db_diagnostics(project_path: Path) -> tuple[dict[str, Any], dict[str, Any]]
 def _vector_diagnostics(project_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     store = MemoryStore(project_path)
     payload = store.describe_vector_index()
-    payload["vector_dir"] = str(store.paths.lancedb_dir.relative_to(project_path))
-    if not store.paths.lancedb_dir.exists():
+    payload["vector_dir"] = str(store.paths.active_vector_namespace_dir.relative_to(project_path))
+    payload["vector_root_dir"] = str(store.paths.vector_root_dir.relative_to(project_path))
+    payload["legacy_flat_layout"] = has_legacy_flat_vector_layout(project_path, root_dir=store.paths.vector_root_dir)
+    if not store.paths.vector_root_dir.exists():
         return (
             payload,
             _make_check(
                 "vector",
                 "error",
-                "vector index directory is missing",
+                "vector index root directory is missing",
+                [payload["vector_root_dir"]],
+            ),
+        )
+    if not store.paths.active_vector_namespace_dir.exists():
+        return (
+            payload,
+            _make_check(
+                "vector",
+                "error",
+                "active vector namespace directory is missing",
                 [payload["vector_dir"]],
             ),
         )
@@ -345,6 +408,9 @@ def _vector_diagnostics(project_path: Path) -> tuple[dict[str, Any], dict[str, A
         if required_table not in table_names:
             status = "warn"
             details.append(f"missing vector table: {required_table}")
+    if payload["legacy_flat_layout"]:
+        status = "warn"
+        details.append("legacy flat vector layout detected; run `madspec memory reindex` to rebuild the active namespace")
     summary = "vector index backend is available"
     if status == "warn":
         summary = "vector index backend is available but some tables are missing"
@@ -388,6 +454,52 @@ def _indexing_diagnostics(project_path: Path, branch_name: str) -> tuple[dict[st
     if status == "warn":
         summary = "index queue requires attention"
     return payload, _make_check("indexing", status, summary, details)
+
+
+def _embeddings_diagnostics(project_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    configured = resolve_configured_embeddings(project_path).to_status_payload(project_path)
+    index_state = build_reindex_status(project_path)
+    payload = {
+        "configured_embeddings": configured,
+        "index_state": index_state,
+    }
+    provider = configured.get("provider")
+    cache_status = configured.get("status")
+    cache_message = ((configured.get("bootstrap") or {}).get("message")) or configured.get("message")
+    details: list[str] = []
+    probable_cause: str | None = None
+    repair_hint: str | None = None
+    status = "ok"
+    summary = "configured embeddings cache and active index are ready"
+
+    if provider != "hash" and cache_status in {"missing", "corrupted"}:
+        status = "error"
+        summary = "configured embeddings cache is not ready"
+        details.append(f"cache status: {cache_status}")
+        if cache_message:
+            details.append(str(cache_message))
+        probable_cause = "The configured dense model is missing from the project cache or the cache metadata is invalid."
+        repair_hint = "Run `madspec memory bootstrap-model`, then `madspec memory reindex`."
+    elif index_state.get("reindexRequired"):
+        status = "warn"
+        summary = "active embeddings configuration still requires a confirmed reindex"
+        details.append(str(index_state.get("message") or "Run `madspec memory reindex` to confirm the active namespace."))
+        last_namespace = index_state.get("lastIndexedNamespace")
+        if isinstance(last_namespace, dict):
+            details.append(f"last indexed namespace: {last_namespace.get('path')}")
+        repair_hint = str(index_state.get("nextAction") or "Run `madspec memory reindex` to confirm the active namespace.")
+
+    return (
+        payload,
+        _make_check(
+            "embeddings",
+            status,
+            summary,
+            details,
+            probable_cause=probable_cause,
+            repair_hint=repair_hint,
+        ),
+    )
 
 
 def _lease_diagnostics(project_path: Path, branch_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -585,3 +697,30 @@ def _make_check(
     if repair_hint is not None:
         payload["repair_hint"] = repair_hint
     return payload
+
+
+def _semantic_integrity_check(
+    name: str,
+    section: dict[str, Any],
+    *,
+    ok_summary: str,
+    warn_summary: str,
+    error_summary: str,
+) -> dict[str, Any]:
+    issues = list(section.get("issues") or [])
+    status = str(section.get("status") or "ok")
+    summary = ok_summary
+    if status == "warn":
+        summary = warn_summary
+    elif status == "error":
+        summary = error_summary
+    probable_cause = issues[0]["probable_cause"] if issues else None
+    repair_hint = issues[0]["repair_hint"] if issues else None
+    return _make_check(
+        name,
+        status,
+        summary,
+        [item["summary"] for item in issues[:10]],
+        probable_cause=probable_cause,
+        repair_hint=repair_hint,
+    )

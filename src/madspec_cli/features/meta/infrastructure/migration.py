@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from madspec_cli.memory import consolidate_branch_memory, ensure_memory_layout
+from madspec_cli.memory.shared.storage import ensure_memory_layout
+from madspec_cli.memory.views import consolidate_branch_memory
 from madspec_cli.shared.infra.project_config import create_madspec_config, ensure_branch_dir
 
 

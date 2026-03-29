@@ -6,6 +6,7 @@ from typing import Any
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
+from .branch_state import refresh_branch_state
 from .proposal_guard import guard_direct_runtime_write
 from ..shared.storage import ensure_memory_layout
 from ..workflow.implementation import checkpoint_implementation_step, complete_implementation_step, start_implementation_step
@@ -46,6 +47,12 @@ def start(request: ImplementationStepRequest) -> ImplementationStepResult:
         expected_revision=request.expected_revision,
         **request.options,
     )
+    if payload.get("accepted", True):
+        refresh_branch_state(
+            request.project_path,
+            request.branch_name,
+            stage=request.stage,
+        )
     return ImplementationStepResult(payload=payload)
 
 
@@ -67,6 +74,12 @@ def checkpoint(request: ImplementationStepRequest) -> ImplementationStepResult:
         expected_revision=request.expected_revision,
         **request.options,
     )
+    if payload.get("accepted", True):
+        refresh_branch_state(
+            request.project_path,
+            request.branch_name,
+            stage=request.stage,
+        )
     return ImplementationStepResult(payload=payload)
 
 
@@ -88,4 +101,10 @@ def complete(request: ImplementationStepRequest) -> ImplementationStepResult:
         expected_revision=request.expected_revision,
         **request.options,
     )
+    if payload.get("accepted", True):
+        refresh_branch_state(
+            request.project_path,
+            request.branch_name,
+            stage=request.stage,
+        )
     return ImplementationStepResult(payload=payload)

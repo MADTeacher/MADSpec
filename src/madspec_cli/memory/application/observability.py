@@ -8,9 +8,12 @@ if TYPE_CHECKING:
     from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator
 from ..shared.system_store.canonical_state import load_canonical_branch_state
 from ..shared.system_store.constants import SYSTEM_SESSION_KEY
+from ..shared.system_store.layout import build_reindex_status, get_system_memory_paths
+from ..shared.system_store.provider_factory import resolve_configured_embeddings
 from ..shared.system_store.store import MemoryStore
 from ..shared.validation import validate_branch_memory
 from ..shared.validation_views import validate_generated_stage_views
+from .semantic_integrity import build_semantic_integrity, semantic_integrity_summary
 
 _SNAPSHOT_KEY_TO_PATH = {
     "progress": "progress",
@@ -41,6 +44,7 @@ def build_runtime_observability(
     stage: str | None = None,
     step_id: str | None = None,
     limit: int = 5,
+    semantic_runtime: dict[str, Any] | None = None,
     _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
     store = MemoryStore(project_path)
@@ -82,6 +86,15 @@ def build_runtime_observability(
         coordination=coordination,
         sessions=sessions,
     )
+    embeddings = _embeddings_observability(
+        project_path,
+        semantic_runtime=semantic_runtime,
+    )
+    semantic_integrity = build_semantic_integrity(
+        project_path,
+        branch_name=branch_name,
+    )
+    semantic_summary = semantic_integrity_summary(semantic_integrity)
     shared_branch_state = {
         "branch": branch_name,
         "runtime_revision": canonical.runtime_revision,
@@ -105,6 +118,7 @@ def build_runtime_observability(
         "active_leases": active_leases,
         "proposal_state": proposal_state,
         "conflict_state": conflict_state,
+        "embeddings": embeddings,
         "ownership_state": {
             "task": coordination.get("task"),
             "work_item": coordination.get("work_item"),
@@ -113,6 +127,7 @@ def build_runtime_observability(
         },
         "projection_health": projection_health,
         "orphan_sessions": orphan_sessions,
+        "semantic_integrity": semantic_summary,
         "summary": {
             "stage": stage,
             "step_id": step_id,
@@ -123,9 +138,46 @@ def build_runtime_observability(
             "pending_proposal_count": proposal_state["pending_count"],
             "unresolved_proposal_conflict_count": proposal_state["conflict_count"],
             "conflict_count": conflict_state["summary"]["total_conflicts"],
+            "embeddings_provider": ((embeddings.get("configured_embeddings") or {}).get("provider")),
+            "embeddings_model": ((embeddings.get("configured_embeddings") or {}).get("model")),
+            "embeddings_ready": ((embeddings.get("configured_embeddings") or {}).get("ready")),
+            "embeddings_reindex_required": bool((embeddings.get("index_state") or {}).get("reindexRequired")),
+            "semantic_outcome": embeddings.get("semantic_outcome"),
             "projection_status": projection_health["status"],
+            **semantic_summary,
         },
     }
+
+
+def _embeddings_observability(
+    project_path: Path,
+    *,
+    semantic_runtime: dict[str, Any] | None,
+) -> dict[str, Any]:
+    configured_embeddings = resolve_configured_embeddings(project_path).to_status_payload(project_path)
+    active_namespace = get_system_memory_paths(project_path).active_vector_namespace.to_payload(project_path)
+    index_state = build_reindex_status(project_path)
+    if semantic_runtime is None:
+        return {
+            "configured_embeddings": configured_embeddings,
+            "active_vector_namespace": active_namespace,
+            "index_state": index_state,
+            "semantic_requested": False,
+            "semantic_used": False,
+            "semantic_outcome": "skipped",
+            "runtime_provider": None,
+            "provider_error": None,
+        }
+    payload = dict(semantic_runtime)
+    payload.setdefault("configured_embeddings", configured_embeddings)
+    payload.setdefault("active_vector_namespace", active_namespace)
+    payload.setdefault("index_state", index_state)
+    payload.setdefault("semantic_requested", False)
+    payload.setdefault("semantic_used", False)
+    payload.setdefault("semantic_outcome", "skipped")
+    payload.setdefault("runtime_provider", None)
+    payload.setdefault("provider_error", None)
+    return payload
 
 
 def _current_session_state(

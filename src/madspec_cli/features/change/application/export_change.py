@@ -7,7 +7,8 @@ from pathlib import Path
 from madspec_cli.memory.shared.storage import now_iso
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import append_change_history, export_change_bundle, save_change_state
+from ..infrastructure.export import export_change_bundle
+from ..infrastructure.repository import append_change_history, save_change_state
 from .shared import refresh_bundle_content_hashes, require_change_state
 
 

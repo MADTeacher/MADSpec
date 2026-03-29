@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import json
 
-from madspec_cli.memory import append_jsonl, get_memory_paths, make_record, write_json
+from madspec_cli.memory.domain.conflicts import PROJECT_MEMORY_BRANCH
+from madspec_cli.memory.shared.records import make_record
+from madspec_cli.memory.shared.storage import append_jsonl, get_memory_paths, write_json
 from madspec_cli.memory.shared.system_store.canonical_state import load_canonical_branch_state
+from madspec_cli.memory.shared.system_store.layout import resolve_vector_namespace
+from madspec_cli.memory.shared.system_store.model_bootstrap import resolve_model_cache_root
 from madspec_cli.memory.shared.system_store.sessions import save_runtime_session
 from madspec_cli.memory.shared.system_store.store import MemoryStore
+from madspec_cli.memory.shared.system_store.vector import VectorMemoryIndex
 
-from tests.support import step_metadata, step_status
+from tests.support import step_metadata, step_status, sync_branch_state, write_madspec_config
 
 
 def _write_progress(paths, *, planned_steps: list[str], completed_steps: list[str]) -> None:
@@ -58,6 +63,64 @@ def _write_progress(paths, *, planned_steps: list[str], completed_steps: list[st
     )
 
 
+def _semantic_record(
+    branch_name: str,
+    stage: str,
+    semantic_kind: str,
+    summary: str,
+    *,
+    scope: str = "branch",
+    record_id: str | None = None,
+) -> dict[str, object]:
+    record = make_record(
+        branch_name,
+        stage,
+        "memory.promote",
+        summary,
+        status="validated",
+        semantic_kind=semantic_kind,
+        record_type=semantic_kind,
+        scope=scope,
+        metadata={"topic": summary},
+    )
+    if record_id is not None:
+        record["id"] = record_id
+    record["record_stream"] = {
+        "fact": "facts",
+        "decision": "decisions",
+        "contract": "contracts",
+    }[semantic_kind]
+    return record
+
+
+def _sync_paths(paths) -> None:
+    sync_branch_state(paths.branch_dir.parents[1], paths.branch_dir.name)
+
+
+def _inactive_semantic_chunk(namespace_dir, *, source_id: str, branch: str) -> None:
+    index = VectorMemoryIndex(namespace_dir, provider_kind="hash", model_key="default", revision="legacy", dimension=64)
+    index.upsert_chunks(
+        "memory_chunks",
+        [
+            {
+                "chunk_id": f"record:{source_id}:0",
+                "source_type": "record",
+                "source_id": source_id,
+                "branch": branch,
+                "stage": "mvp.plan",
+                "step_id": None,
+                "scope": "branch",
+                "status": "validated",
+                "kind": "fact",
+                "content_hash": f"hash-{source_id}",
+                "text": "inactive semantic residue",
+                "snippet": "inactive semantic residue",
+                "vector": [0.0] * 64,
+            }
+        ],
+    )
+
+
 def test_memory_why_next_step_and_explain_show_step_reasoning(init_memory_branch, invoke_cli) -> None:
     project_path = init_memory_branch(branch="main")
     paths = get_memory_paths(project_path, "main")
@@ -81,6 +144,7 @@ def test_memory_why_next_step_and_explain_show_step_reasoning(init_memory_branch
             )
         ],
     )
+    _sync_paths(paths)
 
     why_result = invoke_cli(
         ["memory", "why-next-step", "--branch", "main", "--stage", "mvp.implement", "--json-output"]
@@ -120,6 +184,8 @@ def test_memory_why_next_step_and_explain_show_step_reasoning(init_memory_branch
     assert "semantic_decision" in influence_kinds
     assert "recall_match" in influence_kinds
     assert explain_payload["observability"]["summary"]["projection_status"] in {"ok", "warn", "error"}
+    assert explain_payload["observability"]["summary"]["semantic_integrity_status"] in {"ok", "warn", "error"}
+    assert explain_payload["observability"]["summary"]["semantic_integrity_branch_issue_count"] >= 0
 
     why_text_result = invoke_cli(["memory", "why-next-step", "--branch", "main", "--stage", "mvp.implement"])
     assert why_text_result.exit_code == 0, why_text_result.stdout
@@ -140,6 +206,7 @@ def test_memory_explain_supports_session_local_focus(init_memory_branch, invoke_
     payload["stepStatus"]["step-01-bootstrap"] = step_status(status="in_progress", tdd_phase="green")
     payload["planningMetadata"]["lastPlannedStep"] = "step-02-auth-flow"
     write_json(paths.progress, payload)
+    _sync_paths(paths)
 
     load_canonical_branch_state(project_path, "main")
     save_runtime_session(
@@ -218,8 +285,8 @@ def test_memory_explain_supports_session_local_focus(init_memory_branch, invoke_
     assert impl_payload["summary"]["shared_current_implement_step"] == "step-01-bootstrap"
     assert planner_payload["summary"]["next_executable_step"] == "step-01-bootstrap"
     assert impl_payload["summary"]["next_executable_step"] == "step-01-bootstrap"
-    assert planner_payload["summary"]["last_planned_step"] == "step-03-billing"
-    assert planner_payload["summary"]["planning_phase"] == "incremental"
+    assert planner_payload["summary"]["last_planned_step"] == "step-02-auth-flow"
+    assert planner_payload["summary"]["planning_phase"] == "initial"
     assert planner_payload["summary"]["progress_metrics"]["p1Coverage"]["covered"] == 2
 
 
@@ -267,6 +334,10 @@ def test_memory_timeline_includes_progress_snapshot_and_retrieval_runs(init_memo
     categories = {item["category"] for item in timeline_payload["items"]}
     assert "shared_commit" in categories
     assert "session_event" in categories
+    retrieval_item = next(item for item in timeline_payload["items"] if item["source_type"] == "retrieval_run")
+    assert retrieval_item["provider"] == "hash"
+    assert retrieval_item["semantic_outcome"] == "used"
+    assert timeline_payload["observability"]["embeddings"]["configured_embeddings"]["provider"] == "hash"
     assert timeline_payload["observability"]["summary"]["projection_status"] in {"ok", "warn", "error"}
 
 
@@ -343,6 +414,7 @@ def test_memory_inspect_record_and_conflicts_report_index_and_integrity(init_mem
     )
     append_jsonl(paths.decisions, [inspected_record])
     append_jsonl(paths.facts, [conflicted_record])
+    _sync_paths(paths)
 
     reindex_result = invoke_cli(["memory", "reindex", "--branch", "main", "--json-output"])
     assert reindex_result.exit_code == 0, reindex_result.stdout
@@ -390,10 +462,37 @@ def test_memory_doctor_reports_healthy_state_and_generated_view_drift(init_memor
     assert healthy_result.exit_code == 0, healthy_result.stdout
     healthy_payload = json.loads(healthy_result.stdout)
     check_names = {item["name"] for item in healthy_payload["checks"]}
-    assert {"branch_layout", "integrity", "sqlite", "vector", "indexing", "generated_views"} <= check_names
+    assert {
+        "branch_layout",
+        "integrity",
+        "sqlite",
+        "vector",
+        "indexing",
+        "generated_views",
+        "semantic_integrity_branch",
+        "semantic_integrity_project",
+        "semantic_integrity_active_namespace",
+        "semantic_integrity_inactive_namespaces",
+    } <= check_names
     assert healthy_payload["status"] in {"ok", "warn"}
+    assert healthy_payload["semantic_integrity"]["status"] == "ok"
+    assert healthy_payload["semantic_integrity"]["summary"]["error_count"] == 0
     assert set(healthy_payload["db"]) >= {"exists", "sqlite_path", "tables"}
-    assert set(healthy_payload["vector"]) >= {"backend", "memory_chunk_count", "artifact_chunk_count"}
+    assert healthy_payload["observability"]["embeddings"]["configured_embeddings"]["provider"] == "hash"
+    assert healthy_payload["observability"]["semantic_integrity"]["semantic_integrity_status"] == "ok"
+    assert set(healthy_payload["vector"]) >= {
+        "backend",
+        "memory_chunk_count",
+        "artifact_chunk_count",
+        "vector_root_dir",
+        "vector_dir",
+        "active_vector_namespace",
+        "legacy_flat_layout",
+    }
+    assert healthy_payload["vector"]["vector_root_dir"] == ".madspec/system/memory/lancedb"
+    assert healthy_payload["vector"]["vector_dir"] == ".madspec/system/memory/lancedb/hash/default/current/64"
+    assert healthy_payload["vector"]["active_vector_namespace"] == ".madspec/system/memory/lancedb/hash/default/current/64"
+    assert healthy_payload["vector"]["legacy_flat_layout"] is False
 
     (project_path / ".madspec" / "main" / "concept.md").write_text("# Drifted concept\n", encoding="utf-8")
 
@@ -409,6 +508,229 @@ def test_memory_doctor_reports_healthy_state_and_generated_view_drift(init_memor
     doctor_text_result = invoke_cli(["memory", "doctor", "--branch", "main"])
     assert doctor_text_result.exit_code == 1, doctor_text_result.stdout
     assert "Overall status:" in doctor_text_result.stdout
+
+
+def test_memory_doctor_reports_semantic_branch_projection_drift(init_memory_branch, invoke_cli) -> None:
+    project_path = init_memory_branch(branch="main")
+    store = MemoryStore(project_path)
+    paths = get_memory_paths(project_path, "main")
+    fact = _semantic_record("main", "mvp.plan", "fact", "Canonical semantic fact")
+    store.upsert_records_batch([fact])
+
+    paths.facts.write_text("", encoding="utf-8")
+
+    result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+
+    assert result.exit_code == 1, result.stdout
+    payload = json.loads(result.stdout)
+    branch_issues = payload["semantic_integrity"]["branch"]["issues"]
+    assert any(item["code"] == "semantic_branch_projection_drift" for item in branch_issues)
+    checks = {item["name"]: item for item in payload["checks"]}
+    assert checks["semantic_integrity_branch"]["status"] == "error"
+
+
+def test_memory_doctor_reports_project_semantic_shape_and_id_mismatch(init_memory_branch, invoke_cli) -> None:
+    project_path = init_memory_branch(branch="main")
+    store = MemoryStore(project_path)
+    project_record = _semantic_record(
+        PROJECT_MEMORY_BRANCH,
+        "mvp.plan",
+        "decision",
+        "Broken promoted project decision",
+        scope="branch",
+        record_id="manual-project-record-id",
+    )
+    store.upsert_records_batch([project_record])
+
+    result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+
+    assert result.exit_code == 1, result.stdout
+    payload = json.loads(result.stdout)
+    project_issues = payload["semantic_integrity"]["project"]["issues"]
+    issue_codes = {item["code"] for item in project_issues}
+    assert "semantic_project_id_mismatch" in issue_codes
+    assert "semantic_project_scope_mismatch" in issue_codes
+    checks = {item["name"]: item for item in payload["checks"]}
+    assert checks["semantic_integrity_project"]["status"] == "error"
+
+
+def test_memory_doctor_reports_semantic_active_chunk_orphan(init_memory_branch, invoke_cli) -> None:
+    project_path = init_memory_branch(branch="main")
+    store = MemoryStore(project_path)
+    fact = _semantic_record("main", "mvp.plan", "fact", "Index me before orphaning")
+    store.upsert_records_batch([fact])
+    store.process_pending_jobs(rebuild=True, limit=500)
+    store.delete_records([str(fact["id"])])
+
+    result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+
+    assert result.exit_code == 1, result.stdout
+    payload = json.loads(result.stdout)
+    active_issues = payload["semantic_integrity"]["active_vector_namespace"]["issues"]
+    assert any(item["code"] == "semantic_active_chunk_orphan" for item in active_issues)
+    checks = {item["name"]: item for item in payload["checks"]}
+    assert checks["semantic_integrity_active_namespace"]["status"] == "error"
+
+
+def test_memory_doctor_warns_about_inactive_semantic_namespace_residue(init_memory_branch, invoke_cli) -> None:
+    project_path = init_memory_branch(branch="main")
+    inactive_namespace = resolve_vector_namespace(
+        project_path,
+        provider="hash",
+        model="default",
+        revision="legacy",
+        dimension=64,
+    )
+    _inactive_semantic_chunk(
+        inactive_namespace.namespace_dir,
+        source_id="ghost-semantic-record",
+        branch="main",
+    )
+
+    result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    inactive_issues = payload["semantic_integrity"]["inactive_vector_namespaces"]["issues"]
+    assert any(item["code"] == "semantic_inactive_namespace_residue" for item in inactive_issues)
+    assert payload["semantic_integrity"]["inactive_vector_namespaces"]["status"] == "warn"
+    assert any("madspec memory gc vector-namespaces" in item["repair_hint"] for item in inactive_issues)
+    checks = {item["name"]: item for item in payload["checks"]}
+    assert checks["semantic_integrity_inactive_namespaces"]["status"] == "warn"
+
+
+def test_memory_gc_vector_namespaces_dry_run_and_delete(init_memory_branch, invoke_cli) -> None:
+    project_path = init_memory_branch(branch="main")
+    inactive_namespace = resolve_vector_namespace(
+        project_path,
+        provider="hash",
+        model="default",
+        revision="legacy",
+        dimension=64,
+    )
+    _inactive_semantic_chunk(
+        inactive_namespace.namespace_dir,
+        source_id="ghost-semantic-record",
+        branch="main",
+    )
+
+    dry_run = invoke_cli(["memory", "gc", "vector-namespaces", "--dry-run", "--json-output"])
+    assert dry_run.exit_code == 0, dry_run.stdout
+    dry_payload = json.loads(dry_run.stdout)
+    assert dry_payload["dry_run"] is True
+    assert dry_payload["candidates"][0]["path"] == str(inactive_namespace.namespace_dir.relative_to(project_path))
+    assert dry_payload["candidates"][0]["semantic_chunk_count"] > 0
+    assert inactive_namespace.namespace_dir.exists()
+
+    gc_result = invoke_cli(["memory", "gc", "vector-namespaces", "--json-output"])
+    assert gc_result.exit_code == 0, gc_result.stdout
+    gc_payload = json.loads(gc_result.stdout)
+    assert gc_payload["deleted_namespaces"] == [str(inactive_namespace.namespace_dir.relative_to(project_path))]
+    assert gc_payload["deleted_chunk_count"] > 0
+    assert not inactive_namespace.namespace_dir.exists()
+
+    doctor_result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+    assert doctor_result.exit_code == 0, doctor_result.stdout
+    doctor_payload = json.loads(doctor_result.stdout)
+    assert doctor_payload["semantic_integrity"]["inactive_vector_namespaces"]["issues"] == []
+
+
+def test_memory_doctor_warns_about_legacy_flat_vector_layout(init_memory_branch, invoke_cli) -> None:
+    project_path = init_memory_branch(branch="main")
+    legacy_root = project_path / ".madspec" / "system" / "memory" / "lancedb"
+    (legacy_root / "memory_chunks.jsonl").write_text("", encoding="utf-8")
+
+    result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["vector"]["legacy_flat_layout"] is True
+    checks = {item["name"]: item for item in payload["checks"]}
+    assert checks["vector"]["status"] == "warn"
+    assert any("legacy flat vector layout detected" in detail for detail in checks["vector"]["details"])
+
+
+def test_memory_doctor_reports_missing_dense_model_cache(tmp_path, monkeypatch, invoke_cli, init_memory_branch) -> None:
+    project_path = tmp_path / "dense-missing"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    config_path = project_path / ".madspec" / "config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["memory"] = {
+        "embeddings": {
+            "provider": "local-hf-onnx",
+            "model": "multilingual-e5-small",
+            "downloadPolicy": "none",
+            "cacheDir": ".madspec/system/models",
+            "revision": None,
+        }
+    }
+    config_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+
+    assert result.exit_code == 1, result.stdout
+    doctor_payload = json.loads(result.stdout)
+    embeddings_check = {item["name"]: item for item in doctor_payload["checks"]}["embeddings"]
+    assert embeddings_check["status"] == "error"
+    assert doctor_payload["embeddings_status"]["configured_embeddings"]["status"] == "missing"
+    assert embeddings_check["repair_hint"] == "Run `madspec memory bootstrap-model`, then `madspec memory reindex`."
+
+
+def test_memory_doctor_warns_when_active_namespace_needs_reindex(tmp_path, monkeypatch, invoke_cli, init_memory_branch) -> None:
+    project_path = tmp_path / "dense-reindex"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    reindex_result = invoke_cli(["memory", "reindex", "--branch", "main", "--json-output"])
+    assert reindex_result.exit_code == 0, reindex_result.stdout
+
+    config_path = project_path / ".madspec" / "config.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["memory"] = {
+        "embeddings": {
+            "provider": "local-hf-onnx",
+            "model": "multilingual-e5-small",
+            "downloadPolicy": "on-first-use",
+            "cacheDir": ".madspec/system/models",
+            "revision": None,
+        }
+    }
+    config_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    cache_root = resolve_model_cache_root(project_path, ".madspec/system/models", "multilingual-e5-small", None)
+    snapshot_dir = cache_root / "snapshot"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    (snapshot_dir / "model.onnx").write_text("placeholder", encoding="utf-8")
+    (cache_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "providerKind": "local-hf-onnx",
+                "modelKey": "multilingual-e5-small",
+                "requestedRevision": None,
+                "resolvedRevision": "current",
+                "hfRepoId": "intfloat/multilingual-e5-small",
+                "dimension": 384,
+                "localPath": str(snapshot_dir.relative_to(project_path)),
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = invoke_cli(["memory", "doctor", "--branch", "main", "--json-output"])
+
+    assert result.exit_code == 0, result.stdout
+    doctor_payload = json.loads(result.stdout)
+    embeddings_check = {item["name"]: item for item in doctor_payload["checks"]}["embeddings"]
+    assert embeddings_check["status"] == "warn"
+    assert doctor_payload["embeddings_status"]["configured_embeddings"]["status"] == "ready"
+    assert doctor_payload["embeddings_status"]["index_state"]["reindexRequired"] is True
+    assert doctor_payload["embeddings_status"]["index_state"]["reason"] == "namespace_mismatch"
 
 
 def test_memory_doctor_reports_active_and_expired_writer_leases(init_memory_branch, invoke_cli) -> None:

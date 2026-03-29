@@ -9,6 +9,7 @@ from madspec_cli.shared.kernel.result import PayloadResult
 if TYPE_CHECKING:
     from madspec_cli.shared.kernel.ports import GateEvaluator, GateFailureExtractor
 
+from .branch_state import refresh_branch_state
 from .proposal_guard import guard_direct_runtime_write
 from ..semantic.checkpoint import checkpoint_stage_memory
 
@@ -85,4 +86,10 @@ def execute(
         expected_revision=request.expected_revision,
         **request.options,
     )
+    if payload.get("accepted", True):
+        refresh_branch_state(
+            request.project_path,
+            request.branch_name,
+            stage=request.stage,
+        )
     return CheckpointStageResult(payload=payload)

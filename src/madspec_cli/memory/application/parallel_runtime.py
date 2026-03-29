@@ -7,7 +7,7 @@ from typing import Any
 from madspec_cli.shared.infra.project_config import normalize_parallel_runtime_policy, read_madspec_config
 
 
-PHASE2_OPT_IN_MESSAGE = "Phase 2 coordinator runtime is opt-in"
+PHASE2_DISABLED_MESSAGE = "Phase 2 coordinator runtime is disabled for this project"
 PHASE2_OPT_IN_GUIDANCE = "Enable parallelRuntime.phase2Enabled=true in .madspec/config.json"
 
 
@@ -48,7 +48,7 @@ def require_phase2_enabled(
     return {
         "accepted": False,
         "reason": "phase2_disabled",
-        "message": PHASE2_OPT_IN_MESSAGE,
+        "message": PHASE2_DISABLED_MESSAGE,
         "guidance": PHASE2_OPT_IN_GUIDANCE,
         "command": command_name,
         "parallel_runtime": policy.to_payload(),

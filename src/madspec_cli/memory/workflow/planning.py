@@ -4,16 +4,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..domain.workflow_rules import validate_register_step_rules
 from ..domain.progress import explain_next_executable_step
 
 if TYPE_CHECKING:
     from madspec_cli.shared.kernel.ports import BranchPolicyEvaluator
 from ..shared.progress_utils import (
     _compute_progress_metrics,
-    _normalize_function_label,
     extract_function_catalog,
 )
-from ..shared.records import STEP_ID_PATTERN, make_record
+from ..shared.records import make_record
 from ..shared.storage import (
     _default_progress_state,
     _default_step_coverage,
@@ -101,17 +101,6 @@ def _catalog_source_name(stage: str) -> str:
     return "feature.init.json" if "feature." in stage.lower() else "mvp.concept.json"
 
 
-def _known_function_samples(catalog: dict[str, list[str]], limit: int = 5) -> str:
-    values: list[str] = []
-    for priority in ("p1", "p2", "p3"):
-        for item in catalog.get(priority, []):
-            if item not in values:
-                values.append(item)
-            if len(values) >= limit:
-                return ", ".join(values)
-    return ", ".join(values)
-
-
 def determine_next_step(
     project_path: Path,
     branch_name: str,
@@ -123,28 +112,23 @@ def determine_next_step(
     _evaluate_branch_policies: BranchPolicyEvaluator | None = None,
 ) -> dict[str, Any]:
     progress = load_canonical_branch_state(project_path, branch_name).progress
-    planned_steps = progress.get("plannedSteps", [])
-    completed_steps = set(progress.get("completedSteps", []))
     step_dependencies = progress.get("planningMetadata", {}).get("stepDependencies", {})
 
     if candidate_step:
-        errors: list[str] = []
         normalized_dependencies = candidate_dependencies or []
-        if not STEP_ID_PATTERN.match(candidate_step):
-            errors.append("candidate step id must match step-XX-kebab-case")
-        if candidate_step in planned_steps:
-            errors.append("candidate step id already exists in plannedSteps")
-        if len(set(normalized_dependencies)) != len(normalized_dependencies):
-            errors.append("candidate dependencies must be unique")
-        for dependency in normalized_dependencies:
-            if dependency not in planned_steps:
-                errors.append(f"dependency '{dependency}' is not present in plannedSteps")
-            elif not allow_completed_dependencies and dependency in completed_steps:
-                errors.append(
-                    f"dependency '{dependency}' is already completed and not allowed by current policy"
-                )
-        if candidate_step in normalized_dependencies:
-            errors.append("candidate step cannot depend on itself")
+        report = validate_register_step_rules(
+            progress=progress,
+            step_id=candidate_step,
+            step_kind="non-code",
+            tdd_policy="not-applicable",
+            waiver_reason=None,
+            depends_on=normalized_dependencies,
+            covers=[],
+            catalog={},
+            catalog_source="mvp.concept.json",
+            allow_completed_dependencies=allow_completed_dependencies,
+        )
+        errors = list(report.errors)
 
         if _evaluate_branch_policies is None:
             from madspec_cli.features.policy.application.common import evaluate_branch_policies
@@ -373,78 +357,30 @@ def register_planned_step(
             errors=decision["errors"],
         ).to_payload()
 
-    if step_kind not in {"code", "non-code"}:
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=["step kind must be one of: code, non-code"],
-        ).to_payload()
-
-    effective_tdd_policy = tdd_policy
-    if effective_tdd_policy is None:
-        if step_kind == "code":
-            effective_tdd_policy = "required"
-        elif waiver_reason:
-            effective_tdd_policy = "waived"
-        else:
-            effective_tdd_policy = "not-applicable"
-
-    if effective_tdd_policy not in {"required", "waived", "not-applicable"}:
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=["tdd policy must be one of: required, waived, not-applicable"],
-        ).to_payload()
-
-    if step_kind == "code" and effective_tdd_policy != "required":
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=["code steps must use the required TDD policy"],
-        ).to_payload()
-
-    if step_kind == "non-code" and effective_tdd_policy == "required":
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=["non-code steps cannot use the required TDD policy"],
-        ).to_payload()
-
-    if effective_tdd_policy == "waived" and not waiver_reason:
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=["waiver reason is required when TDD policy is waived"],
-        ).to_payload()
-
-    if effective_tdd_policy != "waived" and waiver_reason is not None:
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=["waiver reason is only allowed when TDD policy is waived"],
-        ).to_payload()
-
-    normalized_covers = [_normalize_function_label(item) for item in covers]
-    normalized_covers = [item for item in normalized_covers if item]
-
-    if step_kind == "code" and not normalized_covers:
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=["code steps must declare at least one covered function"],
-        ).to_payload()
-
     catalog = extract_function_catalog(project_path, branch_name, stage)
     catalog_source = _catalog_source_name(stage)
+    rule_report = validate_register_step_rules(
+        progress=progress,
+        step_id=step_id,
+        step_kind=step_kind,
+        tdd_policy=tdd_policy,
+        waiver_reason=waiver_reason,
+        depends_on=depends_on,
+        covers=covers,
+        catalog=catalog,
+        catalog_source=catalog_source,
+    )
+    if rule_report.errors:
+        return RegisterStepResult(
+            accepted=False,
+            step_id=step_id,
+            errors=rule_report.errors,
+        ).to_payload()
+    effective_tdd_policy = rule_report.normalized["effective_tdd_policy"]
+    normalized_covers = rule_report.normalized["normalized_covers"]
     known_functions = {
         item: priority for priority, items in catalog.items() for item in items
     }
-    if not known_functions and normalized_covers:
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=[f"no functions catalog found in {catalog_source} for the target stage"],
-        ).to_payload()
 
     if _evaluate_branch_policies is None:
         from madspec_cli.features.policy.application.common import evaluate_branch_policies
@@ -470,17 +406,6 @@ def register_planned_step(
             errors=[item["message"] for item in policy_payload["violations"]],
         ).to_payload()
 
-    unknown = [item for item in normalized_covers if item not in known_functions]
-    if unknown:
-        choices = _known_function_samples(catalog)
-        suggestion = f" Known labels from {catalog_source}: {choices}" if choices else ""
-        return RegisterStepResult(
-            accepted=False,
-            step_id=step_id,
-            errors=[
-                f"unknown covered functions in {catalog_source}: {', '.join(unknown)}.{suggestion}"
-            ],
-        ).to_payload()
     projection_meta = commit_runtime_mutation(
         project_path,
         branch_name=branch_name,

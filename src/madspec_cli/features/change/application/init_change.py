@@ -5,7 +5,11 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import ensure_change_layout, resolve_base_revision, resolve_default_base_branch
+from madspec_cli.features.change.infrastructure.git_ops import (
+    resolve_base_revision,
+    resolve_default_base_branch,
+)
+from ..infrastructure.service import ensure_change_layout
 
 
 @dataclass(frozen=True)

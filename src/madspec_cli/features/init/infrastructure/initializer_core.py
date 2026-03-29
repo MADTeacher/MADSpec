@@ -10,8 +10,10 @@ from typing import Callable
 
 import httpx
 
-from madspec_cli.memory import consolidate_branch_memory, ensure_memory_layout, validate_branch_memory
-from madspec_cli.shared.infra.project_config import create_madspec_config, ensure_branch_dir
+from madspec_cli.memory.application.branch_state import BootstrapBranchStateRequest, bootstrap_branch_state, refresh_branch_state
+from madspec_cli.memory.shared.validation import validate_branch_memory
+from madspec_cli.memory.shared.system_store.model_bootstrap import ensure_model_available
+from madspec_cli.memory.shared.system_store.provider_factory import resolve_configured_embeddings
 from madspec_cli.shared.infra.github_client import (
     DEFAULT_SSL_CONTEXT,
     ReleaseAsset,
@@ -32,6 +34,7 @@ class InitResult:
     branch_name: str | None
     git_error_message: str | None
     config_error_message: str | None
+    memory_bootstrap: dict[str, object] | None = None
 
 
 def _emit_progress(
@@ -245,6 +248,7 @@ def initialize_project(
     project_path: Path,
     *,
     selected_ai: str,
+    memory_embeddings: dict[str, object] | None,
     here: bool,
     no_git: bool,
     should_init_git: bool,
@@ -258,6 +262,7 @@ def initialize_project(
     git_error_message: str | None = None
     config_error_message: str | None = None
     branch_name: str | None = None
+    memory_bootstrap: dict[str, object] | None = None
 
     download_and_extract_template(
         project_path,
@@ -277,13 +282,30 @@ def initialize_project(
     _emit_progress(emit_progress, "start", "madspec-config")
     try:
         branch_name = get_current_branch(project_path)
-        create_madspec_config(project_path, branch_name, agent_environment=selected_ai)
-        ensure_branch_dir(project_path, branch_name)
-        ensure_memory_layout(project_path, branch_name)
+        bootstrap_branch_state(
+            BootstrapBranchStateRequest(
+                project_path=project_path,
+                branch_name=branch_name,
+                agent_environment=selected_ai,
+                memory_embeddings=memory_embeddings,
+            )
+        )
+        embeddings_config = dict(memory_embeddings or {})
+        provider = str(embeddings_config.get("provider") or "hash")
+        download_policy = str(embeddings_config.get("downloadPolicy") or "none")
+        if provider == "local-hf-onnx" and download_policy == "on-init":
+            _emit_progress(emit_progress, "start", "memory-bootstrap", str(embeddings_config.get("model") or "dense"))
+            ensure_model_available(project_path, embeddings_config, allow_download=True)
+            _emit_progress(emit_progress, "complete", "memory-bootstrap", "downloaded")
+        elif provider == "local-hf-onnx":
+            _emit_progress(emit_progress, "skip", "memory-bootstrap", "deferred")
+        else:
+            _emit_progress(emit_progress, "skip", "memory-bootstrap", "not required")
+        memory_bootstrap = resolve_configured_embeddings(project_path).to_status_payload(project_path)
         ensure_policy_layout(project_path)
         agents_state, _ = ensure_agents_layout(project_path, environment_id=selected_ai)
         render_workspace_agents(project_path, agents_state)
-        consolidate_branch_memory(project_path, branch_name)
+        refresh_branch_state(project_path, branch_name, full=True)
         init_policy_payload = evaluate_branch_policies(
             project_path,
             branch_name,
@@ -324,4 +346,5 @@ def initialize_project(
         branch_name=branch_name,
         git_error_message=git_error_message,
         config_error_message=config_error_message,
+        memory_bootstrap=memory_bootstrap,
     )

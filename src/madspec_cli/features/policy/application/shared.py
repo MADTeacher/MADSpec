@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from ..infrastructure.storage import load_policy_state, list_policy_proposals, normalize_policy_payload, now_iso
+from ..infrastructure.normalization import normalize_policy_payload, now_iso
+from ..infrastructure.repository import list_policy_proposals, load_policy_state
 
 
 def find_policy(project_path, policy_id: str) -> dict[str, Any] | None:

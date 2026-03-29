@@ -6,14 +6,10 @@ from typing import Any
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import (
-    build_git_diff,
-    build_manifest_hash,
-    build_snapshot_diff,
-    capture_branch_snapshot,
-    get_change_paths,
-    render_change_summary_markdown,
-)
+from madspec_cli.features.change.infrastructure.git_ops import build_git_diff
+from ..infrastructure.paths import get_change_paths
+from ..infrastructure.rendering import render_change_summary_markdown
+from ..infrastructure.snapshot import build_manifest_hash, build_snapshot_diff, capture_branch_snapshot
 from .shared import build_change_bundle, require_change_state
 
 

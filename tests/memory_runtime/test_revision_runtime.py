@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from madspec_cli.memory.shared.storage import get_memory_paths
-from madspec_cli.memory.shared.system_store import build_runtime_snapshot_specs, load_canonical_branch_state
+from madspec_cli.memory.shared.system_store.canonical_state import (
+    build_runtime_snapshot_specs,
+    load_canonical_branch_state,
+)
 from madspec_cli.memory.shared.system_store.runtime_mutations import RuntimeMutationPlan, commit_runtime_mutation
 from madspec_cli.memory.shared.system_store.store import MemoryStore
 from madspec_cli.memory.implementation import checkpoint_implementation_step, complete_implementation_step, start_implementation_step

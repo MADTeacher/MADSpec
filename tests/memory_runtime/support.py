@@ -9,6 +9,7 @@ from tests.support import (
     create_step_artifacts,
     step_metadata,
     step_status,
+    sync_branch_state,
     write_concept_markdown,
 )
 
@@ -50,6 +51,9 @@ class MemoryProjectHarness:
         ui_dir.mkdir(parents=True, exist_ok=True)
         for name in ("index.html", "schedule-board.html", "profile-studio.html", "export-hub.html"):
             (ui_dir / name).write_text(f"<html><body>{name}</body></html>\n", encoding="utf-8")
+
+    def sync(self, *, stage: str | None = None, full: bool = True) -> None:
+        sync_branch_state(self.project_path, self.branch, stage=stage, full=full)
 
 
 def bootstrap_memory_project(tmp_path: Path, branch: str = "main") -> MemoryProjectHarness:

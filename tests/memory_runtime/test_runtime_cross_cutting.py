@@ -6,18 +6,20 @@ from pathlib import Path
 import madspec_cli.memory.shared.system_store.runtime_mutations as runtime_mutations_module
 from madspec_cli.memory.application.consolidate_memory import ConsolidateMemoryRequest, execute as consolidate_memory
 from madspec_cli.memory import (
-    append_jsonl,
     capture_stage_memory,
     checkpoint_stage_memory,
     consolidate_branch_memory,
     learn_from_outcomes,
-    make_record,
     promote_validated_records,
     retrieve_memory_context,
     validate_branch_memory,
-    write_json,
 )
-from madspec_cli.memory.shared.system_store import bootstrap_branch_canonical_state, load_canonical_branch_state
+from madspec_cli.memory.shared.records import make_record
+from madspec_cli.memory.shared.storage import append_jsonl, write_json
+from madspec_cli.memory.shared.system_store.canonical_state import (
+    bootstrap_branch_canonical_state,
+    load_canonical_branch_state,
+)
 from madspec_cli.memory.shared.system_store.store import MemoryStore
 from tests.memory_runtime.support import step_metadata, step_status
 
@@ -101,6 +103,7 @@ def test_consolidate_is_deterministic_for_same_memory_state(memory_project) -> N
             )
         ],
     )
+    memory_project.sync()
 
     first_run = consolidate_branch_memory(memory_project.project_path, "main")
     snapshot_a = {
@@ -208,6 +211,7 @@ def test_promote_retrieve_and_learn_flow(memory_project) -> None:
             ),
         ],
     )
+    memory_project.sync()
 
     promoted = promote_validated_records(memory_project.project_path, "main")
     context = retrieve_memory_context(memory_project.project_path, "main", "mvp.plan")

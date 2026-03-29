@@ -8,13 +8,13 @@ from madspec_cli.memory import (
     register_planned_step,
     retrieve_memory_context,
     validate_branch_memory,
-    write_json,
 )
 from madspec_cli.memory.implementation import (
     checkpoint_implementation_step,
     complete_implementation_step,
     start_implementation_step,
 )
+from madspec_cli.memory.shared.storage import write_json
 from tests.memory_runtime.support import step_metadata, step_status
 
 
@@ -194,7 +194,7 @@ def test_ensure_memory_layout_normalizes_legacy_coverage_shape(memory_project) -
     )
 
     ensure_memory_layout(memory_project.project_path, "main")
-    consolidate_branch_memory(memory_project.project_path, "main")
+    memory_project.sync()
     progress = json.loads(paths["progress"].read_text(encoding="utf-8"))
 
     assert progress["coversFunctions"]["step-01-bootstrap"] == {"p1": [], "p2": [], "p3": []}
@@ -291,4 +291,3 @@ def test_validate_requires_waiver_reason_for_waived_step(memory_project) -> None
     errors = validate_branch_memory(memory_project.project_path, "main")
 
     assert any("waiverReason is required" in error for error in errors)
-

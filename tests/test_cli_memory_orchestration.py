@@ -229,7 +229,7 @@ def test_memory_work_item_dependency_blocks_claim_and_explain(tmp_path, monkeypa
     assert explain_payload["coordinator"]["readiness"]["status"] == "blocked"
 
 
-def test_phase2_cli_commands_are_opt_in_by_default(tmp_path, monkeypatch, invoke_cli, init_memory_branch) -> None:
+def test_phase2_cli_commands_are_available_by_default(tmp_path, monkeypatch, invoke_cli, init_memory_branch) -> None:
     project_path = tmp_path / "demo"
     project_path.mkdir()
     monkeypatch.chdir(project_path)
@@ -246,7 +246,39 @@ def test_phase2_cli_commands_are_opt_in_by_default(tmp_path, monkeypatch, invoke
             "--branch",
             "main",
             "--title",
-            "Blocked by rollout",
+            "Available by default",
+            "--json-output",
+        ]
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["task"]["title"] == "Available by default"
+
+
+def test_phase2_cli_commands_are_blocked_when_explicitly_disabled(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    from tests.support import write_madspec_config
+
+    write_madspec_config(project_path, branch="main", agent_environment="cursor-agent", phase2_enabled=False)
+    init_memory_branch(branch="main", project_path=project_path)
+
+    result = invoke_cli(
+        [
+            "memory",
+            "tasks",
+            "create",
+            "--branch",
+            "main",
+            "--title",
+            "Blocked explicitly",
             "--json-output",
         ]
     )
@@ -254,6 +286,6 @@ def test_phase2_cli_commands_are_opt_in_by_default(tmp_path, monkeypatch, invoke
     assert result.exit_code == 1, result.stdout
     payload = json.loads(result.stdout)
     assert payload["reason"] == "phase2_disabled"
-    assert payload["message"] == "Phase 2 coordinator runtime is opt-in"
+    assert payload["message"] == "Phase 2 coordinator runtime is disabled for this project"
     assert payload["parallel_runtime"]["phase1Enabled"] is True
     assert payload["parallel_runtime"]["phase2Enabled"] is False

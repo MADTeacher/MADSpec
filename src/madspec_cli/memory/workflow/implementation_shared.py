@@ -83,19 +83,3 @@ def append_unique(existing: list[str], values: list[str]) -> list[str]:
         if value not in result:
             result.append(value)
     return result
-
-
-def validate_start_step(progress: dict[str, Any], step_id: str) -> list[str]:
-    errors: list[str] = []
-    planned_steps = progress.get("plannedSteps", [])
-    completed_steps = set(progress.get("completedSteps", []))
-    if step_id not in planned_steps:
-        errors.append(f"step '{step_id}' is not present in plannedSteps")
-        return errors
-    if step_id in completed_steps:
-        errors.append(f"step '{step_id}' is already completed")
-    if not is_step_ready(progress, step_id):
-        errors.append(
-            f"step '{step_id}' has incomplete dependencies: {', '.join(step_dependencies(progress, step_id))}"
-        )
-    return errors

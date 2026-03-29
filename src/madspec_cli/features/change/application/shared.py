@@ -7,17 +7,10 @@ from typing import Any
 from madspec_cli.memory.shared.storage import now_iso, read_json
 from madspec_cli.shared.kernel.result import serialize
 
-from ..infrastructure.storage import (
-    append_change_proposal,
-    build_git_diff,
-    build_manifest_hash,
-    build_snapshot_diff,
-    capture_branch_snapshot,
-    current_git_revision,
-    get_change_paths,
-    list_change_proposals,
-    load_change_state,
-)
+from madspec_cli.features.change.infrastructure.git_ops import build_git_diff, current_git_revision
+from ..infrastructure.paths import get_change_paths
+from ..infrastructure.repository import append_change_proposal, list_change_proposals, load_change_state
+from ..infrastructure.snapshot import build_manifest_hash, build_snapshot_diff, capture_branch_snapshot
 
 
 def find_proposal(project_path: Path, branch_name: str, proposal_id: str) -> dict[str, Any] | None:

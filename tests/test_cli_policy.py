@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 
 from madspec_cli.features.policy.infrastructure.storage import get_policy_paths
-from madspec_cli.memory import ensure_memory_layout, get_memory_paths, write_json
+from madspec_cli.memory import ensure_memory_layout, get_memory_paths
+from madspec_cli.memory.shared.storage import write_json
 from madspec_cli.memory.views import consolidate_branch_memory
 
 

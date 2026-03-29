@@ -10,9 +10,9 @@
 
 - Если `madspec memory tasks ...`, `work-items ...`, `proposals ...` или `coordinator explain` возвращают `reason="phase2_disabled"`, не считай это поломкой памяти.
 - Сначала проверь `.madspec/config.json` и блок `parallelRuntime`.
-- Для default-режима ожидаемо `phase1Enabled=true` и `phase2Enabled=false`.
-- Если нужен полный coordinator runtime, явно включи `parallelRuntime.phase2Enabled=true`.
-- `madspec migrate` не включает этот режим автоматически, потому что мигрирует только layout, а не rollout policy.
+- Для текущего default-режима ожидаемо `phase1Enabled=true` и `phase2Enabled=true`.
+- Если coordinator runtime недоступен, почти всегда это значит, что проект явно выставил `parallelRuntime.phase2Enabled=false`.
+- Если нужен полный coordinator runtime, верни `parallelRuntime.phase2Enabled=true`.
 
 ## Не хватает артефактов предыдущего этапа
 

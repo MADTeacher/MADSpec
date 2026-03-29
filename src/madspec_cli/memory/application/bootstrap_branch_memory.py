@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from madspec_cli.shared.infra.project_config import create_madspec_config
-
 if TYPE_CHECKING:
     from madspec_cli.shared.kernel.ports import (
         AgentsLayoutEnsurer,
@@ -13,9 +11,12 @@ if TYPE_CHECKING:
         PolicyLayoutEnsurer,
     )
 
-from ..projection.materialize import consolidate_branch_memory
-from ..shared.storage import ensure_memory_layout
 from ..shared.validation import validate_branch_memory
+from .branch_state import (
+    BootstrapBranchStateRequest,
+    bootstrap_branch_state,
+    refresh_branch_state,
+)
 
 
 @dataclass(frozen=True)
@@ -62,11 +63,16 @@ def execute(
         from madspec_cli.features.policy.infrastructure.storage import ensure_policy_layout
         _ensure_policy_layout = ensure_policy_layout
 
-    create_madspec_config(request.project_path, request.branch_name)
-    created = ensure_memory_layout(request.project_path, request.branch_name, full=True)
+    bootstrap = bootstrap_branch_state(
+        BootstrapBranchStateRequest(
+            project_path=request.project_path,
+            branch_name=request.branch_name,
+        )
+    )
+    created = list(bootstrap.created_paths)
     created.extend(_ensure_policy_layout(request.project_path))
     created.extend(_ensure_agents_layout(request.project_path)[1])
-    generated = consolidate_branch_memory(request.project_path, request.branch_name, full=True)
+    generated = refresh_branch_state(request.project_path, request.branch_name, full=True)
     policy_payload = _evaluate_branch_policies(
         request.project_path,
         request.branch_name,

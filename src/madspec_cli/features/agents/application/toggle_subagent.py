@@ -4,17 +4,16 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from madspec_cli.memory.shared.storage import now_iso
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import (
+from ..domain.normalizers import unique_role_ids
+from ..infrastructure.catalog_store import (
     append_agent_history,
     enabled_subagents_for_output,
-    load_agents_state,
-    now_iso,
-    render_workspace_agents,
-    save_agents_state,
-    unique_role_ids,
 )
+from ..infrastructure.render_workspace import render_workspace_agents
+from ..infrastructure.state_store import load_agents_state, save_agents_state
 from .common import find_subagent
 
 

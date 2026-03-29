@@ -370,9 +370,6 @@ def write_json(path: Path, data: Any) -> None:
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    from .system_store import sync_json_path_to_store
-
-    sync_json_path_to_store(path, data)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -394,9 +391,6 @@ def append_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
     with path.open("a", encoding="utf-8") as fh:
         for record in records:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
-    from .system_store import sync_jsonl_path_to_store
-
-    sync_jsonl_path_to_store(path, records)
 
 
 def ensure_procedures_layout(project_path: Path) -> list[Path]:
@@ -432,6 +426,7 @@ def ensure_memory_layout(
         save_architecture_state,
     )
     from ..stages.plan.state import (
+        default_plan_state,
         is_empty_plan_state,
         migrate_legacy_plan_state,
         save_plan_state,
@@ -447,16 +442,6 @@ def ensure_memory_layout(
     scope = resolve_stage_scope(stage, full=full)
     created: list[Path] = []
 
-    from .system_store import (
-        bootstrap_branch_canonical_state,
-        ensure_system_memory_layout,
-        load_canonical_branch_state,
-        load_runtime_session,
-        refresh_branch_file_projections,
-    )
-
-    created.extend(ensure_system_memory_layout(project_path))
-
     paths.branch_dir.mkdir(parents=True, exist_ok=True)
     paths.stages_dir.mkdir(parents=True, exist_ok=True)
     paths.working_dir.mkdir(parents=True, exist_ok=True)
@@ -464,13 +449,13 @@ def ensure_memory_layout(
     paths.semantic_dir.mkdir(parents=True, exist_ok=True)
 
     created.extend(ensure_procedures_layout(project_path))
-    bootstrap_branch_canonical_state(project_path, branch_name)
-    canonical = load_canonical_branch_state(project_path, branch_name)
 
     progress_exists = paths.progress.exists()
-    progress = canonical.progress if isinstance(canonical.progress, dict) else _default_progress_state()
+    progress = read_json(paths.progress, _default_progress_state())
+    if not isinstance(progress, dict):
+        progress = _default_progress_state()
     progress, progress_changed = normalize_runtime_progress(project_path, branch_name, progress)
-    if (not progress_exists) or ("progress" not in canonical.present_snapshots) or progress_changed:
+    if (not progress_exists) or progress_changed:
         write_json(paths.progress, progress)
         if not progress_exists:
             created.append(paths.progress)
@@ -478,20 +463,15 @@ def ensure_memory_layout(
         write_json(paths.progress, progress)
 
     active_session_exists = paths.active_session.exists()
-    load_runtime_session(project_path, branch_name=branch_name)
-    if not active_session_exists and paths.active_session.exists():
+    if not active_session_exists:
+        write_json(paths.active_session, _default_active_session(branch_name))
         created.append(paths.active_session)
 
     if "mvp.concept" in scope.stage_snapshot_keys:
         concept_exists = paths.concept_state.exists()
-        concept_state = canonical.snapshots["mvp.concept"]
-        if "mvp.concept" not in canonical.present_snapshots:
-            legacy_concept_path = paths.branch_dir / "concept.md"
-            concept_state = (
-                migrate_legacy_concept_markdown(legacy_concept_path)
-                if legacy_concept_path.exists()
-                else default_concept_state()
-            )
+        concept_state = read_json(paths.concept_state, default_concept_state())
+        if not isinstance(concept_state, dict):
+            concept_state = default_concept_state()
         legacy_concept_path = paths.branch_dir / "concept.md"
         if legacy_concept_path.exists() and is_empty_concept_state(concept_state):
             concept_state = migrate_legacy_concept_markdown(legacy_concept_path)
@@ -501,44 +481,36 @@ def ensure_memory_layout(
 
     if "mvp.design" in scope.stage_snapshot_keys:
         design_exists = paths.design_state.exists()
-        design_state = (
-            canonical.snapshots["mvp.design"]
-            if "mvp.design" in canonical.present_snapshots
-            else default_design_state()
-        )
+        design_state = read_json(paths.design_state, default_design_state())
+        if not isinstance(design_state, dict):
+            design_state = default_design_state()
         save_design_state(paths.design_state, design_state)
         if not design_exists and paths.design_state.exists():
             created.append(paths.design_state)
 
     if "mvp.tech" in scope.stage_snapshot_keys:
         tech_exists = paths.tech_state.exists()
-        tech_state = (
-            canonical.snapshots["mvp.tech"]
-            if "mvp.tech" in canonical.present_snapshots
-            else default_tech_state()
-        )
+        tech_state = read_json(paths.tech_state, default_tech_state())
+        if not isinstance(tech_state, dict):
+            tech_state = default_tech_state()
         save_tech_state(paths.tech_state, tech_state)
         if not tech_exists and paths.tech_state.exists():
             created.append(paths.tech_state)
 
     if "deploy" in scope.stage_snapshot_keys:
         deploy_exists = paths.deploy_state.exists()
-        deploy_state = (
-            canonical.snapshots["deploy"]
-            if "deploy" in canonical.present_snapshots
-            else default_deploy_state()
-        )
+        deploy_state = read_json(paths.deploy_state, default_deploy_state())
+        if not isinstance(deploy_state, dict):
+            deploy_state = default_deploy_state()
         save_deploy_state(paths.deploy_state, deploy_state)
         if not deploy_exists and paths.deploy_state.exists():
             created.append(paths.deploy_state)
 
     if "mvp.architecture" in scope.stage_snapshot_keys:
         architecture_exists = paths.architecture_state.exists()
-        architecture_state = (
-            canonical.snapshots["mvp.architecture"]
-            if "mvp.architecture" in canonical.present_snapshots
-            else default_architecture_state()
-        )
+        architecture_state = read_json(paths.architecture_state, default_architecture_state())
+        if not isinstance(architecture_state, dict):
+            architecture_state = default_architecture_state()
         save_architecture_state(paths.architecture_state, architecture_state)
         if not architecture_exists and paths.architecture_state.exists():
             created.append(paths.architecture_state)
@@ -546,15 +518,11 @@ def ensure_memory_layout(
     if "mvp.plan" in scope.stage_snapshot_keys:
         plan_exists = paths.plan_state.exists()
         should_migrate_plan = (
-            "mvp.plan" not in canonical.present_snapshots
-            or (
-                not plan_exists
-                and is_empty_plan_state(canonical.snapshots["mvp.plan"])
-                and (
-                    (paths.branch_dir / "implementation-plan.md").exists()
-                    or any(progress.get("plannedSteps", []))
-                    or (paths.branch_dir / "steps").exists()
-                )
+            not plan_exists
+            and (
+                (paths.branch_dir / "implementation-plan.md").exists()
+                or any(progress.get("plannedSteps", []))
+                or (paths.branch_dir / "steps").exists()
             )
         )
         if should_migrate_plan:
@@ -564,21 +532,21 @@ def ensure_memory_layout(
                 steps_dir=paths.branch_dir / "steps",
             )
         else:
-            plan_state = canonical.snapshots["mvp.plan"]
+            plan_state = read_json(paths.plan_state, default_plan_state())
+            if not isinstance(plan_state, dict):
+                plan_state = default_plan_state()
         save_plan_state(paths.plan_state, plan_state)
         if not plan_exists and paths.plan_state.exists():
             created.append(paths.plan_state)
 
     if "feature.init" in scope.stage_snapshot_keys:
         feature_init_exists = paths.feature_init_state.exists()
-        feature_init_state = canonical.snapshots["feature.init"]
-        if "feature.init" not in canonical.present_snapshots:
-            legacy_analysis_path = paths.branch_dir / "project-analysis.md"
-            feature_init_state = (
-                migrate_legacy_project_analysis_markdown(legacy_analysis_path)
-                if legacy_analysis_path.exists()
-                else default_feature_init_state()
-            )
+        feature_init_state = read_json(paths.feature_init_state, default_feature_init_state())
+        if not isinstance(feature_init_state, dict):
+            feature_init_state = default_feature_init_state()
+        legacy_analysis_path = paths.branch_dir / "project-analysis.md"
+        if not feature_init_exists and legacy_analysis_path.exists():
+            feature_init_state = migrate_legacy_project_analysis_markdown(legacy_analysis_path)
         save_feature_init_state(paths.feature_init_state, feature_init_state)
         if not feature_init_exists and paths.feature_init_state.exists():
             created.append(paths.feature_init_state)
@@ -586,15 +554,11 @@ def ensure_memory_layout(
     if "feature.plan" in scope.stage_snapshot_keys:
         feature_plan_exists = paths.feature_plan_state.exists()
         should_migrate_feature_plan = (
-            "feature.plan" not in canonical.present_snapshots
-            or (
-                not feature_plan_exists
-                and is_empty_plan_state(canonical.snapshots["feature.plan"])
-                and (
-                    (paths.branch_dir / "implementation-plan.md").exists()
-                    or any(progress.get("plannedSteps", []))
-                    or (paths.branch_dir / "steps").exists()
-                )
+            not feature_plan_exists
+            and (
+                (paths.branch_dir / "implementation-plan.md").exists()
+                or any(progress.get("plannedSteps", []))
+                or (paths.branch_dir / "steps").exists()
             )
         )
         if should_migrate_feature_plan:
@@ -604,7 +568,9 @@ def ensure_memory_layout(
                 steps_dir=paths.branch_dir / "steps",
             )
         else:
-            feature_plan_state = canonical.snapshots["feature.plan"]
+            feature_plan_state = read_json(paths.feature_plan_state, default_plan_state())
+            if not isinstance(feature_plan_state, dict):
+                feature_plan_state = default_plan_state()
         save_feature_plan_state(paths.feature_plan_state, feature_plan_state)
         if not feature_plan_exists and paths.feature_plan_state.exists():
             created.append(paths.feature_plan_state)
@@ -619,5 +585,4 @@ def ensure_memory_layout(
         if not path.exists():
             path.write_text("", encoding="utf-8")
             created.append(path)
-    refresh_branch_file_projections(project_path, branch_name)
     return created

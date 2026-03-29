@@ -4,6 +4,7 @@ from pathlib import Path
 
 import typer
 
+from madspec_cli.shared.cli.presenters import emit_error
 from ..application.observability import build_runtime_observability
 from madspec_cli.shared.cli.banners import console, show_banner
 from madspec_cli.shared.cli.json_output import emit_json
@@ -12,6 +13,7 @@ from madspec_cli.shared.cli.toon_output import emit_toon, ensure_structured_outp
 from ..application.retrieve_context import RetrieveMemoryContextRequest, execute as retrieve_context
 from ..application.resolve_branch import resolve_branch
 from ..application.memory_query import load_runtime_session, search_memory_store
+from ..shared.system_store.retrieval import RetrievalEmbeddingProviderError
 from ..shared import SYSTEM_SESSION_KEY
 
 
@@ -37,24 +39,35 @@ def memory_retrieve(
     project_path = Path.cwd()
     target_branch = resolve_branch(project_path, branch_name)
     resolved_limit = limit if limit is not None else (3 if stage.strip().lower() in {"mvp.concept", "mvp.design", "mvp.tech", "deploy", "mvp.architecture", "mvp.plan", "feature.init", "feature.plan"} else 5)
-    result = retrieve_context(
-        RetrieveMemoryContextRequest(
-            project_path=project_path,
-            branch_name=target_branch,
-            stage=stage,
-            session_key=session_key,
-            step_id=step_id,
-            limit=resolved_limit,
-            query=query,
-            disable_semantic=disable_semantic,
-            recall_limit=recall_limit if recall_limit is not None else resolved_limit,
-            scope=scope,
-            include_obsolete=include_obsolete,
-            include_conflicted=include_conflicted,
-            full_artifact=full_artifact,
-            include_history=include_history,
+    try:
+        result = retrieve_context(
+            RetrieveMemoryContextRequest(
+                project_path=project_path,
+                branch_name=target_branch,
+                stage=stage,
+                session_key=session_key,
+                step_id=step_id,
+                limit=resolved_limit,
+                query=query,
+                disable_semantic=disable_semantic,
+                recall_limit=recall_limit if recall_limit is not None else resolved_limit,
+                scope=scope,
+                include_obsolete=include_obsolete,
+                include_conflicted=include_conflicted,
+                full_artifact=full_artifact,
+                include_history=include_history,
+            )
         )
-    )
+    except RetrievalEmbeddingProviderError as exc:
+        _emit_retrieval_provider_error(
+            exc.payload,
+            json_output=json_output,
+            toon_output=toon_output,
+        )
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        emit_error(exc, json_output=json_output, toon_output=toon_output)
+        raise typer.Exit(1) from exc
     payload = result.to_payload()
     if json_output:
         emit_json(payload)
@@ -74,6 +87,7 @@ def memory_retrieve(
     console.print(f"[cyan]Policies:[/cyan] required={len(payload['policy_context']['required'])} advisory={len(payload['policy_context']['advisory'])}")
     console.print(f"[cyan]Episodes:[/cyan] {len(payload['episodes'])}")
     console.print(f"[cyan]Recall matches:[/cyan] {len(payload['recall']['merged'])}")
+    _print_semantic_runtime(payload["recall"].get("semantic_runtime"))
     summary = (payload.get("observability") or {}).get("summary") or {}
     console.print(f"[cyan]Active leases:[/cyan] {summary.get('active_lease_count', 0)}")
     console.print(f"[cyan]Pending proposals:[/cyan] {summary.get('pending_proposal_count', 0)}")
@@ -96,24 +110,31 @@ def memory_search(
     """Inspect hybrid recall candidates without loading full stage context."""
     project_path = Path.cwd()
     target_branch = resolve_branch(project_path, branch_name)
-    active_session = load_runtime_session(
-        project_path,
-        branch_name=target_branch,
-        session_key=session_key,
-    )
-    payload = search_memory_store(
-        project_path,
-        branch_name=target_branch,
-        stage=stage,
-        step_id=step_id,
-        query=query,
-        scope=scope,
-        recall_limit=recall_limit,
-        disable_semantic=disable_semantic,
-        include_obsolete=include_obsolete,
-        include_conflicted=include_conflicted,
-        active_session=active_session,
-    )
+    try:
+        active_session = load_runtime_session(
+            project_path,
+            branch_name=target_branch,
+            session_key=session_key,
+        )
+        payload = search_memory_store(
+            project_path,
+            branch_name=target_branch,
+            stage=stage,
+            step_id=step_id,
+            query=query,
+            scope=scope,
+            recall_limit=recall_limit,
+            disable_semantic=disable_semantic,
+            include_obsolete=include_obsolete,
+            include_conflicted=include_conflicted,
+            active_session=active_session,
+        )
+    except RetrievalEmbeddingProviderError as exc:
+        _emit_retrieval_provider_error(exc.payload, json_output=json_output, toon_output=False)
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        emit_error(exc, json_output=json_output)
+        raise typer.Exit(1) from exc
     payload["observability"] = build_runtime_observability(
         project_path,
         branch_name=target_branch,
@@ -121,6 +142,7 @@ def memory_search(
         stage=stage,
         step_id=step_id,
         limit=recall_limit,
+        semantic_runtime=payload.get("semantic_runtime"),
     )
 
     if json_output:
@@ -137,6 +159,7 @@ def memory_search(
     console.print(f"[cyan]Lexical:[/cyan] {len(payload['lexical_matches'])}")
     console.print(f"[cyan]Semantic:[/cyan] {len(payload['semantic_matches'])}")
     console.print(f"[cyan]Merged:[/cyan] {len(payload['merged'])}")
+    _print_semantic_runtime(payload.get("semantic_runtime"))
     summary = (payload.get("observability") or {}).get("summary") or {}
     console.print(f"[cyan]Runtime summary:[/cyan] leases={summary.get('active_lease_count', 0)} proposals={summary.get('pending_proposal_count', 0)} conflicts={summary.get('conflict_count', 0)}")
     for item in payload["merged"]:
@@ -149,3 +172,40 @@ def memory_search(
 def register(memory_app: typer.Typer) -> None:
     memory_app.command("retrieve")(memory_retrieve)
     memory_app.command("search")(memory_search)
+
+
+def _emit_retrieval_provider_error(
+    payload: dict[str, object],
+    *,
+    json_output: bool,
+    toon_output: bool,
+) -> None:
+    if json_output:
+        emit_json(payload)
+        return
+    if toon_output:
+        emit_toon(payload)
+        return
+    show_banner()
+    console.print(f"[red]Embeddings provider error:[/red] {payload.get('message')}")
+    console.print(f"[cyan]Provider:[/cyan] {payload.get('provider') or 'n/a'}")
+    console.print(f"[cyan]Model:[/cyan] {payload.get('model') or 'n/a'}")
+    console.print(f"[cyan]Status:[/cyan] {payload.get('status') or 'n/a'}")
+    bootstrap = payload.get("bootstrap") or {}
+    if isinstance(bootstrap, dict):
+        console.print(f"[cyan]Bootstrap:[/cyan] status={bootstrap.get('status') or 'n/a'} ready={bootstrap.get('ready')}")
+    console.print(f"[cyan]Guidance:[/cyan] {payload.get('guidance') or 'n/a'}")
+
+
+def _print_semantic_runtime(semantic_runtime: dict[str, object] | None) -> None:
+    runtime = semantic_runtime or {}
+    configured = runtime.get("configured_embeddings") or {}
+    namespace = runtime.get("active_vector_namespace") or {}
+    outcome = runtime.get("semantic_outcome") or "n/a"
+    console.print(
+        f"[cyan]Embeddings:[/cyan] provider={configured.get('provider') or 'n/a'} "
+        f"model={configured.get('model') or 'n/a'} status={configured.get('status') or 'n/a'} "
+        f"ready={configured.get('ready')} outcome={outcome}"
+    )
+    if namespace:
+        console.print(f"[cyan]Active namespace:[/cyan] {namespace.get('path') or 'n/a'}")

@@ -19,14 +19,19 @@ def test_git_set_branch_and_list_branches_json(tmp_path, monkeypatch, invoke_cli
     main_result = invoke_cli(["git", "set-branch", "main", "--json-output"])
     feature_result = invoke_cli(["git", "set-branch", "feature/new-ui", "--json-output"])
     list_result = invoke_cli(["git", "list-branches", "--json-output"])
+    db_result = invoke_cli(["memory", "db-status", "--branch", "feature/new-ui", "--json-output"])
 
     assert main_result.exit_code == 0, main_result.stdout
     assert feature_result.exit_code == 0, feature_result.stdout
     assert list_result.exit_code == 0, list_result.stdout
+    assert db_result.exit_code == 0, db_result.stdout
 
     feature_payload = json.loads(feature_result.stdout)
     assert feature_payload["branch"] == "feature/new-ui"
     assert (tmp_path / ".madspec" / "feature/new-ui" / "memory" / "progress.json").exists()
+    db_payload = json.loads(db_result.stdout)
+    assert db_payload["stage_snapshots"] >= 1
+    assert db_payload["artifacts"] >= 1
 
     list_payload = json.loads(list_result.stdout)
     branch_names = {branch["name"] for branch in list_payload["branches"]}
@@ -52,10 +57,15 @@ def test_git_init_create_branch_commit_and_current_branch_json(
 
     branch_result = invoke_cli(["git", "create-branch", "feature/auth", "--json-output"])
     current_result = invoke_cli(["git", "current-branch", "--json-output"])
+    db_result = invoke_cli(["memory", "db-status", "--branch", "feature/auth", "--json-output"])
 
     assert branch_result.exit_code == 0, branch_result.stdout
     assert current_result.exit_code == 0, current_result.stdout
+    assert db_result.exit_code == 0, db_result.stdout
     assert json.loads(current_result.stdout) == {"branch": "feature/auth", "source": "git"}
+    db_payload = json.loads(db_result.stdout)
+    assert db_payload["stage_snapshots"] >= 1
+    assert db_payload["artifacts"] >= 1
 
     (tmp_path / "README.md").write_text("# demo\n\nupdated\n", encoding="utf-8")
     commit_result = invoke_cli(
@@ -67,4 +77,3 @@ def test_git_init_create_branch_commit_and_current_branch_json(
     commit_payload = json.loads(commit_result.stdout)
     assert commit_payload["message"] == "feat: update readme"
     assert len(commit_payload["commit_hash"]) == 40
-

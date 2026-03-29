@@ -1,8 +1,18 @@
 # Configurable Local Embeddings Roadmap for MADSpec Memory
 
+> Статус: архивный документ. Базовый контракт и основная реализация embedding provider уже зафиксированы в коде и пользовательской документации; этот файл сохранён как исторический roadmap/ADR.
+
 Этот документ служит одновременно дорожной картой и архитектурным решением уровня Epic 0 для перехода MADSpec от текущего hash-based semantic layer к конфигурируемой модели памяти с выбором embedding provider на уровне проекта.
 
 До завершения Epics 1–6 именно этот файл фиксирует baseline по configuration contract, provider model, bootstrap strategy, index versioning, rollout order и compatibility policy.
+
+Важно для чтения документа:
+
+- `Epic 0` не меняет runtime-поведение CLI, формат существующих файлов проекта и текущий UX;
+- раздел **Current-State Diagnosis** описывает только уже существующий baseline в репозитории;
+- раздел **Embedded ADR — Epic 0 Lock** фиксирует только архитектурные решения уровня `Epic 0`;
+- разделы **Canonical Config Contract** и **Canonical Init UX** ниже уже описывают реализованный baseline после `Epic 1–3`, а эпики `4–6` описывают оставшееся направление реализации;
+- публичная документация CLI обновляется только вместе с тем эпиком, который действительно меняет поведение.
 
 ## 1. Goal and Non-Goals
 
@@ -48,37 +58,41 @@ MADSpec должен безопасно поддерживать:
 
 ### Текущее поведение
 
-В текущей реализации memory semantic layer уже существует, но фактически работает через hash-based embedding provider:
+В текущей реализации memory semantic layer уже существует, а `Epic 1–3` уже частично или в большой части реализованы:
 
-- `EmbeddingProvider` строит вектор фиксированной размерности из токенов через hashing;
-- текущая размерность задается как `DEFAULT_EMBEDDING_DIMENSION = 64`;
-- `VectorMemoryIndex` принимает provider, но по умолчанию создает встроенный hash provider;
+- текущий hash runtime по-прежнему существует и использует `DEFAULT_EMBEDDING_DIMENSION = 64`;
+- `HashEmbeddingProvider` и `LocalHfOnnxEmbeddingProvider` уже выделены как отдельные runtime providers;
 - chunk indexing уже существует и работает через `index_jobs`;
 - `memory retrieve` и `memory search` уже умеют semantic lane и опцию `--disable-semantic`;
-- semantic lane встроен в hybrid retrieval, но не опирается на dense semantic embeddings.
+- semantic lane по-прежнему встроен в hybrid retrieval и уже использует configured provider как runtime path для semantic branch;
+- главные незакрытые хвосты на момент этого документа — user-facing provider observability в read paths и migration/offline hardening.
 
 ### Текущая конфигурация проекта
 
-Сейчас `.madspec/config.json` хранит только базовые project/runtime настройки:
+Сейчас `.madspec/config.json` уже хранит не только базовые project/runtime настройки, но и project-level contract для embeddings:
 
 - `currentBranch`;
 - `version`;
 - `agentsSchemaVersion`;
 - `parallelRuntime`;
 - `agentEnvironment` при наличии.
+- `memory.embeddings.provider`;
+- `memory.embeddings.model`;
+- `memory.embeddings.downloadPolicy`;
+- `memory.embeddings.cacheDir`;
+- `memory.embeddings.revision`.
 
-Это означает, что project-level contract для memory provider пока отсутствует.
+Это означает, что config contract, versioned layout и runtime provider binding уже введены, а отставание осталось в основном на стороне user-facing observability, migration notes и offline-операций.
 
 ### Текущий init flow
 
-`madspec init` уже содержит естественную точку расширения:
+`madspec init` уже не просто содержит точку расширения, а уже реализует provider selection:
 
 - есть интерактивный выбор AI-среды;
-- есть отдельный шаг `Create MADSpec config`;
-- `create_madspec_config(...)` уже собирает `.madspec/config.json`;
+- есть выбор memory embeddings provider/model и download policy;
+- `create_madspec_config(...)` уже записывает `memory.embeddings` в `.madspec/config.json`;
+- dense bootstrap уже может запускаться прямо во время `madspec init` при `downloadPolicy = "on-init"`;
 - после конфигурации выполняются `ensure_memory_layout(...)`, `consolidate_branch_memory(...)` и связанная инициализация.
-
-Следовательно, добавить memory provider selection в `init` можно без отдельной команды и без ломки текущего UX.
 
 ### Текущая модель поставки CLI
 
@@ -90,14 +104,41 @@ MADSpec должен безопасно поддерживать:
 
 ### Основное архитектурное ограничение
 
-Главная проблема не в retrieval orchestration и не в index storage. Главная проблема в том, что:
+Главная проблема на текущем этапе уже не в config contract и не в bootstrap/runtime provider. Основной remaining gap в том, что:
 
 - semantic lane уже есть;
 - provider abstraction уже есть;
-- index jobs уже есть;
-- но current provider не является dense semantic model.
+- dense provider runtime уже есть;
+- versioned vector layout уже введен и привязан к provider/model/revision/dimension;
+- retrieval flow уже использует configured provider как canonical runtime path для semantic lane, но не везде показывает этот выбор пользователю и не везде отдает structured provider diagnostics.
 
-Следовательно, migration path должен менять прежде всего provider layer, config contract и lifecycle модели, а не ломать всю retrieval architecture.
+Следовательно, ближайший migration path должен добивать прежде всего provider observability в user-facing retrieval paths и затем закрывать migration/offline hardening.
+
+### Текущие точки расширения в репозитории
+
+Ниже перечислены подсистемы, на которые опирается дальнейший rollout. Таблица отражает реальный baseline репозитория на момент обновления документа:
+
+| Подсистема | Текущее состояние | Будущая роль в rollout |
+| --- | --- | --- |
+| `src/madspec_cli/shared/infra/project_config.py` | уже читает и нормализует `memory.embeddings` | baseline `Epic 1`; источник истины для provider selection |
+| `src/madspec_cli/features/init/cli.py` | уже управляет интерактивным UX `madspec init`, включая выбор memory embeddings | baseline `Epic 1`; точка дальнейшего UX уточнения |
+| `src/madspec_cli/features/init/infrastructure/initializer_core.py` | уже создает `.madspec/config.json`, поднимает memory layout и dense bootstrap по policy | baseline `Epic 1–2` |
+| `src/madspec_cli/memory/shared/system_store/embedding_registry.py` | уже содержит supported model registry | baseline `Epic 2` |
+| `src/madspec_cli/memory/shared/system_store/model_bootstrap.py` | уже реализует inspect/bootstrap lifecycle модели | baseline `Epic 2` |
+| `src/madspec_cli/memory/shared/system_store/vector.py` | уже содержит `HashEmbeddingProvider`, `LocalHfOnnxEmbeddingProvider` и vector index API | baseline `Epic 3`; точка перехода к versioned layout в `Epic 4` |
+| `src/madspec_cli/memory/shared/system_store/layout.py` | уже задает vector root и active namespace по `provider/model/revision/dimension` | baseline `Epic 4`; источник истины для namespace-aware layout |
+| `src/madspec_cli/memory/shared/system_store/jobs.py` | уже обрабатывает `index_jobs` с rebuild per active namespace | baseline `Epic 4`; точка дальнейшего audit/observability расширения |
+| `src/madspec_cli/memory/shared/system_store/retrieval.py` | semantic lane уже использует configured provider, но user-facing diagnostics по provider и bootstrap еще неполны | основная точка остатка `Epic 5` |
+| `src/madspec_cli/memory/shared/system_store/store.py` | уже отдает namespace-aware diagnostics и status | baseline `Epic 4`; вспомогательная точка observability в `Epic 5` |
+
+### Что уже закреплено текущей документацией и тестами
+
+На момент обновления документа репозиторий уже фиксирует следующий baseline:
+
+- публичная документация уже описывает `memory.embeddings`, bootstrap cache и separation между configured embeddings и текущим retrieval behavior;
+- dense bootstrap и dense provider runtime уже покрыты кодом и тестами;
+- документация и тесты по layout/reindex уже обновлены под namespaced vector layout;
+- retrieval/provider observability docs и часть user-facing read-path assertions остаются зоной остатка `Epic 5`.
 
 ## 3. Target Architecture
 
@@ -122,7 +163,7 @@ MADSpec должен безопасно поддерживать:
     "embeddings": {
       "provider": "hash",
       "model": null,
-      "downloadPolicy": "on-init",
+      "downloadPolicy": "none",
       "cacheDir": ".madspec/system/models",
       "revision": null
     }
@@ -234,12 +275,14 @@ Vector index должен версионироваться как минимум
 
 ```text
 .madspec/system/memory/lancedb/
-  hash/default/64/
+  hash/default/current/64/
   local-hf-onnx/multilingual-e5-small/<revision>/384/
   local-hf-onnx/bge-m3/<revision>/1024/
 ```
 
-Сегмент `default` в пути `hash/default/64/` — **фиксированный namespace** для провайдера `hash`: отдельного model key у hash-режима нет, используется один согласованный профиль (размерность задаётся реализацией CLI, в примере `64`). Это не пользовательский идентификатор и не подлежит подстановке из конфига.
+Сегмент `default` в пути `hash/default/current/64/` — **фиксированный namespace** для провайдера `hash`: отдельного model key у hash-режима нет, используется один согласованный профиль (размерность задаётся реализацией CLI, в примере `64`). Это не пользовательский идентификатор и не подлежит подстановке из конфига.
+
+Сегмент revision в namespace всегда присутствует. Если `memory.embeddings.revision = null`, runtime нормализует его в согласованный служебный сегмент `current`. Следовательно, dense namespace без pin выглядит как `local-hf-onnx/<model_key>/current/<dimension>/`, а не как путь без revision-сегмента.
 
 Это исключает silent corruption при смене модели и позволяет параллельно хранить старый и новый индекс.
 
@@ -247,9 +290,9 @@ Vector index должен версионироваться как минимум
 
 Пути ниже задаются относительно корня проекта; `<cacheDir>` — значение из `memory.embeddings.cacheDir` после нормализации (по умолчанию `.madspec/system/models`).
 
-- Базовый каталог артефактов одной модели: `<cacheDir>/<model_key>/`, где `<model_key>` — stable internal key из registry.
+- Базовый каталог артефактов одной модели при `revision = null`: `<cacheDir>/<model_key>/current/`, где `<model_key>` — stable internal key из registry, а `current` — нормализованный revision-сегмент для неприбитой ревизии.
 - Если в конфиге задан непустой `revision` (pin на конкретный снимок весов), файлы этой закреплённой ревизии хранятся в `<cacheDir>/<model_key>/<revision>/` (строка revision должна быть безопасна для имени каталога; для Hugging Face обычно используется commit hash или идентификатор revision API).
-- Если `revision` в конфиге равен `null`, runtime выбирает одну согласованную «текущую» выкладку внутри `<cacheDir>/<model_key>/` по правилам bootstrap (без смешивания разных ревизий в одном namespace).
+- Если `revision` в конфиге равен `null`, runtime хранит и читает неприбитую «текущую» выкладку внутри `<cacheDir>/<model_key>/current/`. Это сохраняет единый контракт layout: и cache, и vector namespace всегда имеют явный revision-сегмент.
 
 Индекс векторов (дерево `lancedb` выше) и каталог весов ONNX — **разные деревья**: смена только файлов модели не должна перезаписывать путь индекса без согласования с `provider` / `model` / `revision` / `dimension`.
 
@@ -318,7 +361,15 @@ Vector index должен версионироваться как минимум
 - нет открытых решений по project-local cache layout;
 - все следующие изменения могут идти без архитектурных споров о базовом направлении.
 
-### Phase 1: Project Config and Init UX
+Границы фазы:
+
+- runtime-поведение CLI не меняется;
+- `MADSPEC_CONFIG_VERSION` не меняется;
+- `SYSTEM_SCHEMA_VERSION` не меняется;
+- новые обязательные зависимости в `pyproject.toml` не добавляются;
+- публичная документация в `docs/cli/` и operator skill не обновляются до эпиков с реальным поведением.
+
+### Phase 1 / Epic 1: Project Config and Init UX
 
 Цель фазы:
 
@@ -332,21 +383,35 @@ Vector index должен версионироваться как минимум
 - инициализация проекта сразу формирует правильную memory strategy;
 - конфиг становится source of truth для provider selection.
 
-### Phase 2: Provider Abstraction and Bootstrap Runtime
+### Phase 2 / Epic 2: Provider Registry and Bootstrap Manager
+
+Цель фазы:
+
+- ввести canonical registry поддерживаемых embedding models;
+- реализовать lifecycle bootstrap/download manager;
+- сделать metadata моделей доступной init UX и diagnostics.
+
+Результат фазы:
+
+- runtime умеет проверять, скачана ли модель;
+- bootstrap пишет модель в project-local cache;
+- model registry становится встроенным contract layer.
+
+### Phase 3 / Epic 3: Dense Local Provider Runtime
 
 Цель фазы:
 
 - превратить текущий provider в явно именованный `HashEmbeddingProvider`;
 - добавить `LocalHfOnnxEmbeddingProvider`;
-- реализовать bootstrap/download manager;
-- сделать загрузку модели из project-local cache.
+- поддержать query/passage prefixing per model;
+- обеспечить строго локальную загрузку модели по local path.
 
 Результат фазы:
 
 - runtime умеет реально строить dense embeddings локально;
 - hash provider остается как совместимый режим.
 
-### Phase 3: Index Versioning and Reindex
+### Phase 4 / Epic 4: Index Versioning and Reindex
 
 Цель фазы:
 
@@ -359,20 +424,20 @@ Vector index должен версионироваться как минимум
 - смена модели становится контролируемой операцией;
 - dense rollout не ломает существующие проекты.
 
-### Phase 4: Query/Retrieve Cutover
+### Phase 5 / Epic 5: Query/Retrieve Cutover
 
 Цель фазы:
 
-- привязать retrieval semantic lane к project config;
-- включать dense semantic search только когда provider действительно готов;
-- улучшить observability по активному provider.
+- довести user-facing retrieval paths до прозрачного отображения активного provider;
+- отдавать structured provider/bootstrap diagnostics в query/retrieve flows;
+- улучшить observability по активному provider в read paths и retrieval runs.
 
 Результат фазы:
 
-- `memory search` и `memory retrieve` прозрачно работают с project-selected provider;
-- пользователь может увидеть, что реально используется.
+- `memory search` и `memory retrieve` уже работают с project-selected provider и дополнительно явно показывают, что реально используется;
+- ошибки provider loading и bootstrap больше не выглядят как неявная деградация semantic lane.
 
-### Phase 5: Migration, Docs, Offline and Hardening
+### Phase 6 / Epic 6: Migration, Docs, Offline and Hardening
 
 Цель фазы:
 
@@ -387,6 +452,10 @@ Vector index должен версионироваться как минимум
 ## 6. Epic Roadmap
 
 ### Epic 0 — Architecture Baseline and ADR Lock
+
+**Status**
+
+Завершен как документарный baseline и ADR-слой. Его результат уже включен в текущую редакцию roadmap.
 
 **Objective**
 
@@ -412,7 +481,17 @@ Vector index должен версионироваться как минимум
 
 - не остается открытых решений по config shape, bootstrap policy и index layout.
 
+**Implementation notes**
+
+- `Epic 0` ограничен документом и контрактами; изменение runtime-кода не требуется;
+- документ должен однозначно отделять текущий baseline от будущего состояния;
+- implementer следующих эпиков не должен самостоятельно выбирать config shape, policy bootstrap или layout индекса.
+
 ### Epic 1 — Config Contract and Init Integration
+
+**Status**
+
+В основном реализован и уже считается частью текущего baseline репозитория.
 
 **Objective**
 
@@ -441,6 +520,10 @@ Vector index должен версионироваться как минимум
 
 ### Epic 2 — Provider Registry and Bootstrap Manager
 
+**Status**
+
+В основном реализован и уже считается частью текущего baseline репозитория.
+
 **Objective**
 
 Ввести canonical registry поддерживаемых embedding models и lifecycle загрузки.
@@ -467,6 +550,10 @@ Vector index должен версионироваться как минимум
 
 ### Epic 3 — Dense Local Provider Runtime
 
+**Status**
+
+В основном реализован и уже считается частью текущего baseline репозитория.
+
 **Objective**
 
 Добавить локальный dense provider и сохранить hash compatibility.
@@ -491,6 +578,10 @@ Vector index должен версионироваться как минимум
 - search path больше не зависит от hash vectors в dense mode.
 
 ### Epic 4 — Versioned Index Layout and Reindex
+
+**Status**
+
+Реализован и уже считается частью текущего baseline репозитория.
 
 **Objective**
 
@@ -518,14 +609,18 @@ Vector index должен версионироваться как минимум
 
 ### Epic 5 — Query/Retrieve Integration and Observability
 
+**Status**
+
+Частично реализован: semantic lane уже использует configured provider как runtime path, но user-facing provider observability и structured error surfacing еще не доведены до конца.
+
 **Objective**
 
 Сделать provider selection видимым и диагностируемым в реальном retrieval flow.
 
 **Implementation scope**
 
-- semantic lane использует provider из config, а не default hash implicitly;
-- observability показывает active provider/model;
+- добить user-facing payload и текстовый вывод, чтобы semantic lane явно показывал provider из config;
+- observability показывает active provider/model и bootstrap readiness прямо в retrieval/read paths;
 - retrieval runs логируют provider metadata;
 - ошибки bootstrap/provider loading имеют structured payload.
 
@@ -542,6 +637,10 @@ Vector index должен версионироваться как минимум
 - semantic recall не маскирует отсутствие модели.
 
 ### Epic 6 — Migration and Operational Hardening
+
+**Status**
+
+Пока не реализован как отдельный эпик; остаётся следующим этапом после завершения остатка `Epic 5`.
 
 **Objective**
 
@@ -577,6 +676,8 @@ Vector index должен версионироваться как минимум
 - bootstrap weights отделен от bootstrap CLI;
 - vector index versioned layout обязателен;
 - retrieval остается hybrid.
+- отсутствие `memory.embeddings` в старом конфиге трактуется как compatibility-mode `hash`;
+- текущий unversioned каталог `.madspec/system/memory/lancedb/` считается baseline до `Epic 4`, а не целевым контрактом.
 
 ### Rejected alternatives
 
@@ -593,8 +694,21 @@ Vector index должен версионироваться как минимум
 - dense model не может активироваться частично или неявно;
 - несовместимый индекс не должен использоваться повторно;
 - semantic lane не должен отправлять project content во внешний embedding API.
+- `Epic 0` не меняет публичные CLI docs, skill docs и закрепленные runtime tests;
+- после реализации `Epic 1–3` project-level config, init UX, registry, bootstrap и dense local runtime считаются закрепленным baseline, а не будущим направлением.
 
-## 8. Proposed Config Contract
+### Матрица влияния на репозиторий для следующих эпиков
+
+| Epic | Основные подсистемы | Что меняется |
+| --- | --- | --- |
+| `Epic 1` | `src/madspec_cli/shared/infra/project_config.py`, `src/madspec_cli/features/init/cli.py`, `src/madspec_cli/features/init/application/contracts.py`, `src/madspec_cli/features/init/infrastructure/initializer_core.py` | config contract, нормализация и UX выбора provider/model |
+| `Epic 2` | `src/madspec_cli/memory/shared/system_store/embedding_registry.py`, `src/madspec_cli/memory/shared/system_store/model_bootstrap.py`, `src/madspec_cli/memory/shared/system_store/provider_factory.py` | registry моделей и lifecycle bootstrap |
+| `Epic 3` | `src/madspec_cli/memory/shared/system_store/vector.py`, `src/madspec_cli/memory/shared/system_store/provider_factory.py`, при необходимости `src/madspec_cli/memory/shared/system_store/text.py` | dense runtime provider и локальный inference |
+| `Epic 4` | `src/madspec_cli/memory/shared/system_store/layout.py`, `src/madspec_cli/memory/shared/system_store/vector.py`, `src/madspec_cli/memory/shared/system_store/jobs.py`, `src/madspec_cli/memory/shared/system_store/store.py`, `src/madspec_cli/memory/shared/system_store/constants.py` | versioned layout индекса, reindex и detection несовместимости |
+| `Epic 5` | `src/madspec_cli/memory/shared/system_store/retrieval.py`, `src/madspec_cli/memory/application/memory_query.py`, `src/madspec_cli/memory/application/retrieve_context.py`, `src/madspec_cli/memory/application/observability.py`, `src/madspec_cli/memory/cli/query.py` | cutover semantic lane и observability |
+| `Дальнейшие обновления документации и тестов` | `docs/cli/init.md`, `docs/cli/memory.md`, `tests/test_cli_init.py`, `tests/test_cli_memory_query.py`, `tests/test_cli_memory_diagnostics.py` | меняются только вместе с runtime-эпиком, который реально меняет зафиксированный baseline |
+
+## 8. Canonical Config Contract After Epic 1
 
 ### Minimal normalized config
 
@@ -605,7 +719,7 @@ Vector index должен версионироваться как минимум
   "agentsSchemaVersion": 1,
   "parallelRuntime": {
     "phase1Enabled": true,
-    "phase2Enabled": false
+    "phase2Enabled": true
   },
   "agentEnvironment": "cursor-agent",
   "memory": {
@@ -635,6 +749,7 @@ Vector index должен версионироваться как минимум
 ### Normalization rules
 
 - если `memory` отсутствует, создается compatibility payload с `provider = "hash"`;
+- если `memory.embeddings` отсутствует целиком, создается compatibility payload с `provider = "hash"` и `model = null`;
 - если `provider = "hash"`, `model` принудительно нормализуется в `null`;
 - если `provider = "local-hf-onnx"`, `model` обязателен;
 - если `cacheDir` не задан, используется project-local default;
@@ -642,12 +757,15 @@ Vector index должен версионироваться как минимум
   - `hash` → `none`
   - `local-hf-onnx` → `on-init`
 - если пользователь в `init` выбирает «Download on first use», в конфиг записывается `downloadPolicy: "on-first-use"` (перекрывает default `on-init` для dense).
+- если задан неизвестный `provider`, конфиг считается невалидным;
+- если задан неизвестный `downloadPolicy`, конфиг считается невалидным;
+- не допускается silent fallback с `local-hf-onnx` на `hash` ни при чтении конфига, ни при runtime-загрузке модели.
 
-## 9. Proposed Init UX
+## 9. Canonical Init UX After Epic 1
 
 ### Interactive flow
 
-После выбора AI-среды `madspec init` должен добавить новый шаг:
+После выбора AI-среды `madspec init` уже добавляет новый шаг:
 
 `Choose memory embeddings`
 
@@ -666,10 +784,10 @@ Vector index должен версионироваться как минимум
 
 ### UX requirements
 
-- размер загрузки должен быть показан до подтверждения;
-- статус рекомендации (`recommended` / `advanced`) должен быть показан явно;
+- размер загрузки показывается до подтверждения;
+- статус рекомендации (`recommended` / `advanced`) показывается явно;
 - если download падает, init не должен молча завершаться как будто dense mode готов;
-- пользователь должен увидеть, где именно лежит cache модели.
+- пользователь должен видеть, где именно лежит cache модели.
 
 ## 10. Migration Strategy for Existing Projects
 
@@ -760,16 +878,13 @@ Dense mode считается включенным только если одн�
 
 ## 13. Recommended Rollout Order
 
-1. architecture baseline and contract lock;
-2. config schema and normalization;
-3. init UX integration;
-4. model registry;
-5. local bootstrap manager;
-6. dense provider runtime;
-7. versioned index layout;
-8. reindex and diagnostics;
-9. query/retrieve integration;
-10. migration docs and offline hardening.
+1. `Epic 0` — architecture baseline and contract lock;
+2. `Epic 1` — config schema, normalization and init UX integration;
+3. `Epic 2` — model registry and bootstrap manager;
+4. `Epic 3` — dense local provider runtime;
+5. `Epic 4` — versioned index layout, reindex and diagnostics;
+6. `Epic 5` — query/retrieve integration and provider observability;
+7. `Epic 6` — migration docs, offline bootstrap and operational hardening.
 
 ## 14. Final Recommendation
 
@@ -785,5 +900,7 @@ Dense mode считается включенным только если одн�
 - mandatory `reindex` after provider/model switch;
 - no silent fallback;
 - hybrid retrieval preserved.
+
+При этом layout/reindex docs и связанные тесты уже обновлены вместе с `Epic 4`, а оставшаяся часть provider observability и structured retrieval diagnostics в user-facing read paths относится к остатку `Epic 5`.
 
 Это дает MADSpec реалистичный и безопасный путь к настоящему локальному semantic search без внешнего embedding provider, без ломки текущего UX установки и без разрушения существующей memory architecture.

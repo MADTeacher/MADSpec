@@ -120,7 +120,7 @@ def test_parallel_memory_docs_describe_current_runtime_truth(repo_root) -> None:
     assert "все mutating runtime-команды теперь сначала коммитят изменения в `SQLite`" in memory_docs
     assert "branch `memory/*.json`, `memory/*.jsonl` и generated markdown остаются rebuildable projections" in memory_docs
     assert "`parallelRuntime.phase2Enabled`" in memory_docs
-    assert "opt-in" in memory_docs
+    assert "включен по умолчанию" in memory_docs
     assert "`--session-key`" in memory_docs
     assert "`--expected-revision`" in memory_docs
     assert "`runtime_revision`" in memory_docs
@@ -143,10 +143,8 @@ def test_parallel_memory_docs_describe_current_runtime_truth(repo_root) -> None:
     assert "`scope_busy`" in agents_docs
     assert "`madspec memory explain --session-key`" in agents_docs
     assert "`parallelRuntime.phase2Enabled`" in readme
-    assert "opt-in" in readme
+    assert "включен по умолчанию" in readme
     assert "`parallelRuntime.phase2Enabled`" in operator_skill
-    assert "opt-in" in operator_skill
-    assert "Phase 2 уже существует в кодовой базе, но пока работает только как opt-in режим." in cutover
-    assert "phase2Enabled" in cutover
-    assert "набор проверок для двух режимов" in cutover
-    assert "stop/go" in cutover
+    assert "включен по умолчанию" in operator_skill
+    assert "архив" in cutover.lower()
+    assert "выполн" in cutover.lower()

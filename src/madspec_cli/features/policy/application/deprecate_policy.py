@@ -6,7 +6,8 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import append_policy_proposal, now_iso
+from ..infrastructure.normalization import now_iso
+from ..infrastructure.service import append_policy_proposal
 from .apply_policy import ApplyPolicyRequest, execute as apply_policy
 from .shared import build_diff, find_policy
 

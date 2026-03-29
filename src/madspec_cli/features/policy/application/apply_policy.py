@@ -6,13 +6,9 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import (
-    append_policy_history,
-    append_policy_proposal,
-    load_policy_state,
-    now_iso,
-    save_policy_state,
-)
+from ..infrastructure.normalization import now_iso
+from ..infrastructure.repository import load_policy_state
+from ..infrastructure.service import append_policy_history, append_policy_proposal, save_policy_state
 from .shared import find_policy, find_proposal
 
 

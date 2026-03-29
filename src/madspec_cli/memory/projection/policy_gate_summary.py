@@ -23,11 +23,11 @@ def _lazy_gate_imports() -> tuple:
 
 def _lazy_policy_imports() -> tuple:
     from madspec_cli.features.policy.application.common import evaluate_branch_policies
-    from madspec_cli.features.policy.infrastructure.storage import (
+    from madspec_cli.features.policy.infrastructure.queries import (
         build_policy_context,
-        load_policy_state,
         policy_summary,
     )
+    from madspec_cli.features.policy.infrastructure.repository import load_policy_state
     return evaluate_branch_policies, build_policy_context, load_policy_state, policy_summary
 
 

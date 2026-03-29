@@ -89,6 +89,29 @@ def test_agents_propose_and_apply_profile_renders_native_subagents(tmp_path, mon
     assert not (project_path / ".opencode" / "agents" / "madspec-architecture.md").exists()
 
 
+def test_agents_apply_profile_reports_structured_error_for_missing_proposal(
+    tmp_path,
+    monkeypatch,
+    invoke_cli,
+    init_memory_branch,
+) -> None:
+    project_path = tmp_path / "demo"
+    project_path.mkdir()
+    monkeypatch.chdir(project_path)
+    from tests.support import write_madspec_config
+
+    write_madspec_config(project_path, branch="main", agent_environment="opencode")
+    init_memory_branch(branch="main", project_path=project_path)
+
+    result = invoke_cli(
+        ["agents", "apply-profile", "--proposal-id", "missing-proposal", "--json-output"]
+    )
+
+    assert result.exit_code == 1, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["error"] == "proposal 'missing-proposal' was not found"
+
+
 def test_agents_enable_disable_updates_rendered_files(tmp_path, monkeypatch, invoke_cli, init_memory_branch) -> None:
     project_path = tmp_path / "demo"
     project_path.mkdir()
@@ -195,7 +218,7 @@ def test_subagent_context_accepts_session_key(tmp_path, monkeypatch, invoke_cli,
     assert payload["memory"]["session_key"] == "planner"
 
 
-def test_subagent_context_skips_phase2_coordination_when_opt_in_is_disabled(
+def test_subagent_context_skips_phase2_coordination_when_explicitly_disabled(
     tmp_path,
     monkeypatch,
     invoke_cli,
@@ -206,7 +229,7 @@ def test_subagent_context_skips_phase2_coordination_when_opt_in_is_disabled(
     monkeypatch.chdir(project_path)
     from tests.support import write_madspec_config
 
-    write_madspec_config(project_path, branch="main", agent_environment="copilot")
+    write_madspec_config(project_path, branch="main", agent_environment="copilot", phase2_enabled=False)
     init_memory_branch(branch="main", project_path=project_path)
 
     result = invoke_cli(

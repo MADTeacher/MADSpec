@@ -5,7 +5,7 @@ from pathlib import Path
 
 from madspec_cli.shared.kernel.result import PayloadResult
 
-from ..infrastructure.storage import append_agent_proposal
+from ..infrastructure.catalog_store import append_agent_proposal
 from .common import build_proposal
 
 

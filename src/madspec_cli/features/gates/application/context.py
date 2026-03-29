@@ -60,5 +60,9 @@ def resolve_step_id(
         session_payload=session_payload,
         stage=stage if stage in IMPLEMENTATION_STAGES else "",
         explicit_step_id=explicit_step_id,
-        require_ready=operation == "start-step" and stage in IMPLEMENTATION_STAGES,
+        require_ready=(
+            operation == "start-step"
+            and stage in IMPLEMENTATION_STAGES
+            and explicit_step_id is None
+        ),
     )

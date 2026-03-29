@@ -9,7 +9,8 @@ from madspec_cli.shared.kernel.result import PayloadResult
 if TYPE_CHECKING:
     from madspec_cli.shared.kernel.ports import GateEvaluator, GateFailureExtractor
 
-from ..shared.storage import ensure_memory_layout, get_memory_paths
+from ..shared.storage import ensure_memory_layout
+from .branch_state import refresh_branch_state
 from .proposal_guard import guard_direct_runtime_write
 from ..workflow.planning import register_planned_step
 
@@ -92,7 +93,6 @@ def execute(
                 "gate_summary": gate_payload,
             }
         )
-    paths = get_memory_paths(request.project_path, request.branch_name)
     payload = register_planned_step(
         request.project_path,
         request.branch_name,
@@ -111,4 +111,10 @@ def execute(
         size=request.size,
         complexity=request.complexity,
     )
+    if payload.get("accepted", True):
+        refresh_branch_state(
+            request.project_path,
+            request.branch_name,
+            stage=request.stage,
+        )
     return RegisterStepResult(payload=payload)
