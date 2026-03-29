@@ -67,10 +67,10 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             if name.endswith("madspec.policy.md") or name.endswith("madspec.policy.agent.md")
         )
         policy_body = zf.read(policy_command).decode("utf-8")
-        assert "policy-engine" in policy_body
+        assert "madspec-policy-engine" in policy_body
         assert "madspec policy propose" in policy_body
         assert "madspec policy apply" in policy_body
-        assert any(name.endswith("policy-engine/SKILL.md") for name in names)
+        assert any(name.endswith("madspec-policy-engine/SKILL.md") for name in names)
 
         change_command = next(
             name
@@ -78,11 +78,11 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             if name.endswith("madspec.change.md") or name.endswith("madspec.change.agent.md")
         )
         change_body = zf.read(change_command).decode("utf-8")
-        assert "change-engine" in change_body
+        assert "madspec-change-engine" in change_body
         assert "madspec change preview" in change_body
         assert "madspec change apply" in change_body
         assert "madspec change verify" in change_body
-        assert any(name.endswith("change-engine/SKILL.md") for name in names)
+        assert any(name.endswith("madspec-change-engine/SKILL.md") for name in names)
 
         gate_command = next(
             name
@@ -90,10 +90,10 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             if name.endswith("madspec.gate.md") or name.endswith("madspec.gate.agent.md")
         )
         gate_body = zf.read(gate_command).decode("utf-8")
-        assert "gate-orchestrator" in gate_body
+        assert "madspec-gate-orchestrator" in gate_body
         assert "madspec gate status" in gate_body
         assert "madspec gate apply-waiver" in gate_body
-        assert any(name.endswith("gate-orchestrator/SKILL.md") for name in names)
+        assert any(name.endswith("madspec-gate-orchestrator/SKILL.md") for name in names)
 
         memory_command = next(
             name
@@ -101,10 +101,10 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             if name.endswith("madspec.memory.md") or name.endswith("madspec.memory.agent.md")
         )
         memory_body = zf.read(memory_command).decode("utf-8")
-        assert "memory-explain" in memory_body
+        assert "madspec-memory-explain" in memory_body
         assert "madspec memory doctor" in memory_body
         assert "madspec memory explain" in memory_body
-        assert any(name.endswith("memory-explain/SKILL.md") for name in names)
+        assert any(name.endswith("madspec-memory-explain/SKILL.md") for name in names)
 
         merge_command = next(
             name
@@ -112,10 +112,10 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             if name.endswith("madspec.merge.md") or name.endswith("madspec.merge.agent.md")
         )
         merge_body = zf.read(merge_command).decode("utf-8")
-        assert "merge-assistant" in merge_body
+        assert "madspec-merge-assistant" in merge_body
         assert "madspec memory compare-branches" in merge_body
         assert "madspec memory merge-branches" in merge_body
-        assert any(name.endswith("merge-assistant/SKILL.md") for name in names)
+        assert any(name.endswith("madspec-merge-assistant/SKILL.md") for name in names)
 
         agents_command = next(
             name
@@ -123,13 +123,13 @@ def test_release_packaging_includes_memory_assets(repo_root) -> None:
             if name.endswith("madspec.agents.md") or name.endswith("madspec.agents.agent.md")
         )
         agents_body = zf.read(agents_command).decode("utf-8")
-        assert "subagent-role-advisor" in agents_body
+        assert "madspec-subagent-role-advisor" in agents_body
         assert "madspec agents profile" in agents_body
         assert "madspec agents subagents create" in agents_body
         assert "madspec agents subagents update" in agents_body
         assert "madspec agents subagents remove" in agents_body
         assert "madspec agents subagents context" in agents_body
-        assert any(name.endswith("subagent-role-advisor/SKILL.md") for name in names)
+        assert any(name.endswith("madspec-subagent-role-advisor/SKILL.md") for name in names)
 
         for stage_name in (
             "madspec.mvp.concept",

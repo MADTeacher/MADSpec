@@ -1,9 +1,9 @@
 ---
-name: subagent-role-advisor
+name: madspec-subagent-role-advisor
 description: Навык выбора, объяснения и безопасного применения субагентных ролей поверх канонического `madspec agents ...` механизма.
 ---
 
-# `subagent-role-advisor`
+# `madspec-subagent-role-advisor`
 
 ## Когда использовать
 

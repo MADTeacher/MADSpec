@@ -11,7 +11,7 @@ $ARGUMENTS
 ## Обязательные навыки
 
 - Перед началом работы обязательно найди и прочитай навык `madspec-cli-operator`.
-- Затем найди и прочитай навык `subagent-role-advisor`.
+- Затем найди и прочитай навык `madspec-subagent-role-advisor`.
 
 ## Назначение
 

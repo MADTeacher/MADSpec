@@ -11,7 +11,7 @@ $ARGUMENTS
 ## Обязательные навыки
 
 - Перед началом работы обязательно найди и прочитай `madspec-cli-operator`.
-- Затем найди и прочитай `gate-orchestrator`.
+- Затем найди и прочитай `madspec-gate-orchestrator`.
 
 ## Язык и стиль
 

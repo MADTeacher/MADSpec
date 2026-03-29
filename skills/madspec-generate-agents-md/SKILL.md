@@ -1,5 +1,5 @@
 ---
-name: generate-agents-md
+name: madspec-generate-agents-md
 description: Генерирует для репозитория файл AGENTS.md (инструкции для coding-агентов) по лучшим практикам: коротко, детерминированно, с Persona/Architecture/Operations/Code Style/Boundaries & Security. Использовать, когда пользователь просит создать/обновить AGENTS.md, agent instructions, copilot instructions, cursor rules, CLAUDE.md.
 ---
 

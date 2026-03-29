@@ -1,9 +1,9 @@
 ---
-name: merge-assistant
+name: madspec-merge-assistant
 description: Операционный навык для межветочного сравнения, подготовки предложений на слияние, разрешения конфликтов и продвижения знаний на уровень проекта через `madspec memory ...`.
 ---
 
-# `merge-assistant`
+# `madspec-merge-assistant`
 
 ## Когда использовать
 

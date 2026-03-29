@@ -1,9 +1,9 @@
 ---
-name: policy-engine
+name: madspec-policy-engine
 description: Операционный навык для жизненного цикла проектных правил в MADSpec. Использовать, когда нужно показать, предложить, применить, объяснить или проверить проектные правила через `madspec policy ...`.
 ---
 
-# `policy-engine`
+# `madspec-policy-engine`
 
 ## Когда использовать
 

@@ -1,9 +1,9 @@
 ---
-name: gate-orchestrator
+name: madspec-gate-orchestrator
 description: Операционный навык для слоя контрольных проверок в MADSpec. Использовать, когда нужно показать статус через `madspec gate status`, объяснить блокировку перехода, выполнить аудируемую проверку или управлять предложениями на исключения через `madspec gate ...`.
 ---
 
-# `gate-orchestrator`
+# `madspec-gate-orchestrator`
 
 ## Когда использовать
 
